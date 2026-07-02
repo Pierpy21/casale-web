@@ -13,129 +13,109 @@ export interface RoomData {
 }
 export const ROOMS: RoomData[] = [
   {
-    id: "sala-grande",
-    name: "Sala Grande",
-    type: "large",
-    capacity: "Fino a 80 ospiti",
-    atmosphere:
-      "Il salone principale della tenuta, caratterizzato da soffitti in pietra a volta e alte finestre che si affacciano sull'uliveto. La luce attraversa la stanza in modo unico a ogni ora del giorno.",
-    events:
-      "Ideale per ricevimenti di nozze, gala aziendali e grandi celebrazioni. Infrastruttura audio-visiva completa a disposizione.",
+    id: "sala-1",
+    name: "Sala 1",
+    type: "small",
+    capacity: "Fino a 40 ospiti",
+    atmosphere: "Immersa nelle note di blu e azzurro, ricorda il paesaggio marittimo...",
+    events: "Pranzi di lavoro, piccoli ritrovi familiari, degustazioni private e cene di anniversario.",
     images: [
-      {
-        src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala Grande — sala da pranzo con finestre ad arco",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1778591103012-eb50e49f8ec2?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala Grande — lampadari e pianoforte a coda",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1776848517525-ccc3a43bfcfb?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala Grande — tavolo apparecchiato con calici da vino",
-      },
+      { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Sala Grande — sala da pranzo con finestre ad arco" },
+      { src: "https://images.unsplash.com/photo-1778591103012-eb50e49f8ec2?w=720&h=480&fit=crop&auto=format", alt: "Sala Grande — lampadari e pianoforte a coda" },
+      { src: "https://images.unsplash.com/photo-1776848517525-ccc3a43bfcfb?w=720&h=480&fit=crop&auto=format", alt: "Sala Grande — tavolo apparecchiato con calici da vino" },
     ],
-    svgRect: { x: 24, y: 24, w: 290, h: 220 },
+    // Perfettamente sotto Sala 1 e Sala 2 (stessa larghezza combinata: 100 + 100 = 200)
+    svgRect: { x: 53, y: 143, w: 89, h: 153 },
   },
   {
     id: "palmento",
     name: "Palmento",
     type: "large",
     capacity: "Fino a 120 ospiti",
-    atmosphere:
-      "L'antico palmento è la storica cantina nel cuore della tenuta, oggi restaurata e riportata al suo antico splendore. Le vasche di pigiatura originali in pietra e i mattoni a vista creano un'atmosfera senza eguali.",
-    events:
-      "Cene private, percorsi di degustazione con abbinamento vini ed eventi musicali intimi. Uno spazio dal carattere straordinario.",
+    atmosphere: "L'antico palmento è la storica cantina nel cuore della tenuta...",
+    events: "Cene private, percorsi di degustazione con abbinamento vini ed eventi musicali intimi...",
     images: [
-      {
-        src: "https://images.unsplash.com/photo-1745818016691-14c4020a73ed?w=720&h=480&fit=crop&auto=format",
-        alt: "Palmento — storica cantina con pareti in pietra",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1766832255363-c9f060ade8b0?w=720&h=480&fit=crop&auto=format",
-        alt: "Palmento — tavoli elegantemente apparecchiati",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1694021408920-922ff450c525?w=720&h=480&fit=crop&auto=format",
-        alt: "Palmento — servizio del vino",
-      },
+      { src: "https://images.unsplash.com/photo-1745818016691-14c4020a73ed?w=720&h=480&fit=crop&auto=format", alt: "Palmento — storica cantina con pareti in pietra" },
+      { src: "https://images.unsplash.com/photo-1766832255363-c9f060ade8b0?w=720&h=480&fit=crop&auto=format", alt: "Palmento — tavoli elegantemente apparecchiati" },
+      { src: "https://images.unsplash.com/photo-1694021408920-922ff450c525?w=720&h=480&fit=crop&auto=format", alt: "Palmento — servizio del vino" },
     ],
-    svgRect: { x: 334, y: 24, w: 430, h: 220 },
+    // Il grande blocco in alto a destra
+    svgRect: { x: 535, y: 175, w: 168, h: 121 },
   },
   {
-    id: "sala-1",
-    name: "Sala 1",
-    type: "small",
-    capacity: "Fino a 18 ospiti",
-    atmosphere:
-      "Un ambiente caldo e intimo dotato di camino e pavimenti originali in cotto. L'angolo più riservato della casa, perfetto per lunghe conversazioni.",
-    events:
-      "Pranzi di lavoro, piccoli ritrovi familiari, degustazioni private e cene di anniversario.",
+    id: "sala-grande",
+    name: "Sala Grande",
+    type: "large",
+    capacity: "Fino a 80 ospiti",
+    atmosphere: "Il salone principale della tenuta, caratterizzato da soffitti in pietra a volta...",
+    events: "Ideale per ricevimenti di nozze, gala aziendali e grandi celebrazioni...",
     images: [
-      {
-        src: "https://images.unsplash.com/photo-1776848517525-ccc3a43bfcfb?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala 1 — mise en place intima",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1663530761401-15eefb544889?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala 1 — servizio dello chef",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1676471926534-d5c9771909fa?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala 1 — piatto impiattato",
-      },
+      { src: "https://images.unsplash.com/photo-1776848517525-ccc3a43bfcfb?w=720&h=480&fit=crop&auto=format", alt: "Sala 1 — mise en place intima" },
+      { src: "https://images.unsplash.com/photo-1663530761401-15eefb544889?w=720&h=480&fit=crop&auto=format", alt: "Sala 1 — servizio dello chef" },
+      { src: "https://images.unsplash.com/photo-1676471926534-d5c9771909fa?w=720&h=480&fit=crop&auto=format", alt: "Sala 1 — piatto impiattato" },
     ],
-    svgRect: { x: 24, y: 264, w: 186, h: 180 },
+    // Blocco in alto a sinistra
+    svgRect: { x: 422, y: 118, w: 112, h: 178 },
   },
   {
     id: "sala-2",
     name: "Sala 2",
     type: "small",
-    capacity: "Fino a 22 ospiti",
-    atmosphere:
-      "Si affaccia sulla corte interna attraverso grandi porte a vetri. La luce naturale inonda la stanza per tutta la mattina, lasciando spazio alla luce dei candelabri la sera.",
-    events:
-      "Aperitivi e cocktail di benvenuto, pranzi leggeri, lanci di prodotto e celebrazioni private.",
+    capacity: "Fino a 20 ospiti",
+    atmosphere: "Sulle note di un verde chiaro, dà la possibilità anche ad una piccola tavolata...",
+    events: "Piccole tavolate familiari, cene intime e degustazioni private...",
     images: [
-      {
-        src: "https://images.unsplash.com/photo-1778591103012-eb50e49f8ec2?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala 2 — stanza elegante con luce naturale",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1766832255363-c9f060ade8b0?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala 2 — allestimento tavoli",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1643879397174-4f10ac503566?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala 2 — servizio cena serale",
-      },
+      { src: "https://images.unsplash.com/photo-1778591103012-eb50e49f8ec2?w=720&h=480&fit=crop&auto=format", alt: "Sala 2 — stanza elegante con luce naturale" },
+      { src: "https://images.unsplash.com/photo-1766832255363-c9f060ade8b0?w=720&h=480&fit=crop&auto=format", alt: "Sala 2 — allestimento tavoli" },
+      { src: "https://images.unsplash.com/photo-1643879397174-4f10ac503566?w=720&h=480&fit=crop&auto=format", alt: "Sala 2 — servizio cena serale" },
     ],
-    svgRect: { x: 230, y: 264, w: 186, h: 180 },
+    // A destra di Sala 1
+    svgRect: { x: 142, y: 143, w: 86, h: 91 },
   },
   {
     id: "sala-3",
     name: "Sala 3",
     type: "small",
     capacity: "Fino a 35 ospiti",
-    atmosphere:
-      "La più versatile tra le stanze più raccolte. Layout flessibile, ingresso indipendente e accesso diretto alla terrazza del giardino.",
-    events:
-      "Cene servite, ricevimenti a buffet, pranzi di team e shooting fotografici.",
+    atmosphere: "La prima sala a partire da sinistra, sulle note del verde chiaro...",
+    events: "Pranzi di lavoro, piccoli ritrovi familiari, degustazioni private e cene di anniversario.",
     images: [
-      {
-        src: "https://images.unsplash.com/photo-1745818016691-14c4020a73ed?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala 3 — spazio eventi versatile",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala 3 — porta ad arco",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1694021408920-922ff450c525?w=720&h=480&fit=crop&auto=format",
-        alt: "Sala 3 — servizio del vino",
-      },
+      { src: "https://images.unsplash.com/photo-1745818016691-14c4020a73ed?w=720&h=480&fit=crop&auto=format", alt: "Sala 3 — spazio eventi versatile" },
+      { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Sala 3 — porta ad arco" },
+      { src: "https://images.unsplash.com/photo-1694021408920-922ff450c525?w=720&h=480&fit=crop&auto=format", alt: "Sala 3 — servizio del vino" },
     ],
-    svgRect: { x: 436, y: 264, w: 328, h: 180 },
+    // Il quadrato centrale, con il corridoio alle spalle
+    svgRect: { x: 254, y: 210, w: 111, h: 86 },
+  },
+  {
+    id: "terrazza",
+    name: "Terrazza",
+    type: "large",
+    capacity: "Fino a 300 ospiti",
+    atmosphere: "Ampio spazio esterno e coperto che costeggia il nucleo centrale della struttura...",
+    events: "Grandi buffet, aperitivi di benvenuto e configurazioni di eventi open-air...",
+    images: [
+      { src: "https://images.unsplash.com/photo-1745818016691-14c4020a73ed?w=720&h=480&fit=crop&auto=format", alt: "Terrazza — veduta panoramica ed esterni" },
+      { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Terrazza — porta ad arco" },
+      { src: "https://images.unsplash.com/photo-1694021408920-922ff450c525?w=720&h=480&fit=crop&auto=format", alt: "Terrazza — servizio del vino" },
+    ],
+    // Ampia zona inferiore destra (sprovvista di tratteggi)
+    svgRect: { x: 255, y: 296, w: 448, h: 175 },
+  },
+  {
+    id: "pozzo",
+    name: "Pozzo",
+    type: "small",
+    capacity: "Fino a 60 ospiti",
+    atmosphere: "Lo storico nucleo verticale della tenuta, comunicante col corridoio di Sala 3...",
+    events: "Degustazioni esclusive, eventi storici e momenti fotografici dal fascino rurale.",
+    images: [
+      { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Zona Pozzo — dettagli architettonici in pietra" },
+      { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Zona Pozzo — dettagli architettonici in pietra" },
+      { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Zona Pozzo — dettagli architettonici in pietra" },
+    ],
+    // La stanza stretta e alta raggiungibile dal corridoio
+    svgRect: { x: 81, y: 296, w: 174, h: 84 },
   },
 ];
 
