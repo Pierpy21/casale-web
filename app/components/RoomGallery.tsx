@@ -48,8 +48,8 @@ export const ROOMS: RoomData[] = [
     atmosphere: "Il salone principale della tenuta, caratterizzato da soffitti in pietra a volta...",
     events: "Ideale per ricevimenti di nozze, gala aziendali e grandi celebrazioni...",
     images: [
-      { src: "https://images.unsplash.com/photo-1776848517525-ccc3a43bfcfb?w=720&h=480&fit=crop&auto=format", alt: "Sala 1 — mise en place intima" },
-      { src: "https://images.unsplash.com/photo-1663530761401-15eefb544889?w=720&h=480&fit=crop&auto=format", alt: "Sala 1 — servizio dello chef" },
+      { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAHUxguBGMlxH8hIUAl5NNuu34X3iHVou6oA_CwgXOoi6VlT2Ps1zR3FjLuev8EVwN8mEDP1LVh-cfwkKQKUSpq4qENSLP84iRNIza5HGStIWgykVDj_Jt8XZ0f2d9TupxMN84CLvA=s1360-w1360-h1020-rw", alt: "Sala 1 — mise en place intima" },
+      { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAHnGJS_6DRDtbyykZiJHjgtg4yoKBlfIpHSIsLpB3RsMOE48hQzdeNf9XfnDEaYRjsQYWb-_2tdNRHh0p-JYXskA6gW-NxJ6fsNVYJ8ZWW_euGL3PFMktPcpRzc-UWCjgV7hF8LSg=s1360-w1360-h1020-rw", alt: "Sala 1 — servizio dello chef" },
       { src: "https://images.unsplash.com/photo-1676471926534-d5c9771909fa?w=720&h=480&fit=crop&auto=format", alt: "Sala 1 — piatto impiattato" },
     ],
     svgRect: { x: 422, y: 118, w: 112, h: 178 },
@@ -92,7 +92,7 @@ export const ROOMS: RoomData[] = [
     images: [
       { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEN_aiZKUoBBKFBscXrLBSVBcXNio95XLNbz7D3HbK04UNcKJOdalSxS-XxSZU4J05BRjKjUDpJVYtHBGdAt-U9zYZx4Wh-bjVil6BMs5g1gjZhr7kl-52Pc1uEgGBEVa1Xz7i4iw=s1360-w1360-h1020-rw", alt: "Terrazza — veduta panoramica ed esterni" },
       { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEdhrJtqZs3b2Z0oJdmpRuEe9pTUbRonX45-GFRvUL3HtyKV0r8XOKNx1zy4putCci91uBFk2QfRW6q2LL31zjGAM0JgnzUIX16QFDnmtEeIQVTJrshLla_S3rjeFax5dXkn1Y=s1360-w1360-h1020-rw", alt: "Terrazza — porta ad arco" },
-      { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAFZ_W_zTqiRF0p8WmYQsFHVS6WFLqnp0sLHc8t4YNhP8EV14-zigBKQQU3pnAGznPqxpat-WnNinCUDYCI_ReIF_zRzhSH0f8ix1_WmIbHDeyZDfhewT1Igjd8B7N4EjoiIIsq5Ng=s1360-w1360-h1020-rw", alt: "Terrazza — servizio del vino" },
+      { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEq_7vEIKrc4ieZMKIcivFDaZLImyXgHW56c7n-4z45PBCAZPVC2L2WuYp4J7aozR7NjTOvNOVN-Lqkc4OH-GbCw-7veLvKOx_2_Dkzl1UhJZ-ce9EoB-0rZp-QGW92plitKt38=s1360-w1360-h1020-rw", alt: "Terrazza — servizio del vino" },
     ],
     svgRect: { x: 255, y: 296, w: 448, h: 175 },
   },
@@ -104,8 +104,8 @@ export const ROOMS: RoomData[] = [
     atmosphere: "Il Punto più alto del Casale con vista sulla Terrazza, crea un clima intimo e familiare, tra le mura del Casale da una parte e la campagna dall’altra.Il Pozzo inoltre può essere adibito a Punto Torta, in pieno stile Casale. ",
     events: "Degustazioni esclusive, eventi storici e momenti fotografici dal fascino rurale.",
     images: [
-      { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Zona Pozzo — dettagli architettonici in pietra" },
-      { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Zona Pozzo — dettagli architettonici in pietra" },
+      { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAHVonSxP3hrNXclNrJB4EP27zlO0W0Gl57Rkitu8OMc48eQGQ8ntwvc788WLMcQY5aZubXtXJO2NUuq4J3RMCMHm1YuGMJtpvzSCdo0yO53dO66DkRzYdC-FdE98JS0uzyXdOeftQ=s1360-w1360-h1020-rw", alt: "Zona Pozzo — dettagli architettonici in pietra" },
+      { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAHVonSxP3hrNXclNrJB4EP27zlO0W0Gl57Rkitu8OMc48eQGQ8ntwvc788WLMcQY5aZubXtXJO2NUuq4J3RMCMHm1YuGMJtpvzSCdo0yO53dO66DkRzYdC-FdE98JS0uzyXdOeftQ=s1360-w1360-h1020-rw", alt: "Zona Pozzo — dettagli architettonici in pietra" },
       { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Zona Pozzo — dettagli architettonici in pietra" },
     ],
     svgRect: { x: 81, y: 296, w: 174, h: 84 },
