@@ -24,7 +24,6 @@ export const ROOMS: RoomData[] = [
       { src: "https://images.unsplash.com/photo-1778591103012-eb50e49f8ec2?w=720&h=480&fit=crop&auto=format", alt: "Sala Grande — lampadari e pianoforte a coda" },
       { src: "https://images.unsplash.com/photo-1776848517525-ccc3a43bfcfb?w=720&h=480&fit=crop&auto=format", alt: "Sala Grande — tavolo apparecchiato con calici da vino" },
     ],
-    // Perfettamente sotto Sala 1 e Sala 2 (stessa larghezza combinata: 100 + 100 = 200)
     svgRect: { x: 53, y: 143, w: 89, h: 153 },
   },
   {
@@ -39,7 +38,6 @@ export const ROOMS: RoomData[] = [
       { src: "https://images.unsplash.com/photo-1766832255363-c9f060ade8b0?w=720&h=480&fit=crop&auto=format", alt: "Palmento — tavoli elegantemente apparecchiati" },
       { src: "https://images.unsplash.com/photo-1694021408920-922ff450c525?w=720&h=480&fit=crop&auto=format", alt: "Palmento — servizio del vino" },
     ],
-    // Il grande blocco in alto a destra
     svgRect: { x: 535, y: 175, w: 168, h: 121 },
   },
   {
@@ -54,7 +52,6 @@ export const ROOMS: RoomData[] = [
       { src: "https://images.unsplash.com/photo-1663530761401-15eefb544889?w=720&h=480&fit=crop&auto=format", alt: "Sala 1 — servizio dello chef" },
       { src: "https://images.unsplash.com/photo-1676471926534-d5c9771909fa?w=720&h=480&fit=crop&auto=format", alt: "Sala 1 — piatto impiattato" },
     ],
-    // Blocco in alto a sinistra
     svgRect: { x: 422, y: 118, w: 112, h: 178 },
   },
   {
@@ -69,7 +66,6 @@ export const ROOMS: RoomData[] = [
       { src: "https://images.unsplash.com/photo-1766832255363-c9f060ade8b0?w=720&h=480&fit=crop&auto=format", alt: "Sala 2 — allestimento tavoli" },
       { src: "https://images.unsplash.com/photo-1643879397174-4f10ac503566?w=720&h=480&fit=crop&auto=format", alt: "Sala 2 — servizio cena serale" },
     ],
-    // A destra di Sala 1
     svgRect: { x: 142, y: 143, w: 86, h: 91 },
   },
   {
@@ -84,7 +80,6 @@ export const ROOMS: RoomData[] = [
       { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Sala 3 — porta ad arco" },
       { src: "https://images.unsplash.com/photo-1694021408920-922ff450c525?w=720&h=480&fit=crop&auto=format", alt: "Sala 3 — servizio del vino" },
     ],
-    // Il quadrato centrale, con il corridoio alle spalle
     svgRect: { x: 254, y: 210, w: 111, h: 86 },
   },
   {
@@ -92,14 +87,13 @@ export const ROOMS: RoomData[] = [
     name: "Terrazza",
     type: "large",
     capacity: "Fino a 300 ospiti",
-    atmosphere: "Ampio spazio esterno e coperto che costeggia il nucleo centrale della struttura...",
+    atmosphere: "Immensa. Caratterizzata dal cielo stellato sovrastante con vista panoramica sui paesi etnei ed il mare. La sua spaziosità dà ampie possibilità, aggiungendo il pacchetto musica e beverage puoi dare vita al tuo personale, Evento indimenticabile.",
     events: "Grandi buffet, aperitivi di benvenuto e configurazioni di eventi open-air...",
     images: [
-      { src: "https://images.unsplash.com/photo-1745818016691-14c4020a73ed?w=720&h=480&fit=crop&auto=format", alt: "Terrazza — veduta panoramica ed esterni" },
-      { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Terrazza — porta ad arco" },
+      { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEN_aiZKUoBBKFBscXrLBSVBcXNio95XLNbz7D3HbK04UNcKJOdalSxS-XxSZU4J05BRjKjUDpJVYtHBGdAt-U9zYZx4Wh-bjVil6BMs5g1gjZhr7kl-52Pc1uEgGBEVa1Xz7i4iw=s1360-w1360-h1020-rw", alt: "Terrazza — veduta panoramica ed esterni" },
+      { src: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEdhrJtqZs3b2Z0oJdmpRuEe9pTUbRonX45-GFRvUL3HtyKV0r8XOKNx1zy4putCci91uBFk2QfRW6q2LL31zjGAM0JgnzUIX16QFDnmtEeIQVTJrshLla_S3rjeFax5dXkn1Y=s1360-w1360-h1020-rw", alt: "Terrazza — porta ad arco" },
       { src: "https://images.unsplash.com/photo-1694021408920-922ff450c525?w=720&h=480&fit=crop&auto=format", alt: "Terrazza — servizio del vino" },
     ],
-    // Ampia zona inferiore destra (sprovvista di tratteggi)
     svgRect: { x: 255, y: 296, w: 448, h: 175 },
   },
   {
@@ -107,14 +101,13 @@ export const ROOMS: RoomData[] = [
     name: "Pozzo",
     type: "small",
     capacity: "Fino a 60 ospiti",
-    atmosphere: "Lo storico nucleo verticale della tenuta, comunicante col corridoio di Sala 3...",
+    atmosphere: "Il Punto più alto del Casale con vista sulla Terrazza, crea un clima intimo e familiare, tra le mura del Casale da una parte e la campagna dall’altra.Il Pozzo inoltre può essere adibito a Punto Torta, in pieno stile Casale. ",
     events: "Degustazioni esclusive, eventi storici e momenti fotografici dal fascino rurale.",
     images: [
       { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Zona Pozzo — dettagli architettonici in pietra" },
       { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Zona Pozzo — dettagli architettonici in pietra" },
       { src: "https://images.unsplash.com/photo-1773100699991-b7e6bf89a6a1?w=720&h=480&fit=crop&auto=format", alt: "Zona Pozzo — dettagli architettonici in pietra" },
     ],
-    // La stanza stretta e alta raggiungibile dal corridoio
     svgRect: { x: 81, y: 296, w: 174, h: 84 },
   },
 ];

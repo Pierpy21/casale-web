@@ -10,13 +10,13 @@ function FloorStructure() {
     <g>
 
       
-      {/* Raccordo visivo (porta/passaggio) tra il blocco di sinistra e la zona centrale */}
+      {/* Corridoio / ingresso */}
       <line x1={227} y1={178} x2={365} y2={178} stroke="#1C2B2D" strokeWidth={1.5} />
-      <path d="M 10 10 L 20 20" stroke="#1C2B2D" strokeWidth={2} />
+
       <line x1={365} y1={178} x2={365} y2={119} stroke="#1C2B2D" strokeWidth={1.5} />
-      <path d="M 10 10 L 20 20" stroke="#1C2B2D" strokeWidth={2} />
+
       <line x1={365} y1={119} x2={422} y2={119} stroke="#1C2B2D" strokeWidth={1.5} />
-      <path d="M 10 10 L 20 20" stroke="#1C2B2D" strokeWidth={2} />
+
 
       {/* Rosa dei venti geometrica minimale integrata in alto a destra */}
       <g transform="translate(740, 40)">
