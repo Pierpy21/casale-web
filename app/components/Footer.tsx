@@ -41,7 +41,7 @@ export function Footer() {
               href="https://wa.me/393401090100"
               className="font-sans text-[0.8125rem] tracking-widest uppercase font-medium text-[#D5D5B7] bg-transparent border border-[#D5D5B7]/35 hover:border-[#D5D5B7]/60 hover:bg-[#D5D5B7]/8 px-8 py-3.5 rounded-[2px] transition-all duration-250 no-underline inline-flex items-center"
             >
-              Manda una richiesta
+              Invia una richiesta
             </a>
           </div>
         </div>
