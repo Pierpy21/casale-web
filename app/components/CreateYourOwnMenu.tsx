@@ -34,7 +34,7 @@ export function CreateYourOwnMenu({ piatti }: CreateYourOwnMenuProps) {
   };
 
   const categories = Object.keys(piatti).filter((cat) => piatti[cat].length > 0);
-  const categoryOrder = ["Antipasto", "Primo", "Secondo", "Contorno", "Dolce", "Bevande"];
+  const categoryOrder = ["Antipasto", "Primo", "Secondo", "Contorno", "Dolce", "Bevande", "Extra"];
   const sortedCategories = categoryOrder.filter((cat) => categories.includes(cat));
 
   const getSelectedPiattiByCategory = () => {
