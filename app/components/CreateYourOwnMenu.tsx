@@ -143,7 +143,7 @@ export function CreateYourOwnMenu({ piatti }: CreateYourOwnMenuProps) {
                   {category}
                   {category === "Antipasto" && (
                     <span className="text-xs font-sans text-[#8B6B4A] ml-3 italic">
-                      (Incluso di default)
+                      (Selezionato di default)
                     </span>
                   )}
                 </h3>
