@@ -1,20 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PiattoDettaglio } from "@/lib/notion";
 export const dynamic = 'force-dynamic';
+
 interface CreateYourOwnMenuProps {
   piatti: Record<string, PiattoDettaglio[]>;
 }
 
 const WHATSAPP_NUMBER = "393401090100";
 
+// Helper per ottenere la data odierna nel formato YYYY-MM-DD richiesto dall'input date
+const getTodayDate = () => {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+};
+
 export function CreateYourOwnMenu({ piatti }: CreateYourOwnMenuProps) {
-  // Trova i piatti predefiniti (Antipasti e Bevande)
   const antipastoFisso = piatti["Antipasto"]?.[0];
   const bevandeFisse = piatti["Bevande"] || [];
 
-  // Funzione helper per ottenere la lista dei piatti selezionati di default
   const getDefaultSelectedPiatti = (): PiattoDettaglio[] => {
     const defaults: PiattoDettaglio[] = [];
     if (antipastoFisso) defaults.push(antipastoFisso);
@@ -22,11 +27,18 @@ export function CreateYourOwnMenu({ piatti }: CreateYourOwnMenuProps) {
     return defaults;
   };
 
-  // Inizializza lo stato con antipasto e bevande di default
   const [selectedPiatti, setSelectedPiatti] = useState<PiattoDettaglio[]>(
     getDefaultSelectedPiatti()
   );
-  const [menuName, setMenuName] = useState("");
+  
+  // Nuovi stati per i campi obbligatori
+  const [guests, setGuests] = useState("");
+  const [eventDate, setEventDate] = useState("");
+
+  // Imposta la data odierna al mount del componente (evita problemi di idratazione con Next.js)
+  useEffect(() => {
+    setEventDate(getTodayDate());
+  }, []);
 
   const togglePiatto = (piatto: PiattoDettaglio) => {
     if (piatto.Categoria === "Antipasto" || piatto.Categoria === "Bevande") return;
@@ -67,26 +79,35 @@ export function CreateYourOwnMenu({ piatti }: CreateYourOwnMenuProps) {
     }, {} as Record<string, PiattoDettaglio[]>);
   };
 
-  // Validazione del menu
+  // Validazione del menu aggiornata con i nuovi campi obbligatori
   const hasPrimo = selectedPiatti.some(p => p.Categoria === "Primo");
   const hasSecondo = selectedPiatti.some(p => p.Categoria === "Secondo");
-  const isMenuValid = hasPrimo && hasSecondo;
+  const hasValidGuests = guests !== "" && Number(guests) > 0;
+  const hasValidDate = eventDate !== "";
+  
+  const isMenuValid = hasPrimo && hasSecondo && hasValidGuests && hasValidDate;
 
   const generateWhatsAppMessage = () => {
     if (!isMenuValid) return "";
 
     const lines: string[] = [
-      "Gentile Team,",
+      "Gentile Casale del Notaio,",
       "",
       "Desidero richiedere un preventivo per un menu personalizzato.",
       ""
     ];
 
-    if (menuName) {
-      lines.push(`NOME MENU: ${menuName.toUpperCase()}`);
-      lines.push("");
+    // Formattazione data da YYYY-MM-DD a DD/MM/YYYY per il messaggio
+    if (eventDate) {
+      const [year, month, day] = eventDate.split('-');
+      lines.push(`DATA EVENTO: ${day}/${month}/${year}`);
     }
-
+    
+    if (guests) {
+      lines.push(`NUMERO COPERTI: ${guests}`);
+    }
+    
+    lines.push("");
     lines.push("COMPOSIZIONE DEL MENU");
     lines.push("-----------------------------------");
     lines.push("");
@@ -211,23 +232,41 @@ export function CreateYourOwnMenu({ piatti }: CreateYourOwnMenuProps) {
             
             {/* Title */}
             <h3 className="font-serif text-[1.375rem] font-medium text-[#1C2B2D] m-0 pb-4 border-b border-[#8B6B4A]/15 mb-6">
-              Il tuo Menu
+              Dettagli Evento
             </h3>
 
-            {/* Menu name input */}
-            <div className="mb-6">
-              <input
-                type="text"
-                value={menuName}
-                onChange={(e) => setMenuName(e.target.value)}
-                placeholder="Nome del menu"
-                className="w-full p-3.5 font-sans text-[0.9375rem] border border-[#8B6B4A]/20 rounded-none bg-[#F7F7F4] text-[#1C2B2D] transition-colors duration-200 focus:border-[#355A63] focus:outline-none"
-              />
+            {/* Event Details Inputs */}
+            <div className="flex flex-col gap-4 mb-6">
+              <div>
+                <label className="block font-sans text-[0.75rem] uppercase tracking-[0.1em] text-[#8B6B4A] font-semibold mb-1.5">
+                  Numero Coperti *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={guests}
+                  onChange={(e) => setGuests(e.target.value)}
+                  placeholder="Es. 50"
+                  className="w-full p-3.5 font-sans text-[0.9375rem] border border-[#8B6B4A]/20 rounded-none bg-[#F7F7F4] text-[#1C2B2D] transition-colors duration-200 focus:border-[#355A63] focus:outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block font-sans text-[0.75rem] uppercase tracking-[0.1em] text-[#8B6B4A] font-semibold mb-1.5">
+                  Data Evento *
+                </label>
+                <input
+                  type="date"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                  className="w-full p-3.5 font-sans text-[0.9375rem] border border-[#8B6B4A]/20 rounded-none bg-[#F7F7F4] text-[#1C2B2D] transition-colors duration-200 focus:border-[#355A63] focus:outline-none"
+                />
+              </div>
             </div>
 
             {/* Selected dishes grouped by category */}
-            <div className="mb-8">
-              <div className="flex justify-between items-center mb-4">
+            <div className="mb-8 mt-8">
+              <div className="flex justify-between items-center mb-4 border-t border-[#8B6B4A]/15 pt-6">
                 <p className="font-sans text-xs tracking-[0.12em] uppercase text-[#8B6B4A] font-semibold m-0">
                   Riepilogo Scelte
                 </p>
@@ -267,7 +306,7 @@ export function CreateYourOwnMenu({ piatti }: CreateYourOwnMenuProps) {
             <div className="flex flex-col gap-3">
               {!isMenuValid && (
                 <p className="font-sans text-[0.75rem] text-[#8B6B4A] text-center m-0 mb-1">
-                  * Seleziona almeno un Primo e un Secondo
+                  * Compila i campi obbligatori e seleziona almeno un Primo e un Secondo
                 </p>
               )}
               
@@ -286,7 +325,8 @@ export function CreateYourOwnMenu({ piatti }: CreateYourOwnMenuProps) {
               <button
                 onClick={() => {
                   setSelectedPiatti(getDefaultSelectedPiatti());
-                  setMenuName("");
+                  setGuests("");
+                  setEventDate(getTodayDate());
                 }}
                 className="font-sans text-[0.8125rem] tracking-[0.12em] uppercase font-semibold text-[#5A6668] bg-transparent border-[1.5px] border-[#D5D5B7] p-3.5 rounded-none cursor-pointer transition-all duration-300 w-full hover:border-[#8B6B4A] hover:bg-[#8B6B4A]/5"
               >

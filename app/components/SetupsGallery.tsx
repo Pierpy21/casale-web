@@ -46,7 +46,6 @@ const GALLERY_ITEMS: GalleryItem[] = [
     images: [
       { src: "/images/allestimento-esterni/first.webp", alt: "Atmosfere all'aperto" },
       { src: "/images/allestimento-esterni/second.webp", alt: "Decorazione" },
-      { src: "/images/allestimento-esterni/third.webp", alt: "Decorazione" },
       { src: "/images/allestimento-esterni/fourth.webp", alt: "Decorazione" },
       { src: "/images/allestimento-esterni/fifth.webp", alt: "Decorazione" },
       { src: "/images/allestimento-esterni/sixth.webp", alt: "Decorazione" },
@@ -68,8 +67,6 @@ const GALLERY_ITEMS: GalleryItem[] = [
       { src: "/images/tavoli-torte/foto1.webp", alt: "Decorazione" },
       { src: "/images/tavoli-torte/foto2.webp", alt: "Decorazione" },
       { src: "/images/tavoli-torte/foto3.webp", alt: "Decorazione" },
-      { src: "/images/tavoli-torte/foto4.webp", alt: "Decorazione" },
-      { src: "/images/tavoli-torte/foto5.webp", alt: "Decorazione" },
       { src: "/images/tavoli-torte/foto6.webp", alt: "Decorazione" },
     ]
   },

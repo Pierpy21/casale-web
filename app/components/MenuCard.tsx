@@ -94,8 +94,8 @@ export function MenuCard({ menu, onOpenModal }: { menu: MenuCategoria; onOpenMod
       {/* Content */}
       <div className="p-7 flex-1 flex flex-col">
         <p className="font-sans text-[0.6875rem] tracking-[0.2em] uppercase text-[#8B6B4A] mb-2">
-          Menu Degustazione
-        </p>
+    {menu.Stagione}
+  </p>
         <h3 className="font-serif text-2xl font-medium text-[#1C2B2D] mb-3.5 leading-[1.2]">
           {menu.Nome}
         </h3>

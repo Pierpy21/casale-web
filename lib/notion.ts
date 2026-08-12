@@ -24,7 +24,8 @@ export interface MenuCategoria {
   Nome: string;
   Prezzo: number;
   Piatti: PiattoDettaglio[];
-  Foto: string[]; 
+  Foto: string[];
+  Stagione: string; 
 }
 
 const ORDINE_PORTATE: Record<string, number> = {
@@ -117,6 +118,7 @@ export async function getMenuCompleto(): Promise<MenuCategoria[]> {
     const prezzoProp = page.properties.Prezzo;
     const relazioniPiattiProp = page.properties.Piatti;
     const fotoProp = page.properties.Foto;
+    const stagioneProp = page.properties.Stagione;
 
     let piattiInMenu: PiattoDettaglio[] = [];
     
@@ -150,7 +152,12 @@ export async function getMenuCompleto(): Promise<MenuCategoria[]> {
       Nome: nomeProp?.type === 'title' ? nomeProp.title[0]?.plain_text || 'Senza nome' : 'Senza nome',
       Prezzo: prezzoProp?.type === 'number' ? prezzoProp.number : 0,
       Piatti: piattiInMenu,
-      Foto: Foto, 
+      Foto: Foto,
+      Stagione: stagioneProp?.type === 'select' 
+    ? stagioneProp.select?.name || 'Menu Degustazione'
+    : stagioneProp?.type === 'rich_text'
+      ? stagioneProp.rich_text[0]?.plain_text || 'Menu Degustazione'
+      : 'Menu Degustazione', 
     };
   });
 
