@@ -21,7 +21,7 @@ export default async function App() {
       <SeasonalMenus menus={dataMenus} />
 
       {/* Create Your Own Menu */}
-      <CreateYourOwnMenu piatti={tuttiPiatti} />
+      {/* <CreateYourOwnMenu piatti={tuttiPiatti} /> */}
 
       <RestaurantStory />
       <FloorPlan />
