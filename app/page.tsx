@@ -1,6 +1,7 @@
 import { Hero } from "./components/Hero";
 import { SeasonalMenus } from "./components/SeasonalMenus";
 import { CreateYourOwnMenu } from "./components/CreateYourOwnMenu";
+import { ChooseExistingMenu } from "./components/ChooseExistingMenu";
 import { RestaurantStory } from "./components/RestaurantStory";
 import { FloorPlan } from "./components/FloorPlan";
 import { Footer } from "./components/Footer";
@@ -19,6 +20,9 @@ export default async function App() {
 
       {/* Seasonal Menus */}
       <SeasonalMenus menus={dataMenus} />
+
+      {/* Choose Existing Menu */}
+      <ChooseExistingMenu menus={dataMenus} />
 
       {/* Create Your Own Menu */}
       {/* <CreateYourOwnMenu piatti={tuttiPiatti} /> */}
