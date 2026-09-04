@@ -113,7 +113,7 @@ export function ChooseExistingMenu({ menus }: ChooseExistingMenuProps) {
             Scegli il tuo percorso
           </p>
           <h2 className="font-serif text-[2.5rem] text-[#1C2B2D] mb-4 font-medium">
-            Richiedi informazioni per un evento
+            Invia la tua richiesta
           </h2>
           <p className="font-sans text-base leading-relaxed text-[#5A6668] max-w-[600px] mx-auto">
             Seleziona uno dei nostri menù, indica il numero di ospiti e inviaci la tua richiesta.
