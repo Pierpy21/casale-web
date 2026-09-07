@@ -238,7 +238,7 @@ export function ChooseExistingMenu({ menus }: ChooseExistingMenuProps) {
                   type="text"
                   value={eventName}
                   onChange={(e) => setEventName(e.target.value)}
-                  placeholder="Es. Matrimonio, Battesimo..."
+                  placeholder="Es. Battesimo, Comunione..."
                   className="w-full p-3.5 font-sans text-[0.9375rem] border border-[#8B6B4A]/20 rounded-none bg-[#F7F7F4] text-[#1C2B2D] transition-colors duration-200 focus:border-[#355A63] focus:outline-none"
                 />
               </div>
@@ -265,7 +265,7 @@ export function ChooseExistingMenu({ menus }: ChooseExistingMenuProps) {
                     min="1"
                     value={adults}
                     onChange={(e) => setAdults(e.target.value)}
-                    placeholder="Es. 2"
+                    placeholder="Es. 30"
                     className="w-full p-3.5 font-sans text-[0.9375rem] border border-[#8B6B4A]/20 rounded-none bg-[#F7F7F4] text-[#1C2B2D] transition-colors duration-200 focus:border-[#355A63] focus:outline-none"
                   />
                 </div>
@@ -278,7 +278,7 @@ export function ChooseExistingMenu({ menus }: ChooseExistingMenuProps) {
                     min="0"
                     value={children}
                     onChange={(e) => setChildren(e.target.value)}
-                    placeholder="Es. 0"
+                    placeholder="Es. 10"
                     className="w-full p-3.5 font-sans text-[0.9375rem] border border-[#8B6B4A]/20 rounded-none bg-[#F7F7F4] text-[#1C2B2D] transition-colors duration-200 focus:border-[#355A63] focus:outline-none"
                   />
                 </div>

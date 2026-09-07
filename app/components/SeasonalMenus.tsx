@@ -52,8 +52,8 @@ export function SeasonalMenus({ menus }: { menus: MenuCategoria[] }) {
             <span className="font-sans text-[0.6875rem] tracking-[0.2em] uppercase text-[#8B6B4A] font-semibold block mb-1.5">
               Per i più piccoli
             </span>
-            <p  className="text-[#1C2B2D] font-medium">
-              Il nostro menù bambini prevede: Un primo, Pasta (al pomodoro, al pesto o al pistacchio) ed un secondo, Cotoletta con patatine fritte.
+            <p className="font-sans text-[0.9375rem] text-[#4A5558] leading-relaxed m-0">
+              Il nostro menù bambini prevede: <strong className="text-[#1C2B2D] font-medium">Un primo, Pasta (al pomodoro, al pesto o al pistacchio)</strong> ed <strong className="text-[#1C2B2D] font-medium">un secondo, Cotoletta con patatine fritte</strong>.
             </p>
           </div>
           <div className="shrink-0 sm:text-right sm:border-l sm:border-[#8B6B4A]/20 sm:pl-6">
