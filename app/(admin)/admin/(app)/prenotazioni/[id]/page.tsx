@@ -157,7 +157,7 @@ export default async function BookingDetailPage({
             <ButtonLink href={`/admin/prenotazioni/${booking.id}/modifica`} variant="outline" size="md">
               Modifica
             </ButtonLink>
-            <DeleteBookingButton bookingId={booking.id} />
+            <DeleteBookingButton bookingId={booking.id} quotesCount={quotes.length} paymentsCount={payments.length} />
           </div>
         )}
       </header>

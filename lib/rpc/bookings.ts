@@ -3,7 +3,7 @@ import type PocketBase from "pocketbase";
 import { ClientResponseError } from "pocketbase";
 import { UserFacingError } from "@/lib/action-utils";
 import { generateRecordId, dayStartPb, nn, num, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
-import { fetchOne, listAll, countWhere } from "@/lib/pocketbase/queries";
+import { fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { mapBooking } from "@/lib/pocketbase/mappers";
 import {
   allergiesSummary,
@@ -323,29 +323,36 @@ export async function resetBookingDishesFromMenu(db: PocketBase, id: string, act
 }
 
 /**
- * Eliminazione prenotazione. Restrict come la FK SQL: non si elimina se ha preventivi o acconti.
- * Cascade: piatti e allergie (PocketBase). La riga di audit resta senza booking, con booking_label.
+ * Eliminazione definitiva della prenotazione, con preventivi e acconti collegati (e le loro ricevute) nella stessa batch.
+ * Cascade PocketBase: piatti e allergie. La riga di audit resta senza booking, con booking_label.
  */
 export async function deleteBookingRecord(db: PocketBase, id: string, actor: Actor): Promise<void> {
   const booking = await loadBooking(db, id);
+  const byBooking = { filter: db.filter("booking = {:id}", { id }), fields: "id" };
   const [quotes, payments] = await Promise.all([
-    countWhere(db, "quotes", db.filter("booking = {:id}", { id })),
-    countWhere(db, "payments", db.filter("booking = {:id}", { id })),
+    db.collection("quotes").getFullList(byBooking),
+    db.collection("payments").getFullList(byBooking),
   ]);
-  if (quotes + payments > 0) throw restrictError();
   const clientId = nn(booking.client);
   const client = clientId ? await fetchOne(db, "clients", clientId) : null;
   const clientName = client ? `${client.first_name} ${client.last_name}` : "cliente sconosciuto";
   const label = `Prenotazione del ${toDateOnly(booking.event_date)} — ${clientName}`;
+  const linked = [
+    quotes.length > 0 ? `${quotes.length} ${quotes.length === 1 ? "preventivo" : "preventivi"}` : null,
+    payments.length > 0 ? `${payments.length} ${payments.length === 1 ? "acconto" : "acconti"}` : null,
+  ].filter(Boolean);
+  const auditNew = linked.length > 0 ? `eliminati anche ${linked.join(" e ")}` : null;
 
   const batch = db.createBatch();
-  queueAudit(batch, actor, { label, field: "eliminazione", old: label, new: null });
+  queueAudit(batch, actor, { label, field: "eliminazione", old: label, new: auditNew });
+  for (const q of quotes) batch.collection("quotes").delete(q.id);
+  for (const p of payments) batch.collection("payments").delete(p.id);
   batch.collection("bookings").delete(id);
   try {
     await batch.send();
   } catch (err) {
     // Backstop: quotes.booking e payments.booking sono required senza cascade, quindi PocketBase
-    // rifiuta l'eliminazione se nel frattempo sono comparsi preventivi o acconti (race con la pre-verifica).
+    // rifiuta l'eliminazione se nel frattempo sono comparsi altri preventivi o acconti.
     if (err instanceof ClientResponseError && err.status === 400) throw restrictError();
     throw err;
   }
@@ -353,6 +360,6 @@ export async function deleteBookingRecord(db: PocketBase, id: string, actor: Act
 
 function restrictError(): UserFacingError {
   return new UserFacingError(
-    "Impossibile eliminare la prenotazione: esistono preventivi o acconti collegati. Elimina prima quelli collegati o imposta lo stato Annullato.",
+    "Impossibile eliminare la prenotazione: nel frattempo sono stati aggiunti preventivi o acconti. Ricarica la pagina e riprova.",
   );
 }
