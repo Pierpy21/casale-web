@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/* Token di brand (SPEC §1). Usati come classi: bg-petrol, text-ink, border-sand, ... */
+@theme {
+  --color-ink: #1c2b2d;
+  --color-ink-deep: #152022;
+  --color-petrol: #355a63;
+  --color-petrol-hover: #2a4a52;
+  --color-petrol-muted: #3f5d63;
+  --color-slate: #5a6668;
+  --color-slate-dark: #4a5558;
+  --color-bronze: #8b6b4a;
+  --color-olive: #6b6955;
+  --color-sand: #d5d5b7;
+  --color-cream: #edeedd;
+  --color-paper: #f7f7f4;
+  --color-logo-cream: #faf1d7;
+  --color-disabled: #b0b0b0;
+  --color-danger: #9b3b32;
+  --color-success: #4f6b45;
+  --color-warning: #a9792b;
+
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+
+  --radius-btn: 2px;
+}
+
+/*
+ * Overflow orizzontale (iOS/Safari).
+ * Safari < 16 ignora `overflow-x: clip`: il valore `hidden` scritto prima resta il fallback.
+ * Su body NON usiamo `hidden`: renderebbe body un scroll container e romperebbe gli elementi `sticky`
+ * (sidebar desktop, header mobile). `html` con `hidden` viene propagato al viewport, quindi basta lì.
+ */
+html {
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+body {
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+/*
+ * Sostituisce `overflow-x-clip` di Tailwind, usato sul <main> dell'app.
+ * Su Safari < 16 il fallback `hidden` rende il contenitore scroll container sull'asse x:
+ * un elemento `sticky` dentro (es. anteprima preventivo lg:sticky su iPad) può smettere di bloccarsi.
+ */
+.clip-x {
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-petrol);
+  outline-offset: 2px;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  main#contenuto {
+    padding: 0 !important;
+  }
+}

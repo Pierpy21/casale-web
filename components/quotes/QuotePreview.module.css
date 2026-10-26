@@ -1,0 +1,358 @@
+/*
+ * Foglio A4 del preventivo, stesse misure del PDF (react-pdf, A4, margini 40 pt).
+ * Tutto è in mm del foglio reale: --mm vale 1 mm del foglio, scalato sulla larghezza
+ * del contenitore (container query), così su telefono il foglio si rimpicciolisce senza scroll.
+ * Stampando al 100% (vedi QuotePrintStyles) --mm vale 1 mm reale.
+ * Pt → mm: 1 pt = 0,3528 mm.
+ */
+
+.frame {
+  container-type: inline-size;
+  width: 100%;
+  min-width: 0;
+}
+
+.sheet {
+  --mm: calc(100cqw / 210);
+  position: relative;
+  box-sizing: border-box;
+  width: calc(210 * var(--mm));
+  min-height: calc(297 * var(--mm));
+  margin: 0;
+  /* Margini come nel PDF: 40 pt laterali e in alto, 60 pt in basso (spazio per il piè di pagina). */
+  padding: calc(14.1 * var(--mm)) calc(14.1 * var(--mm)) calc(21.2 * var(--mm));
+  background: #ffffff;
+  color: #1c2b2d;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: calc(3.53 * var(--mm)); /* 10 pt */
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+@media screen {
+  .sheet {
+    box-shadow: 0 1px 2px rgb(28 43 45 / 0.08), 0 8px 24px rgb(28 43 45 / 0.12);
+  }
+}
+
+/* Intestazione: dati del Casale a sinistra, logo a destra. */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(4 * var(--mm));
+}
+
+.issuer {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: calc(5.6 * var(--mm));
+}
+
+.issuerName {
+  margin: 0 0 calc(2.1 * var(--mm));
+  font-family: "Times New Roman", Times, serif;
+  font-weight: 400;
+  font-size: calc(7.06 * var(--mm)); /* 20 pt */
+  line-height: 1.2;
+  color: #1c2b2d;
+}
+
+.issuerTagline {
+  margin: 0 0 calc(2.8 * var(--mm));
+  font-family: "Times New Roman", Times, serif;
+  font-style: italic;
+  font-size: calc(3.35 * var(--mm)); /* 9,5 pt */
+  line-height: 1.3;
+  color: #355a63;
+}
+
+.issuerText {
+  margin: 0 0 calc(0.35 * var(--mm));
+  font-size: calc(3 * var(--mm)); /* 8,5 pt */
+  color: #5a6668;
+}
+
+.logo {
+  display: block;
+  flex: 0 0 auto;
+  width: calc(52.9 * var(--mm)); /* 150 pt */
+  height: auto;
+}
+
+.rule {
+  height: calc(0.26 * var(--mm));
+  margin: calc(4.9 * var(--mm)) 0;
+  background: #d5d5b7;
+}
+
+.eyebrow {
+  margin: 0 0 calc(1.76 * var(--mm));
+  font-family: Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: calc(2.82 * var(--mm)); /* 8 pt */
+  line-height: 1.35;
+  letter-spacing: calc(0.49 * var(--mm));
+  text-transform: uppercase;
+  color: #8b6b4a;
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: calc(4 * var(--mm));
+  margin-bottom: calc(9.2 * var(--mm));
+}
+
+.docTitle {
+  margin: 0;
+  font-family: "Times New Roman", Times, serif;
+  font-weight: 400;
+  font-size: calc(7.76 * var(--mm)); /* 22 pt */
+  line-height: 1.2;
+  color: #1c2b2d;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+  text-align: right;
+}
+
+.metaText {
+  margin: 0 0 calc(0.35 * var(--mm));
+  font-size: calc(3.18 * var(--mm)); /* 9 pt */
+  color: #5a6668;
+}
+
+.twoCols {
+  display: flex;
+  gap: calc(8.47 * var(--mm));
+  margin-bottom: calc(4.94 * var(--mm));
+}
+
+.col {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.kvRow {
+  display: flex;
+  margin: 0 0 calc(1.06 * var(--mm));
+}
+
+.kvLabel {
+  flex: 0 0 calc(27.5 * var(--mm)); /* 78 pt */
+  margin: 0;
+  font-size: calc(3 * var(--mm));
+  color: #5a6668;
+}
+
+.kvValue {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: calc(3.53 * var(--mm));
+  color: #1c2b2d;
+}
+
+.section {
+  margin: 0 0 calc(4.94 * var(--mm));
+}
+
+.sectionTitle {
+  margin: 0 0 calc(2.12 * var(--mm));
+  font-family: "Times New Roman", Times, serif;
+  font-weight: 400;
+  font-size: calc(4.59 * var(--mm)); /* 13 pt */
+  line-height: 1.2;
+  color: #1c2b2d;
+}
+
+.courseRow {
+  display: flex;
+  margin-bottom: calc(1.41 * var(--mm));
+  break-inside: avoid;
+}
+
+.courseLabel {
+  flex: 0 0 calc(27.5 * var(--mm));
+  margin: 0;
+  padding-top: calc(0.35 * var(--mm));
+  font-weight: 700;
+  font-size: calc(2.82 * var(--mm));
+  letter-spacing: calc(0.28 * var(--mm));
+  text-transform: uppercase;
+  color: #8b6b4a;
+}
+
+.courseDishes {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dish {
+  margin: 0 0 calc(0.35 * var(--mm));
+  font-size: calc(3.35 * var(--mm)); /* 9,5 pt */
+  color: #1c2b2d;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: calc(3.35 * var(--mm));
+}
+
+.th {
+  padding: calc(1.76 * var(--mm)) 0;
+  border-bottom: calc(0.32 * var(--mm)) solid #1c2b2d;
+  font-weight: 700;
+  font-size: calc(2.82 * var(--mm));
+  letter-spacing: calc(0.28 * var(--mm));
+  text-align: left;
+  text-transform: uppercase;
+  vertical-align: bottom;
+  color: #1c2b2d;
+}
+
+.td {
+  padding: calc(2.1 * var(--mm)) 0;
+  border-bottom: calc(0.18 * var(--mm)) solid #d5d5b7;
+  text-align: left;
+  vertical-align: top;
+}
+
+/* Colonne: la descrizione prende lo spazio residuo, le altre hanno larghezza fissa come nel PDF. */
+.cellDescription {
+  padding-right: calc(2.8 * var(--mm));
+}
+
+.cellQty {
+  width: calc(17.6 * var(--mm)); /* 50 pt */
+  text-align: right;
+}
+
+.cellUnit,
+.cellAmount {
+  width: calc(31.75 * var(--mm)); /* 90 pt */
+  text-align: right;
+}
+
+.totalsWrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(3.53 * var(--mm));
+}
+
+.totalsBox {
+  width: calc(81.2 * var(--mm)); /* 230 pt */
+  margin: 0;
+}
+
+.totalsRow {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(3 * var(--mm));
+  margin-bottom: calc(1.06 * var(--mm));
+}
+
+.totalsLabel {
+  margin: 0;
+  font-size: calc(3.18 * var(--mm));
+  color: #5a6668;
+}
+
+.totalsValue {
+  margin: 0;
+  font-size: calc(3.18 * var(--mm));
+  color: #1c2b2d;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.grandRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(3 * var(--mm));
+  margin-top: calc(1.41 * var(--mm));
+  padding-top: calc(2.12 * var(--mm));
+  border-top: calc(0.32 * var(--mm)) solid #1c2b2d;
+}
+
+.grandLabel {
+  margin: 0;
+  font-weight: 700;
+  font-size: calc(3.53 * var(--mm));
+  color: #1c2b2d;
+}
+
+.grandValue {
+  margin: 0;
+  font-family: "Times New Roman", Times, serif;
+  font-weight: 700;
+  font-size: calc(4.94 * var(--mm)); /* 14 pt */
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #1c2b2d;
+}
+
+.bodyText {
+  margin: 0;
+  font-size: calc(3.35 * var(--mm));
+  color: #1c2b2d;
+  white-space: pre-line;
+}
+
+.conditionText {
+  margin: 0 0 calc(0.7 * var(--mm));
+  font-size: calc(2.82 * var(--mm)); /* 8 pt */
+  color: #5a6668;
+}
+
+.signatureRow {
+  display: flex;
+  gap: calc(14.1 * var(--mm));
+  margin-top: calc(9.9 * var(--mm)); /* 28 pt */
+}
+
+.signatureBox {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.signatureLine {
+  height: calc(12.7 * var(--mm)); /* 36 pt */
+  margin-bottom: calc(1.41 * var(--mm));
+  border-bottom: calc(0.21 * var(--mm)) solid #1c2b2d;
+}
+
+.signatureLabel {
+  margin: 0;
+  font-size: calc(3 * var(--mm));
+  color: #5a6668;
+}
+
+/* Piè di pagina fisso in fondo al foglio, come nel PDF. */
+.footer {
+  position: absolute;
+  right: calc(14.1 * var(--mm));
+  bottom: calc(7.76 * var(--mm));
+  left: calc(14.1 * var(--mm));
+  display: flex;
+  justify-content: space-between;
+  gap: calc(4 * var(--mm));
+  padding-top: calc(2.12 * var(--mm));
+  border-top: calc(0.18 * var(--mm)) solid #d5d5b7;
+}
+
+.footerText {
+  margin: 0;
+  font-size: calc(2.65 * var(--mm)); /* 7,5 pt */
+  color: #5a6668;
+}

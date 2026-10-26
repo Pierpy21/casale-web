@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1C2B2D" />
+    <title>Offline · Agenda Casale</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        padding: calc(env(safe-area-inset-top) + 2rem) 1.5rem calc(env(safe-area-inset-bottom) + 2rem);
+        background: #F7F7F4;
+        color: #1C2B2D;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
+        text-align: center;
+        -webkit-font-smoothing: antialiased;
+      }
+      .brand {
+        width: 220px;
+        max-width: 70%;
+        background: #1C2B2D;
+        border-radius: 2px;
+        padding: 1.25rem 1rem;
+      }
+      .brand img { display: block; width: 100%; height: auto; }
+      .eyebrow {
+        margin: 0;
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #8B6B4A;
+      }
+      h1 {
+        margin: 0;
+        font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+        font-weight: 400;
+        font-size: 1.75rem;
+        line-height: 1.15;
+      }
+      p { margin: 0; max-width: 22rem; font-size: 15px; line-height: 1.5; color: #5A6668; }
+      button {
+        margin-top: 0.5rem;
+        border: 1px solid #355A63;
+        border-radius: 2px;
+        background: #355A63;
+        color: #F7F7F4;
+        padding: 0.875rem 2rem;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+      button:hover { background: #2A4A52; }
+      button:focus-visible { outline: 2px solid #355A63; outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <div class="brand">
+      <img src="/logo.svg" alt="Il Casale del Notaio" width="675" height="225" />
+    </div>
+    <p class="eyebrow">Agenda digitale</p>
+    <h1>Sei offline</h1>
+    <p>Sei offline — riconnettiti per vedere l'agenda.</p>
+    <button type="button" onclick="location.reload()">Riprova</button>
+  </body>
+</html>

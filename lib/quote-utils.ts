@@ -1,0 +1,54 @@
+import type { Quote, QuoteLine, QuoteTotals } from "./types";
+
+/** Menu del catalogo usati per le righe automatiche (solo nome e prezzo a persona). */
+export interface QuoteMenuRef {
+  name: string;
+  price_per_person: number;
+}
+
+/**
+ * Righe automatiche del preventivo (pura, usata sia dal pannello live sia dal server):
+ * "<Menù> — adulti" × adulti al prezzo del menù adulti; "Menù bambini — <nome>" × menù bambini al prezzo del menù bambini.
+ * Una riga per menu valorizzato con quantità > 0.
+ */
+export function buildDefaultQuoteLines(input: {
+  adults: number;
+  kids_menus: number;
+  menu: QuoteMenuRef | null;
+  kids_menu: QuoteMenuRef | null;
+}): QuoteLine[] {
+  const lines: QuoteLine[] = [];
+  if (input.menu && input.adults > 0) {
+    lines.push({ description: `${input.menu.name} — adulti`, quantity: input.adults, unit_price: round2(input.menu.price_per_person) });
+  }
+  if (input.kids_menu && input.kids_menus > 0) {
+    lines.push({
+      description: `Menù bambini — ${input.kids_menu.name}`,
+      quantity: input.kids_menus,
+      unit_price: round2(input.kids_menu.price_per_person),
+    });
+  }
+  return lines;
+}
+
+export const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/**
+ * Totali del preventivo. Prezzi IVA inclusa:
+ * subtotal = Σ quantity × unit_price; discount è un importo in EUR (limitato al subtotale);
+ * total = subtotal − discount; taxable = total / (1 + vat/100); vat = total − taxable.
+ */
+export function computeQuoteTotals(q: Pick<Quote, "lines" | "discount" | "vat_rate">): QuoteTotals {
+  const subtotal = round2(q.lines.reduce((acc, l) => acc + l.quantity * l.unit_price, 0));
+  const discount = round2(Math.min(Math.max(q.discount, 0), subtotal));
+  const total = round2(subtotal - discount);
+  const taxable = round2(total / (1 + q.vat_rate / 100));
+  const vat = round2(total - taxable);
+  return { subtotal, discount, total, taxable, vat };
+}
+
+const eurFormatter = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
+
+export function formatEUR(n: number): string {
+  return eurFormatter.format(n);
+}
