@@ -1,5 +1,9 @@
 import { MapPin, Phone, Mail, Clock } from "lucide-react";
 import Image from "next/image";
+import { Montserrat } from "next/font/google";
+
+// Stesso marchio "Powered by C.PINSAI" della pagina di accesso al pannello.
+const montserrat = Montserrat({ subsets: ["latin"], weight: ["700"], display: "swap" });
 
 /* lucide-react 1.x non include più le icone brand: stessa geometria della vecchia icona, inline. */
 function InstagramIcon({ size = 24 }: { size?: number }) {
@@ -182,11 +186,23 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-[#D5D5B7]/10 pt-8 flex flex-wrap items-center justify-between gap-4">
           <p className="font-sans text-[0.75rem] text-[#D5D5B7]/35">
-            © {new Date().getFullYear()} Casale del Notaio. Tutti i diritti riservati. Designed by <a href="https://cpinsai.it/" className="text-[#D5D5B7]/65 hover:text-[#D5D5B7] no-underline transition-colors duration-200">C.PINSAI</a>
+            © {new Date().getFullYear()} Casale del Notaio. Tutti i diritti riservati.
           </p>
           <p className="font-sans text-[0.75rem] text-[#D5D5B7]/35">
             Privacy Policy · Cookie Policy
           </p>
+          <a
+            href="https://cpinsai.it/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Powered by C.PINSAI"
+            className="inline-flex items-baseline gap-2 rounded-[2px] px-2 py-1 no-underline transition-colors duration-300 hover:bg-white/5"
+          >
+            <span className="font-sans text-[10px] font-medium uppercase tracking-[0.14em] text-[#D5D5B7]/70">Powered by</span>
+            <span className={`${montserrat.className} text-[15px] tracking-[0.04em] text-[#FAF1D7]`}>
+              C<span className="text-[#E5488A]">.</span>PINSAI
+            </span>
+          </a>
         </div>
       </div>
     </footer>
