@@ -334,11 +334,11 @@ export async function renderQuoteDocx(model: QuoteDocumentModel): Promise<Buffer
       ],
     });
   const totalsRows = [
-    totalRow("Subtotale (IVA inclusa)", totals.subtotal),
+    totalRow(totals.subtotalLabel, totals.subtotal),
     ...(totals.hasDiscount ? [totalRow("Sconto", `- ${totals.discount}`)] : []),
     totalRow("di cui imponibile", totals.taxable),
     totalRow(`di cui IVA ${totals.vatRate}`, totals.vat),
-    totalRow("Totale", totals.total, true),
+    totalRow(totals.totalLabel, totals.total, true),
   ];
   const totalsTable = new Table({
     width: { size: totalsWidth, type: WidthType.DXA },

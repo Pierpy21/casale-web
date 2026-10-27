@@ -7,6 +7,7 @@ import { BookingChangesTimeline } from "@/components/bookings/BookingChangesTime
 import { BookingSummary } from "@/components/bookings/BookingSummary";
 import { CoversEditor } from "@/components/bookings/CoversEditor";
 import { DeleteBookingButton } from "@/components/bookings/DeleteBookingButton";
+import { BookingStatusActions } from "@/components/bookings/BookingStatusActions";
 import { DishesEditor } from "@/components/bookings/DishesEditor";
 import { KindBadge } from "@/components/bookings/KindBadge";
 import { decodeWarnings } from "@/components/bookings/booking-form-model";
@@ -157,6 +158,7 @@ export default async function BookingDetailPage({
             <ButtonLink href={`/admin/prenotazioni/${booking.id}/modifica`} variant="outline" size="md">
               Modifica
             </ButtonLink>
+            <BookingStatusActions bookingId={booking.id} kind={booking.kind} status={booking.status} paymentsCount={payments.length} />
             <DeleteBookingButton bookingId={booking.id} quotesCount={quotes.length} paymentsCount={payments.length} />
           </div>
         )}

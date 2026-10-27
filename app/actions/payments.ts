@@ -1,5 +1,6 @@
 "use server";
 
+import type PocketBase from "pocketbase";
 import { revalidatePath } from "next/cache";
 import { PaymentInput, ReceiptFile, resolveReceiptType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId } from "@/lib/action-utils";
@@ -7,7 +8,23 @@ import { isAdmin } from "@/lib/permissions";
 import { sanitizeReceiptName } from "@/lib/payment-utils";
 import { dayStartPb, nn, type PbRecord } from "@/lib/pocketbase/helpers";
 import { fetchOne } from "@/lib/pocketbase/queries";
+import { syncEventStatusFromPayments } from "@/lib/rpc/bookings";
 import type { ActionResult } from "@/lib/types";
+
+/** Riallinea lo stato dell'evento agli acconti. Il pagamento è già salvato: un errore qui non annulla l'operazione. */
+async function syncStatus(db: PocketBase, bookingId: string, actor: { id: string; full_name: string }): Promise<void> {
+  try {
+    await syncEventStatusFromPayments(db, bookingId, actor);
+  } catch (err) {
+    console.error("[payments] stato evento non riallineato:", err);
+  }
+}
+
+function revalidateBookingViews(bookingId: string): void {
+  revalidatePath(`/admin/prenotazioni/${bookingId}`);
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin/dashboard");
+}
 
 // Acconti e ricevute: solo admin. La ricevuta e' un campo file PROTETTO su PocketBase:
 // si crea il record e il file in un'unica richiesta (atomica), e si legge solo via /api/receipts/[id].
@@ -68,7 +85,8 @@ export async function addPayment(bookingId: string, formData: FormData): Promise
 
   try {
     const record = await db.collection("payments").create(body);
-    revalidatePath(`/admin/prenotazioni/${bookingId}`);
+    await syncStatus(db, bookingId, profile);
+    revalidateBookingViews(bookingId);
     return { ok: true, data: { id: record.id } };
   } catch (err) {
     console.error("[payments] salvataggio acconto fallito:", err);
@@ -91,7 +109,9 @@ export async function deletePayment(id: string): Promise<ActionResult> {
     return dbFail(err);
   }
 
-  revalidatePath(`/admin/prenotazioni/${String(row.booking)}`);
+  const bookingId = String(row.booking);
+  await syncStatus(auth.db, bookingId, auth.profile);
+  revalidateBookingViews(bookingId);
   return { ok: true, data: undefined };
 }
 

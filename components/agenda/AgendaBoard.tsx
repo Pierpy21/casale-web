@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { StatusLegend, cn } from "@/components/ui";
-import type { BookingListItem } from "@/lib/types";
+import type { BookingListItem, Room } from "@/lib/types";
 import { AgendaToolbar } from "./AgendaToolbar";
 import { MobileAgenda } from "./MobileAgenda";
 import { MonthView } from "./MonthView";
@@ -30,6 +30,10 @@ export interface AgendaBoardProps {
   loadedRange: IsoRange;
   today: string;
   isAdmin: boolean;
+  /** Sale per l'assegnazione nelle prenotazioni normali della giornata. */
+  rooms: Room[];
+  /** `canAssignRoom(profile, "normale")`: senza, le sale sono in sola lettura. */
+  canAssignRooms: boolean;
 }
 
 /**
@@ -44,6 +48,8 @@ export function AgendaBoard({
   loadedRange,
   today,
   isAdmin,
+  rooms,
+  canAssignRooms,
 }: AgendaBoardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -96,7 +102,7 @@ export function AgendaBoard({
           />
         )}
         {view === "week" && <WeekView days={weekDates(selected)} today={today} byDate={byDate} />}
-        {view === "day" && <DayView items={byDate.get(selected) ?? []} />}
+        {view === "day" && <DayView items={byDate.get(selected) ?? []} rooms={rooms} canAssignRooms={canAssignRooms} />}
       </div>
 
       <div className="lg:hidden">
@@ -105,6 +111,8 @@ export function AgendaBoard({
           today={today}
           byDate={byDate}
           isAdmin={isAdmin}
+          rooms={rooms}
+          canAssignRooms={canAssignRooms}
           onNavigate={(iso) => navigate(iso, view)}
         />
       </div>

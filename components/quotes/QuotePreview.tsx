@@ -146,7 +146,7 @@ export function QuotePreview({ model }: QuotePreviewProps) {
           <div className={styles.totalsWrap}>
             <dl className={styles.totalsBox} aria-label="Totali">
               <div className={styles.totalsRow}>
-                <dt className={styles.totalsLabel}>Subtotale (IVA inclusa)</dt>
+                <dt className={styles.totalsLabel}>{totals.subtotalLabel}</dt>
                 <dd className={styles.totalsValue}>{totals.subtotal}</dd>
               </div>
               {totals.hasDiscount ? (
@@ -164,7 +164,7 @@ export function QuotePreview({ model }: QuotePreviewProps) {
                 <dd className={styles.totalsValue}>{totals.vat}</dd>
               </div>
               <div className={styles.grandRow}>
-                <dt className={styles.grandLabel}>Totale</dt>
+                <dt className={styles.grandLabel}>{totals.totalLabel}</dt>
                 <dd className={styles.grandValue}>{totals.total}</dd>
               </div>
             </dl>

@@ -3,8 +3,9 @@ import type PocketBase from "pocketbase";
 import { ClientResponseError } from "pocketbase";
 import { UserFacingError } from "@/lib/action-utils";
 import { generateRecordId, dayStartPb, nn, num, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
-import { fetchOne, listAll } from "@/lib/pocketbase/queries";
+import { countWhere, fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { mapBooking } from "@/lib/pocketbase/mappers";
+import { eventStatusFor, statusAfterPayments } from "@/lib/booking-status";
 import {
   allergiesSummary,
   bookingAuditValues,
@@ -13,7 +14,7 @@ import {
   nullIfEmpty,
   type AuditEntry,
 } from "@/lib/booking-audit";
-import type { Course } from "@/lib/types";
+import type { BookingStatus, Course } from "@/lib/types";
 import type { BookingInputType } from "@/lib/validation";
 
 // Sostituisce le RPC SQL legacy (upsert_booking, save_booking_dishes, reset_booking_dishes,
@@ -153,12 +154,18 @@ export function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
+/** Numero di acconti di una prenotazione. */
+export async function countPayments(db: PocketBase, bookingId: string): Promise<number> {
+  return countWhere(db, "payments", db.filter("booking = {:id}", { id: bookingId }));
+}
+
 function bookingRecordFields(
   input: BookingInputType,
   actor: Actor,
   clientId: string,
   menuId: string | null,
   kidsMenuId: string | null,
+  status: BookingStatus,
 ) {
   return {
     client: clientId,
@@ -175,7 +182,7 @@ function bookingRecordFields(
     kids_menu: kidsMenuId ?? "",
     setup_colors: input.setup_colors,
     setup_notes: input.setup_notes ?? "",
-    status: input.status,
+    status,
     notes: input.notes ?? "",
     updated_by: actor.id,
   };
@@ -204,10 +211,23 @@ export async function upsertBooking(
     [oldDishes, oldAllergies] = await Promise.all([bookingDishRows(db, id), bookingAllergyRows(db, id)]);
   }
 
+  // Stato: per gli eventi viene ricalcolato dagli acconti; le normali sono sempre confermate (vedi validazione).
+  const paidCount = id ? await countPayments(db, id) : 0;
+  if (isEvent && input.status === "saldato" && paidCount === 0) {
+    throw new UserFacingError("Per segnare l'evento come saldato serve almeno un acconto.");
+  }
+  const status: BookingStatus = isEvent
+    ? eventStatusFor({
+        requested: input.status,
+        previous: before ? (String(before.status) as BookingStatus) : null,
+        paidCount,
+      })
+    : input.status;
+
   const batch = db.createBatch();
   // Cliente nuovo: il record cliente viene messo nella stessa batch, prima della prenotazione.
   const clientId = await planClient(db, input, batch);
-  const fields = bookingRecordFields(input, actor, clientId, menuId, kidsMenuId);
+  const fields = bookingRecordFields(input, actor, clientId, menuId, kidsMenuId, status);
 
   if (!id) {
     batch.collection("bookings").create({ id: bookingId, ...fields, created_by: actor.id });
@@ -235,7 +255,7 @@ export async function upsertBooking(
       kids_menu_id: kidsMenuId,
       setup_colors: input.setup_colors,
       setup_notes: input.setup_notes ?? null,
-      status: input.status,
+      status,
       notes: input.notes ?? null,
     });
     queueAuditEntries(batch, actor, bookingId, diffBookingFields(before_, after_));
@@ -279,6 +299,67 @@ export async function upsertBooking(
 
   await batch.send();
   return bookingId;
+}
+
+/**
+ * Riallinea lo stato di un evento agli acconti (dopo addPayment / deletePayment): senza acconti torna "opzione"
+ * se era confermato o saldato; con acconti "opzione" diventa "confermato". Annullati e saldati con acconti restano.
+ * Il cambio di stato viene registrato nel registro modifiche. Nessun effetto sulle prenotazioni normali.
+ */
+export async function syncEventStatusFromPayments(db: PocketBase, bookingId: string, actor: Actor): Promise<void> {
+  const booking = await loadBooking(db, bookingId);
+  if (String(booking.kind || "evento") !== "evento") return;
+  const current = String(booking.status) as BookingStatus;
+  const next = statusAfterPayments(current, await countPayments(db, bookingId));
+  if (next === current) return;
+
+  const batch = db.createBatch();
+  batch.collection("bookings").update(bookingId, { status: next, updated_by: actor.id });
+  queueAudit(batch, actor, { bookingId, field: "status", old: current, new: next });
+  await batch.send();
+}
+
+/**
+ * Assegna (o libera, con roomId null) la sala di una prenotazione normale, con audit (campo "Sala", nomi delle sale).
+ * I controlli di ruolo e di tipo sono fatti dal chiamante (app/actions/bookings.ts).
+ */
+export async function assignBookingRoom(
+  db: PocketBase,
+  bookingId: string,
+  roomId: string | null,
+  actor: Actor,
+): Promise<void> {
+  const booking = await loadBooking(db, bookingId);
+  const currentRoomId = nn(booking.room);
+  if (currentRoomId === roomId) return;
+
+  const roomName = async (id: string | null): Promise<string | null> => {
+    if (!id) return null;
+    const room = await fetchOne(db, "rooms", id);
+    return room ? String(room.name ?? "") : null;
+  };
+  const [oldName, newName] = await Promise.all([roomName(currentRoomId), roomName(roomId)]);
+
+  const batch = db.createBatch();
+  batch.collection("bookings").update(bookingId, { room: roomId ?? "", updated_by: actor.id });
+  queueAudit(batch, actor, { bookingId, field: "Sala", old: oldName, new: newName });
+  await batch.send();
+}
+
+/** Imposta lo stato di una prenotazione (solo se cambia), con audit. Le regole per tipo sono in app/actions. */
+export async function setBookingStatusRecord(
+  db: PocketBase,
+  bookingId: string,
+  next: BookingStatus,
+  actor: Actor,
+): Promise<void> {
+  const booking = await loadBooking(db, bookingId);
+  const current = String(booking.status) as BookingStatus;
+  if (current === next) return;
+  const batch = db.createBatch();
+  batch.collection("bookings").update(bookingId, { status: next, updated_by: actor.id });
+  queueAudit(batch, actor, { bookingId, field: "status", old: current, new: next });
+  await batch.send();
 }
 
 /** Coperti (admin o sala): aggiorna adulti/bambini/menù bambini con audit. */

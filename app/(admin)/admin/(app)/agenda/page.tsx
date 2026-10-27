@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { requireProfile } from "@/lib/auth";
+import { getRooms } from "@/lib/data/catalog";
 import { getBookingsInRange } from "@/lib/data/bookings";
-import { isAdmin } from "@/lib/permissions";
+import { canAssignRoom, isAdmin } from "@/lib/permissions";
 import { AgendaBoard } from "@/components/agenda/AgendaBoard";
 import { KitchenAgenda } from "@/components/agenda/KitchenAgenda";
 import {
@@ -34,7 +35,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const selected = parseDateParam(params.date);
   // Si carica l'intera griglia mensile (con i giorni dei mesi adiacenti): il resto della navigazione è client-side.
   const loadedRange = monthGridRange(selected);
-  const bookings = await getBookingsInRange(loadedRange.from, loadedRange.to);
+  const [bookings, rooms] = await Promise.all([getBookingsInRange(loadedRange.from, loadedRange.to), getRooms({ includeInactive: true })]);
 
   return (
     <AgendaBoard
@@ -45,6 +46,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       loadedRange={loadedRange}
       today={today}
       isAdmin={admin}
+      rooms={rooms}
+      canAssignRooms={canAssignRoom(profile, "normale")}
     />
   );
 }

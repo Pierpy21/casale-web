@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalBookingStatus } from "./booking-status";
 import {
   BOOKING_KINDS,
   INVENTORY_CATEGORIES,
@@ -89,6 +90,27 @@ const intMin0 = z.preprocess(
 const priceSchema = z.preprocess(
   toNumber,
   z.number(numberError("Prezzo non valido")).min(0, "Il prezzo non può essere negativo").transform(round2),
+);
+
+/** Prezzo finale del preventivo (IVA inclusa): facoltativo, vuoto → null, virgola accettata, 0..1.000.000. */
+const finalTotalSchema = z.preprocess(
+  (v) => {
+    if (v === undefined || v === null) return null;
+    if (typeof v === "string") {
+      // Formato italiano: "1.250,50" → 1250.50; anche "1250,5" e "1250.5".
+      const raw = v.trim();
+      const t = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+      return t === "" ? null : toNumber(t);
+    }
+    return v;
+  },
+  z
+    .number(numberError("Prezzo finale non valido"))
+    .max(1000000, "Prezzo finale troppo alto (massimo 1.000.000 €)")
+    .transform(round2)
+    // Controllo dopo l'arrotondamento: 0,004 → 0,00 è rifiutato come 0.
+    .refine((n) => n >= 0.01, "Il prezzo finale deve essere almeno 0,01 €")
+    .nullable(),
 );
 
 // ---------------------------------------------------------------------
@@ -234,7 +256,8 @@ export const BookingInput = z
     kids_menu_id: optUuid,
     setup_colors: z.array(z.enum(SETUP_COLORS, { message: "Colore non valido" })).max(MAX_ITEMS).default([]),
     setup_notes: optLongText,
-    status: z.enum(["opzione", "confermato", "saldato", "annullato"]).default("opzione"),
+    /** Stato richiesto. Gli eventi lo ricalcolano dagli acconti (vedi lib/booking-status); le normali sono sempre confermate. */
+    status: z.enum(["opzione", "confermato", "saldato", "annullato"]).optional(),
     notes: optLongText,
     allergies: z.array(AllergyInput).max(MAX_ITEMS, "Troppe allergie (massimo 60)").default([]),
     /** Se assente e menu_id presente, il backend copia i piatti dal menù (solo eventi). */
@@ -258,6 +281,7 @@ export const BookingInput = z
     } else if (v.kind === "normale") {
       if (!v.event_time) issue("event_time", "Ora obbligatoria");
       if (v.menu_id || v.kids_menu_id) issue("menu_id", "Le prenotazioni normali non hanno menù");
+      if (v.status === "opzione") issue("status", "Le prenotazioni normali non hanno lo stato Attesa");
       checkCovers(v, ctx);
     } else {
       // appuntamento: incontro con il cliente, niente coperti obbligatori, niente menù.
@@ -267,7 +291,12 @@ export const BookingInput = z
       if (v.menu_id || v.kids_menu_id) issue("menu_id", "Gli appuntamenti non hanno menù");
       checkCovers(v, ctx, false);
     }
-  });
+  })
+  .transform((v) => ({
+    ...v,
+    // Normali: sempre confermate (annullato escluso). Eventi: stato richiesto o "opzione", ricalcolato dal server.
+    status: v.kind === "normale" ? normalBookingStatus(v.status ?? "confermato") : (v.status ?? "opzione"),
+  }));
 export type BookingInputType = z.infer<typeof BookingInput>;
 
 // ---------------------------------------------------------------------
@@ -495,6 +524,7 @@ export const QuoteInput = z.object({
       .max(100, "L'IVA non può superare 100")
       .transform(round2),
   ).default(10),
+  final_total: finalTotalSchema.default(null),
   notes: optLongText,
 });
 export type QuoteInputType = z.infer<typeof QuoteInput>;
@@ -504,6 +534,8 @@ export const QuoteDraftInput = z.object({
   lines: z.array(QuoteLineInput).min(1, "Almeno una riga").max(MAX_ITEMS, "Troppe righe (massimo 60)"),
   discount: z.preprocess(toNumber, z.number(numberError("Sconto non valido")).min(0, "Lo sconto non può essere negativo").transform(round2)).default(0),
   vat_rate: z.preprocess(toNumber, z.number(numberError("IVA non valida")).min(0, "IVA non valida").max(100, "IVA non valida").transform(round2)).default(10),
+  /** Prezzo finale concordato (IVA inclusa): se presente sostituisce il totale calcolato (lo sconto non si applica). */
+  final_total: finalTotalSchema.optional(),
   valid_until: z.preprocess(emptyToNull, dateSchema.nullable()).optional(),
   notes: optLongText.optional(),
 });

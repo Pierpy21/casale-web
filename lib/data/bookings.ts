@@ -6,12 +6,14 @@ import { isRecordId, dayEndPb, dayStartPb, num, toDateOnly, type PbRecord } from
 import { mapChange } from "@/lib/pocketbase/mappers";
 import { listAll, fetchOne } from "@/lib/pocketbase/queries";
 import { addDaysISO, monthBounds, romeToday } from "@/lib/dates";
-import type {
-  BookingChange,
-  BookingDetail,
-  BookingListItem,
-  DashboardStats,
-  RoomBookingSlot,
+import {
+  BOOKING_KINDS,
+  type BookingChange,
+  type BookingDetail,
+  type BookingKind,
+  type BookingListItem,
+  type DashboardStats,
+  type RoomBookingSlot,
 } from "@/lib/types";
 import {
   BOOKING_DETAIL_EXPAND,
@@ -135,7 +137,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const [eventsThisMonth, eventsToday, pendingOptions, week] = await Promise.all([
     count(db.filter("event_date >= {:from} && event_date <= {:to} && status != {:s} && kind != {:k}", { from: dayStartPb(from), to: dayEndPb(to), s: "annullato", k: "appuntamento" })),
     count(db.filter("event_date >= {:from} && event_date <= {:to} && status != {:s} && kind != {:k}", { from: dayStartPb(today), to: dayEndPb(today), s: "annullato", k: "appuntamento" })),
-    count(db.filter("status = {:s} && event_date >= {:from}", { s: "opzione", from: dayStartPb(today) })),
+    // Eventi senza acconto (stato "opzione"): le prenotazioni normali non passano mai da qui.
+    count(db.filter("kind = {:k} && status = {:s} && event_date >= {:from}", { k: "evento", s: "opzione", from: dayStartPb(today) })),
     listAll(
       db,
       "bookings",
@@ -148,15 +151,20 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   return { eventsThisMonth, eventsToday, pendingOptions, coversNext7Days };
 }
 
-export async function getUpcomingBookings(limit: number): Promise<BookingListItem[]> {
+/** Prossime prenotazioni (esclusi gli annullati), in ordine di data. `kinds` limita ai tipi indicati. */
+export async function getUpcomingBookings(
+  limit: number,
+  opts?: { kinds?: BookingKind[] },
+): Promise<BookingListItem[]> {
   if (!(await getCurrentProfile())) return [];
   const db = await getAdminPb();
-  const records = await listAll(
-    db,
-    "bookings",
-    db.filter("event_date >= {:from} && status != {:s}", { from: dayStartPb(romeToday()), s: "annullato" }),
-    { expand: BOOKING_LIST_EXPAND },
-  );
+  const kinds = (opts?.kinds ?? []).filter((k): k is BookingKind => (BOOKING_KINDS as readonly string[]).includes(k));
+  let filter = db.filter("event_date >= {:from} && status != {:s}", { from: dayStartPb(romeToday()), s: "annullato" });
+  if (kinds.length > 0) {
+    const kindFilter = kinds.map((k) => db.filter("kind = {:k}", { k })).join(" || ");
+    filter = `${filter} && (${kindFilter})`;
+  }
+  const records = await listAll(db, "bookings", filter, { expand: BOOKING_LIST_EXPAND });
   const max = Math.max(1, Math.min(limit, 100));
   return bookingListItems(db, sortBookingRecords(records).slice(0, max));
 }

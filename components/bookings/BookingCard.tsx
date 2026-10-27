@@ -106,7 +106,7 @@ export function BookingCard({
         )}
       >
         <span className="flex items-center gap-2 text-[12px] text-slate-dark">
-          <StatusDot status={b.status} size="sm" />
+          {b.kind !== "normale" && <StatusDot status={b.status} size="sm" />}
           <KindBadge kind={b.kind} compact />
           {dateLabel && <span className="font-medium">{dateLabel}</span>}
           {time && <span className="font-medium tabular-nums text-ink">{time}</span>}
@@ -156,7 +156,7 @@ export function BookingCard({
             <KindBadge kind={b.kind} />
             {isEvent && <MenuLabel name={menuName} />}
           </div>
-          <StatusDot status={b.status} />
+          {b.kind !== "normale" && <StatusDot status={b.status} />}
         </div>
 
         <div className="flex min-w-0 flex-col gap-2">

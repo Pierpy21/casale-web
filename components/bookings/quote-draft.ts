@@ -21,6 +21,8 @@ export interface QuoteDraft {
   extra: QuoteLineDraft[];
   priceOverrides: Partial<Record<AutoLineKey, string>>;
   discount: string;
+  /** Prezzo finale concordato (facoltativo): se compilato sostituisce il totale e disabilita lo sconto. */
+  final_total: string;
   vat_rate: string;
   valid_until: string;
   notes: string;
@@ -30,6 +32,7 @@ export const EMPTY_QUOTE_DRAFT: QuoteDraft = {
   extra: [],
   priceOverrides: {},
   discount: "",
+  final_total: "",
   vat_rate: "10",
   valid_until: "",
   notes: "",
@@ -81,6 +84,25 @@ export function lineSubtotal(line: QuoteLineDraft): number {
   return Number.isFinite(quantity) && Number.isFinite(unitPrice) ? round2(quantity * unitPrice) : 0;
 }
 
+/**
+ * Prezzo finale: stessa normalizzazione del server (lib/validation.ts finalTotalSchema).
+ * Se c'è una virgola: i punti sono separatori di migliaia ("1.250,50" → 1250.50); altrimenti il valore resta com'è.
+ */
+export function parseFinalTotal(raw: string): number {
+  const trimmed = raw.trim();
+  const text = trimmed.includes(",") ? trimmed.replace(/\./g, "").replace(",", ".") : trimmed;
+  if (text === "") return Number.NaN;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : Number.NaN;
+}
+
+/** Prezzo finale della bozza: null se vuoto o non valido (la validazione segnala i valori errati). */
+export function finalTotalOf(draft: QuoteDraft): number | null {
+  if (draft.final_total.trim() === "") return null;
+  const n = parseFinalTotal(draft.final_total);
+  return Number.isFinite(n) && round2(n) >= 0.01 ? round2(n) : null;
+}
+
 /** Totali live (IVA inclusa). Valori non validi contano come zero: la validazione li segnala all'invio. */
 export function quoteTotals(draft: QuoteDraft, lines: QuoteLineDraft[]): QuoteTotals {
   const finiteOrZero = (n: number) => (Number.isFinite(n) ? n : 0);
@@ -92,6 +114,7 @@ export function quoteTotals(draft: QuoteDraft, lines: QuoteLineDraft[]): QuoteTo
   return computeQuoteTotals({
     lines: quoteLines,
     discount: finiteOrZero(parseAmount(draft.discount)),
+    final_total: finalTotalOf(draft),
     vat_rate: draft.vat_rate.trim() === "" ? 10 : finiteOrZero(parseAmount(draft.vat_rate)),
   });
 }
@@ -99,6 +122,7 @@ export function quoteTotals(draft: QuoteDraft, lines: QuoteLineDraft[]): QuoteTo
 export interface QuotePayload {
   lines: QuoteLine[];
   discount: number;
+  final_total: number | null;
   vat_rate: number;
   valid_until: string | null;
   notes: string | null;
@@ -134,6 +158,16 @@ export function buildQuotePayload(
   const discount = draft.discount.trim() === "" ? 0 : parseAmount(draft.discount);
   if (!Number.isFinite(discount) || discount < 0) add("quote.discount", "Sconto non valido");
 
+  let finalTotal: number | null = null;
+  if (draft.final_total.trim() !== "") {
+    const parsed = parseFinalTotal(draft.final_total);
+    // Ordine come nel server: massimo sul valore grezzo, poi arrotondamento, poi minimo sul valore arrotondato.
+    if (!Number.isFinite(parsed)) add("quote.final_total", "Prezzo finale non valido");
+    else if (parsed > 1000000) add("quote.final_total", "Prezzo finale troppo alto (massimo 1.000.000 €)");
+    else if (round2(parsed) < 0.01) add("quote.final_total", "Il prezzo finale deve essere almeno 0,01 €");
+    else finalTotal = round2(parsed);
+  }
+
   const vat = draft.vat_rate.trim() === "" ? 10 : parseAmount(draft.vat_rate);
   if (!Number.isFinite(vat) || vat < 0 || vat > 100) add("quote.vat_rate", "IVA non valida (da 0 a 100)");
 
@@ -142,7 +176,8 @@ export function buildQuotePayload(
   return {
     payload: {
       lines: out.map((l) => ({ ...l, unit_price: round2(l.unit_price) })),
-      discount: round2(discount),
+      discount: finalTotal !== null ? 0 : round2(discount),
+      final_total: finalTotal,
       vat_rate: round2(vat),
       valid_until: draft.valid_until || null,
       notes: draft.notes.trim() || null,

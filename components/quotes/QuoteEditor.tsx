@@ -6,9 +6,10 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { deleteQuote, updateQuote } from "@/app/actions/quotes";
 import { ConfirmAction } from "@/components/bookings/ConfirmAction";
+import { parseFinalTotal } from "@/components/bookings/quote-draft";
 import { Alert, Button, DocumentDownload, Field, Input, Textarea, buttonClasses } from "@/components/ui";
 import { buildQuoteDocumentModel } from "@/lib/documents/quote-model";
-import { DOCX_MIME, computeQuoteTotals, formatEUR, quoteFileName } from "@/lib/quote-utils";
+import { DOCX_MIME, computeQuoteTotals, formatEUR, quoteFileName, round2 } from "@/lib/quote-utils";
 import type { QuoteLine, QuoteWithBooking } from "@/lib/types";
 import { QuotePreview } from "./QuotePreview";
 
@@ -40,6 +41,7 @@ function snapshotOf(
   validUntil: string,
   rows: LineRow[],
   discount: string,
+  finalTotal: string,
   vatRate: string,
   notes: string,
 ): string {
@@ -48,6 +50,7 @@ function snapshotOf(
     validUntil,
     lines: rows.map(({ description, quantity, unit_price }) => ({ description, quantity, unit_price })),
     discount,
+    finalTotal,
     vatRate,
     notes,
   });
@@ -65,6 +68,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
   const [validUntil, setValidUntil] = useState(quote.valid_until ?? "");
   const [rows, setRows] = useState<LineRow[]>(() => quote.lines.map(toRow));
   const [discount, setDiscount] = useState(String(quote.discount));
+  const [finalTotal, setFinalTotal] = useState(quote.final_total != null ? String(quote.final_total) : "");
   const [vatRate, setVatRate] = useState(String(quote.vat_rate));
   const [notes, setNotes] = useState(quote.notes ?? "");
   const [errors, setErrors] = useState<Errors>({});
@@ -76,6 +80,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
       quote.valid_until ?? "",
       quote.lines.map(toRow),
       String(quote.discount),
+      quote.final_total != null ? String(quote.final_total) : "",
       String(quote.vat_rate),
       quote.notes ?? "",
     ),
@@ -86,11 +91,19 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
     quantity: toNumber(r.quantity),
     unit_price: toNumber(r.unit_price),
   }));
+  // Prezzo finale vuoto = calcolo automatico; compilato = sostituisce il totale e disabilita lo sconto.
+  // Stessa normalizzazione e stessa soglia del server (minimo 0,01 € dopo l'arrotondamento).
+  const parsedFinal = finalTotal.trim() === "" ? null : parseFinalTotal(finalTotal);
+  const finalTotalValue =
+    parsedFinal !== null && Number.isFinite(parsedFinal) && round2(parsedFinal) >= 0.01 ? round2(parsedFinal) : null;
+  const hasFinalTotal = finalTotalValue !== null;
   const totals = computeQuoteTotals({
     lines: numericLines,
     discount: toNumber(discount),
+    final_total: finalTotalValue,
     vat_rate: toNumber(vatRate),
   });
+  const valueOfLines = numericLines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
 
   // Anteprima = stesso modello di PDF e DOCX, con i valori del form. Una data emissione vuota
   // (campo cancellato) ripiega sulla data salvata: il modello non accetta date invalide.
@@ -100,11 +113,12 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
     valid_until: validUntil || null,
     lines: numericLines,
     discount: toNumber(discount),
+    final_total: finalTotalValue,
     vat_rate: toNumber(vatRate),
     notes: notes.trim() || null,
   });
 
-  const snapshot = snapshotOf(issuedAt, validUntil, rows, discount, vatRate, notes);
+  const snapshot = snapshotOf(issuedAt, validUntil, rows, discount, finalTotal, vatRate, notes);
   const dirty = snapshot !== savedSnapshot;
 
   const updateRow = (index: number, changes: Partial<Omit<LineRow, "key">>) => {
@@ -134,6 +148,11 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
       setFormError("Controlla i campi evidenziati.");
       return;
     }
+    if (parsedFinal !== null && Number.isFinite(parsedFinal) && round2(parsedFinal) < 0.01) {
+      setErrors({ final_total: ["Il prezzo finale deve essere almeno 0,01 €"] });
+      setFormError("Controlla i campi evidenziati.");
+      return;
+    }
     const currentSnapshot = snapshot;
     startTransition(async () => {
       const result = await updateQuote(quote.id, {
@@ -141,6 +160,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
         valid_until: validUntil || null,
         lines: rows.map((r) => ({ description: r.description, quantity: r.quantity, unit_price: r.unit_price })),
         discount,
+        final_total: finalTotal,
         vat_rate: vatRate,
         notes: notes.trim() || null,
       });
@@ -219,8 +239,11 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
         </section>
 
         <section className="grid gap-5 rounded-[2px] border border-sand bg-paper p-5 sm:grid-cols-2 sm:p-6" aria-label="Sconto e IVA">
-          <Field label="Sconto (€)" htmlFor="discount" error={errors.discount?.[0]} hint="Importo, IVA inclusa">
-            <Input id="discount" type="number" inputMode="decimal" step="0.01" min="0" invalid={!!errors.discount} value={discount} onChange={(e) => { setDiscount(e.target.value); setSaved(false); }} />
+          <Field label="Sconto (€)" htmlFor="discount" error={errors.discount?.[0]} hint={hasFinalTotal ? "Il prezzo finale sostituisce il totale" : "Importo, IVA inclusa"}>
+            <Input id="discount" type="number" inputMode="decimal" step="0.01" min="0" invalid={!!errors.discount} disabled={hasFinalTotal} value={discount} onChange={(e) => { setDiscount(e.target.value); setSaved(false); }} />
+          </Field>
+          <Field label="Prezzo finale (facoltativo)" htmlFor="final_total" error={errors.final_total?.[0]} hint="IVA inclusa. Lasciarlo vuoto usa il totale delle voci">
+            <Input id="final_total" type="number" inputMode="decimal" step="0.01" min="0" invalid={!!errors.final_total} value={finalTotal} onChange={(e) => { setFinalTotal(e.target.value); setSaved(false); }} />
           </Field>
           <Field label="Aliquota IVA (%)" htmlFor="vat_rate" error={errors.vat_rate?.[0]}>
             <Input id="vat_rate" type="number" inputMode="decimal" step="0.5" min="0" max="100" invalid={!!errors.vat_rate} value={vatRate} onChange={(e) => { setVatRate(e.target.value); setSaved(false); }} />
@@ -231,9 +254,15 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
         </section>
 
         <dl className="flex flex-col gap-2 rounded-[2px] border border-sand bg-cream/60 p-5 text-[15px]" aria-label="Totali">
-          <div className="flex justify-between"><dt>Subtotale</dt><dd className="tabular-nums">{formatEUR(totals.subtotal)}</dd></div>
-          <div className="flex justify-between"><dt>Sconto</dt><dd className="tabular-nums">− {formatEUR(totals.discount)}</dd></div>
-          <div className="flex justify-between border-t border-sand pt-2 text-lg font-medium"><dt>Totale IVA inclusa</dt><dd className="tabular-nums">{formatEUR(totals.total)}</dd></div>
+          {hasFinalTotal ? (
+            <div className="flex justify-between"><dt>Valore delle voci</dt><dd className="tabular-nums">{formatEUR(valueOfLines)}</dd></div>
+          ) : (
+            <>
+              <div className="flex justify-between"><dt>Subtotale</dt><dd className="tabular-nums">{formatEUR(totals.subtotal)}</dd></div>
+              {totals.discount > 0 && <div className="flex justify-between"><dt>Sconto</dt><dd className="tabular-nums">− {formatEUR(totals.discount)}</dd></div>}
+            </>
+          )}
+          <div className="flex justify-between border-t border-sand pt-2 text-lg font-medium"><dt>{hasFinalTotal ? "Prezzo finale concordato" : "Totale IVA inclusa"}</dt><dd className="tabular-nums">{formatEUR(totals.total)}</dd></div>
           <div className="flex justify-between text-[13px] text-slate-dark"><dt>Imponibile</dt><dd className="tabular-nums">{formatEUR(totals.taxable)}</dd></div>
           <div className="flex justify-between text-[13px] text-slate-dark"><dt>IVA {toNumber(vatRate)}%</dt><dd className="tabular-nums">{formatEUR(totals.vat)}</dd></div>
         </dl>

@@ -5,17 +5,21 @@ import { revalidatePath } from "next/cache";
 import { BookingInput, coversInputFor, DishesInput } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } from "@/lib/action-utils";
 import { createQuote } from "@/lib/rpc/quotes";
-import { canCreateAnyBooking, canCreateBooking, canEditBookingFully, canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
+import { canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditBookingFully, canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
 import { fetchOne } from "@/lib/pocketbase/queries";
 import { loadBookingBrief, notifyBookingDeleted, notifyBookingEvent } from "@/lib/notify";
 import {
+  assignBookingRoom as writeRoomAssignment,
+  countPayments,
+  setBookingStatusRecord,
   deleteBookingRecord,
   resetBookingDishesFromMenu,
   saveBookingDishes,
   updateBookingCovers as writeCovers,
   upsertBooking,
 } from "@/lib/rpc/bookings";
-import type { ActionResult, BookingKind } from "@/lib/types";
+import { eventStatusFor } from "@/lib/booking-status";
+import type { ActionResult, BookingKind, BookingStatus } from "@/lib/types";
 
 function revalidateBooking(id?: string, clientId?: string): void {
   revalidatePath("/admin/agenda");
@@ -102,7 +106,9 @@ export async function updateBooking(id: string, input: unknown): Promise<ActionR
   }
 
   revalidateBooking(id, parsed.data.client_id ?? undefined);
-  const newStatus = parsed.data.status;
+  // Lo stato degli eventi è ricalcolato dal server (acconti): si legge quello salvato.
+  const saved = await fetchOne(auth.db, "bookings", id);
+  const newStatus = String(saved?.status ?? parsed.data.status);
   const previousStatus = String(previous.status);
   const type =
     newStatus === "annullato" && previousStatus !== "annullato"
@@ -185,6 +191,89 @@ export async function updateBookingDishes(id: string, dishes: unknown): Promise<
   revalidateBooking(id);
   const actor = auth.profile;
   after(() => notifyBookingEvent({ type: "dishes_updated", bookingId: id, actor }));
+  return { ok: true, data: undefined };
+}
+
+/** Stati ammessi per tipo. Evento: "opzione"/"confermato" = torna al calcolo automatico dagli acconti. */
+const ALLOWED_STATUS: Record<BookingKind, readonly BookingStatus[]> = {
+  evento: ["opzione", "confermato", "saldato", "annullato"],
+  appuntamento: ["opzione", "confermato", "annullato"],
+  normale: ["confermato", "annullato"],
+};
+
+/**
+ * Cambio di stato manuale (solo admin). Eventi: "saldato" solo con almeno un acconto; "opzione"/"confermato"
+ * ricalcolano lo stato dagli acconti. Con audit e notifica (cancellazione o cambio di stato).
+ */
+export async function setBookingStatus(bookingId: string, status: BookingStatus): Promise<ActionResult> {
+  if (!isRecordId(bookingId)) return fail("Prenotazione non valida.");
+  const auth = await authorize(isAdmin);
+  if (!auth.ok) return auth;
+
+  const booking = await fetchOne(auth.db, "bookings", bookingId);
+  if (!booking) return fail("Prenotazione non trovata.");
+  const kind = kindOf(booking);
+  if (!ALLOWED_STATUS[kind].includes(status)) {
+    return fail("Stato non disponibile per questo tipo di prenotazione.");
+  }
+  const current = String(booking.status) as BookingStatus;
+
+  let next: BookingStatus = status;
+  if (kind === "evento") {
+    const paid = await countPayments(auth.db, bookingId);
+    if (status === "saldato" && paid === 0) {
+      return fail("Per segnare l'evento come saldato serve almeno un acconto.");
+    }
+    if (status === "opzione" || status === "confermato") {
+      next = eventStatusFor({ requested: "confermato", previous: null, paidCount: paid });
+    }
+  }
+  if (next === current) return { ok: true, data: undefined };
+
+  const actor = auth.profile;
+  try {
+    await setBookingStatusRecord(auth.db, bookingId, next, { id: actor.id, full_name: actor.full_name });
+  } catch (err) {
+    return dbFail(err);
+  }
+
+  revalidateBooking(bookingId, String(booking.client ?? "") || undefined);
+  const type = next === "annullato" && current !== "annullato" ? "booking_cancelled" : "booking_status";
+  after(() => notifyBookingEvent({ type, bookingId, actor }));
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Sala di una prenotazione normale (admin, o sala attiva). `roomId` null = nessuna sala.
+ * Solo prenotazioni normali; la sala deve esistere ed essere attiva. Registra l'audit e aggiorna le viste.
+ */
+export async function assignBookingRoom(bookingId: string, roomId: string | null): Promise<ActionResult> {
+  if (!isRecordId(bookingId)) return fail("Prenotazione non valida.");
+  if (roomId !== null && !isRecordId(roomId)) return fail("Sala non valida.");
+  const auth = await authorize(
+    (p) => isAdmin(p) || (p.active && p.role === "sala"),
+    "Non sei autorizzato ad assegnare la sala.",
+  );
+  if (!auth.ok) return auth;
+
+  const booking = await fetchOne(auth.db, "bookings", bookingId);
+  if (!booking) return fail("Prenotazione non trovata.");
+  if (!canAssignRoom(auth.profile, kindOf(booking))) {
+    return fail("Solo le prenotazioni normali hanno la sala assegnabile.");
+  }
+
+  if (roomId) {
+    const room = await fetchOne(auth.db, "rooms", roomId);
+    if (!room || !Boolean(room.active)) return fail("La sala selezionata non esiste o non è attiva.");
+  }
+
+  try {
+    await writeRoomAssignment(auth.db, bookingId, roomId, { id: auth.profile.id, full_name: auth.profile.full_name });
+  } catch (err) {
+    return dbFail(err);
+  }
+
+  revalidateBooking(bookingId, String(booking.client ?? "") || undefined);
   return { ok: true, data: undefined };
 }
 

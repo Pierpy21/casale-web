@@ -44,7 +44,7 @@ function MonthPill({ booking: b }: { booking: BookingListItem }) {
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5">
-        <StatusDot status={b.status} size="sm" />
+        {b.kind !== "normale" && <StatusDot status={b.status} size="sm" />}
         {time && <span className="shrink-0 text-[11px] font-medium tabular-nums text-ink">{time}</span>}
         <span
           className={cn(

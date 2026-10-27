@@ -113,7 +113,9 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
   };
 }
 
-const STATUSES = Object.keys(STATUS_LABELS) as BookingStatus[];
+/** Stati scelgibili a mano: l'appuntamento ha Attesa/Confermato/Annullato; la prenotazione normale è sempre confermata, annullabile solo in modifica dall'admin. */
+const APPOINTMENT_STATUSES: BookingStatus[] = ["opzione", "confermato", "annullato"];
+const NORMAL_STATUSES: BookingStatus[] = ["confermato", "annullato"];
 
 const TITLES: Record<SimpleKind, { create: string; edit: string; submit: string }> = {
   normale: { create: "Nuova prenotazione", edit: "Modifica prenotazione", submit: "Crea prenotazione" },
@@ -124,6 +126,11 @@ const TITLES: Record<SimpleKind, { create: string; edit: string; submit: string 
  * Prenotazione normale (tavolo) e appuntamento. Stesso form con campi diversi per tipo.
  * Niente menù né preventivo: questi tipi non li hanno. Campi nascosti (es. coperti dell'appuntamento) restano invariati in modifica.
  */
+/** Stato di una prenotazione normale: confermata, oppure annullata se l'admin l'ha annullata. */
+function normalStatusOf(status: BookingStatus): BookingStatus {
+  return status === "annullato" ? "annullato" : "confermato";
+}
+
 export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupancy, initialDate, prefill, isAdmin = false }: SimpleBookingFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -227,7 +234,7 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       kids_menu_id: null,
       setup_colors: booking?.setup_colors ?? [],
       setup_notes: booking?.setup_notes ?? null,
-      status: values.status,
+      status: isAppointment ? values.status : normalStatusOf(values.status),
       notes: values.notes.trim() || null,
       allergies: allergyPayload(values.allergies),
     };
@@ -360,10 +367,14 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
             </Field>
           )}
 
-          {isEdit && (
-            <Field label="Stato" htmlFor="status" error={first(errors.status)} hint="Saldato = pagamento completato" className="sm:col-span-2">
-              <Select id="status" value={values.status} onChange={(e) => change({ status: e.target.value as BookingStatus })}>
-                {STATUSES.map((s) => (
+          {(isAppointment || (isEdit && isAdmin)) && (
+            <Field label="Stato" htmlFor="status" error={first(errors.status)} className="sm:col-span-2">
+              <Select
+                id="status"
+                value={isAppointment ? values.status : normalStatusOf(values.status)}
+                onChange={(e) => change({ status: e.target.value as BookingStatus })}
+              >
+                {(isAppointment ? APPOINTMENT_STATUSES : NORMAL_STATUSES).map((s) => (
                   <option key={s} value={s}>
                     {STATUS_LABELS[s]}
                   </option>

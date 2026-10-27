@@ -24,6 +24,9 @@ Le migrazioni sono in `pocketbase/pb_migrations/` del repository:
 - `1793000006_users_manage_rule.js`: manage rule di `users` all'account di servizio (serve per reimpostare la password di un operatore). Idempotente, con down.
 - `1793000007_inventory_catalog.js`: giacenza per fornitore e categoria. `inventory_products` riceve `supplier` (select: viagrande | amadori | vegagel | altro, default altro), `sort` e `unit`; `category` resta testo (valori fissi validati dall'app: ortofrutta, latticini, salumi, carne_uova, dispensa, surgelati, non_food, altro). `inventory_report_lines` riceve gli snapshot `supplier` e `category`. Seed del catalogo (liste del ristorante) per nome: su un prodotto già esistente scrive fornitore, categoria, ordine e unità solo se il fornitore è vuoto, quindi non sovrascrive le modifiche dell'admin. Backfill: prodotti e righe senza fornitore → altro. Idempotente, con down (rimuove i campi, non i dati dei report).
 
+- `1793000008_quote_final_total.js`: prezzo finale del preventivo (`quotes.final_total`, facoltativo, 0 = nessun prezzo finale). Idempotente, con down (rimuove il campo).
+- `1793000009_booking_status_rules.js`: stato delle prenotazioni. Prenotazioni normali in "opzione" → "confermato"; eventi in "opzione" con almeno un acconto → "confermato" (gli eventi senza acconti restano in "opzione"). Idempotente, down no-op.
+
 Le migrazioni già applicate non si modificano: `1793000000` può essere già in produzione, quindi le modifiche vanno in file nuovi.
 
 Procedura sul server (con l'admin, via SSH). Copia solo le migrazioni nuove o non ancora applicate:

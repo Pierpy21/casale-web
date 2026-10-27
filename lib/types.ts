@@ -47,9 +47,10 @@ export interface BookingDetail extends Booking {
 }
 export interface BookingChange { id: string; booking_id: string | null; booking_label: string | null; changed_by: string | null; changed_by_name: string; table_name: string; field: string; old_value: string | null; new_value: string | null; created_at: string; }
 export interface QuoteLine { description: string; quantity: number; unit_price: number; }
-export interface Quote { id: string; booking_id: string; number: string; issued_at: string; valid_until: string | null; lines: QuoteLine[]; discount: number; vat_rate: number; notes: string | null; created_at: string; }
+export interface Quote { id: string; booking_id: string; number: string; issued_at: string; valid_until: string | null; lines: QuoteLine[]; discount: number; vat_rate: number; /** Prezzo finale concordato (IVA inclusa): sostituisce il totale calcolato. Null = calcolo automatico. */ final_total: number | null; notes: string | null; created_at: string; }
 export interface QuoteWithBooking extends Quote { booking: BookingDetail; }
-export interface QuoteTotals { subtotal: number; discount: number; total: number; taxable: number; vat: number; } // prezzi IVA inclusa: taxable = total/(1+vat/100)
+/** Prezzi IVA inclusa: taxable = total/(1+vat/100). Con prezzo finale (`overridden`) il totale è il prezzo finale e lo sconto è 0; subtotal resta la somma delle righe. */
+export interface QuoteTotals { subtotal: number; discount: number; total: number; taxable: number; vat: number; overridden: boolean; }
 export interface DashboardStats { eventsThisMonth: number; coversNext7Days: number; pendingOptions: number; eventsToday: number; }
 
 export type ActionResult<T = void> =

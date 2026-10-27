@@ -131,13 +131,26 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
   };
 }
 
-const STATUSES = Object.keys(STATUS_LABELS) as BookingStatus[];
+/** Stato di un evento: non si sceglie a mano, deriva dagli acconti (vedi syncEventStatusFromPayments). */
+export function eventStatusLabel(status: BookingStatus): string {
+  return status === "opzione" ? "In attesa di acconto" : STATUS_LABELS[status];
+}
 
 /**
  * "Crea evento" (e modifica di un evento). Sezioni in colonna, preventivo live a destra su desktop
  * e sotto il form su mobile. In modifica il preventivo non è mostrato (si gestisce dalla scheda).
  */
-export function EventForm({ mode, booking, clients, rooms, menus, occupancy, initialDate, prefill, isAdmin = false }: EventFormProps) {
+export function EventForm({
+  mode,
+  booking,
+  clients,
+  rooms,
+  menus,
+  occupancy,
+  initialDate,
+  prefill,
+  isAdmin = false,
+}: EventFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -236,6 +249,11 @@ export function EventForm({ mode, booking, clients, rooms, menus, occupancy, ini
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    save();
+  };
+
+  /** Salva il form. Lo stato inviato è quello attuale: il server ricalcola gli eventi e mantiene saldato/annullato. */
+  const save = () => {
     setFormError(null);
 
     const local: Errors = {};
@@ -420,15 +438,16 @@ export function EventForm({ mode, booking, clients, rooms, menus, occupancy, ini
                 />
               </Field>
 
-              <Field label="Stato" htmlFor="status" error={first(errors.status)} hint="Saldato = pagamento completato">
-                <Select id="status" invalid={!!errors.status} value={values.status} onChange={(e) => change({ status: e.target.value as BookingStatus })}>
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_LABELS[s]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-[13px] font-medium text-ink">Stato</span>
+                <p className="rounded-btn border border-sand bg-cream/60 px-3.5 py-2.5 text-[15px] text-ink">{eventStatusLabel(values.status)}</p>
+                <span className="text-[13px] text-slate-dark">Si aggiorna da solo con gli acconti registrati.</span>
+                {isEdit && (
+                  <span className="text-[13px] text-slate-dark">
+                    Per segnare saldato o annullare usa le azioni nella scheda della prenotazione.
+                  </span>
+                )}
+              </div>
             </div>
           </FormCard>
 
@@ -581,6 +600,7 @@ export function EventForm({ mode, booking, clients, rooms, menus, occupancy, ini
         pendingLabel="Salvataggio…"
         pending={pending}
       />
+
     </form>
   );
 }

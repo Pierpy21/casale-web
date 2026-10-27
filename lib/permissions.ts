@@ -48,6 +48,15 @@ export function canManageQuotesAndPayments(p: Profile): boolean {
   return isAdmin(p);
 }
 
+/**
+ * Assegnazione della sala: solo sulle prenotazioni normali, per admin e sala (attiva).
+ * La cucina e le altre combinazioni non possono cambiare la sala da qui.
+ */
+export function canAssignRoom(p: Profile, kind: BookingKind): boolean {
+  if (kind !== "normale") return false;
+  return isAdmin(p) || (p.active && p.role === "sala");
+}
+
 /** Giacenza: admin e cucina (leggere, inviare report). */
 export function canUseInventory(p: Profile): boolean {
   return p.active && (p.role === "admin" || p.role === "cucina");

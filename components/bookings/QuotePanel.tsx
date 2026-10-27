@@ -4,7 +4,7 @@ import { Plus, RotateCcw, X } from "lucide-react";
 import { Button, Checkbox, Field, Input, Textarea, cn } from "@/components/ui";
 import { formatEUR } from "@/lib/quote-utils";
 import { describedBy, first, type Errors } from "./booking-form-model";
-import { lineSubtotal, newQuoteLine, quoteTotals, type QuoteDraft, type QuoteLineDraft } from "./quote-draft";
+import { finalTotalOf, lineSubtotal, newQuoteLine, quoteTotals, type QuoteDraft, type QuoteLineDraft } from "./quote-draft";
 
 export interface QuotePanelProps {
   enabled: boolean;
@@ -23,6 +23,8 @@ const LABEL = "text-[12px] font-medium uppercase tracking-[0.14em] text-slate-da
 export function QuotePanel({ enabled, onEnabledChange, draft, lines, onChange, errors, disabled = false }: QuotePanelProps) {
   const totals = quoteTotals(draft, lines);
   const vatLabel = draft.vat_rate.trim() === "" ? "10" : draft.vat_rate.trim();
+  const hasFinalTotal = finalTotalOf(draft) !== null;
+  const valueOfLines = lines.reduce((sum, line) => sum + lineSubtotal(line), 0);
 
   // Le righe automatiche cambiano solo il prezzo; le voci a mano vivono in draft.extra.
   const updateLine = (line: QuoteLineDraft, changes: Partial<QuoteLineDraft>) => {
@@ -158,13 +160,13 @@ export function QuotePanel({ enabled, onEnabledChange, draft, lines, onChange, e
           </Button>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Sconto €" htmlFor="quote-discount" error={first(errors["quote.discount"])}>
+            <Field label="Sconto €" htmlFor="quote-discount" error={first(errors["quote.discount"])} hint={hasFinalTotal ? "Il prezzo finale sostituisce il totale" : undefined}>
               <Input
                 id="quote-discount"
                 inputMode="decimal"
                 placeholder="0"
                 value={draft.discount}
-                disabled={disabled}
+                disabled={disabled || hasFinalTotal}
                 invalid={!!errors["quote.discount"]}
                 aria-describedby={describedBy("quote-discount", !!errors["quote.discount"], false)}
                 onChange={(e) => onChange({ discount: e.target.value })}
@@ -182,6 +184,25 @@ export function QuotePanel({ enabled, onEnabledChange, draft, lines, onChange, e
               />
             </Field>
           </div>
+
+          <Field
+            label="Prezzo finale (facoltativo)"
+            htmlFor="quote-final-total"
+            error={first(errors["quote.final_total"])}
+            hint="IVA inclusa. Se compilato sostituisce il totale"
+          >
+            <Input
+              id="quote-final-total"
+              inputMode="decimal"
+              placeholder="Calcolato dalle voci"
+              value={draft.final_total}
+              disabled={disabled}
+              invalid={!!errors["quote.final_total"]}
+              aria-describedby={describedBy("quote-final-total", !!errors["quote.final_total"], false)}
+              onChange={(e) => onChange({ final_total: e.target.value })}
+              className="tabular-nums"
+            />
+          </Field>
 
           <Field label="Valido fino al" htmlFor="quote-valid-until" error={first(errors["quote.valid_until"])}>
             <Input
@@ -206,11 +227,18 @@ export function QuotePanel({ enabled, onEnabledChange, draft, lines, onChange, e
           </Field>
 
           <dl className="flex flex-col gap-2 border-t border-sand pt-4 text-[14px]">
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-slate-dark">Subtotale</dt>
-              <dd className="tabular-nums text-ink">{formatEUR(totals.subtotal)}</dd>
-            </div>
-            {totals.discount > 0 && (
+            {hasFinalTotal ? (
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-slate-dark">Valore delle voci</dt>
+                <dd className="tabular-nums text-ink">{formatEUR(valueOfLines)}</dd>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-slate-dark">Subtotale</dt>
+                <dd className="tabular-nums text-ink">{formatEUR(totals.subtotal)}</dd>
+              </div>
+            )}
+            {!hasFinalTotal && totals.discount > 0 && (
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-slate-dark">Sconto</dt>
                 <dd className="tabular-nums text-ink">−{formatEUR(totals.discount)}</dd>
@@ -218,7 +246,7 @@ export function QuotePanel({ enabled, onEnabledChange, draft, lines, onChange, e
             )}
             <div className="flex items-end justify-between gap-3 pt-2">
               <dt className={cn("text-[12px] font-medium uppercase tracking-[0.14em] text-bronze")}>
-                Totale IVA incl.
+                {hasFinalTotal ? "Prezzo finale concordato" : "Totale IVA incl."}
               </dt>
               <dd className="font-serif text-4xl leading-none tabular-nums text-ink">{formatEUR(totals.total)}</dd>
             </div>
