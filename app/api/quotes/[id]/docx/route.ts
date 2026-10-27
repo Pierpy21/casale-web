@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const profile = await getCurrentProfile();
@@ -26,11 +26,13 @@ export async function GET(
 
   const buffer = await renderQuoteDocx(buildQuoteDocumentModel(quote));
 
+  // ?inline=1: si apre nel visualizzatore del browser (telefoni che non scaricano/condividono file).
+  const disposition = new URL(req.url).searchParams.get("inline") === "1" ? "inline;" : "attachment;";
   return new Response(new Uint8Array(buffer), {
     status: 200,
     headers: {
       "Content-Type": DOCX_MIME,
-      "Content-Disposition": `attachment; filename="${quoteFileName(quote.number, "docx")}"`,
+      "Content-Disposition": `${disposition} filename="${quoteFileName(quote.number, "docx")}"`,
       "Cache-Control": "no-store",
     },
   });
