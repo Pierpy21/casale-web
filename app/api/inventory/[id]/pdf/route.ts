@@ -1,3 +1,4 @@
+import { documentError, withDocumentErrors } from "@/lib/documents/document-response";
 import { getCurrentProfile } from "@/lib/auth";
 import { canUseInventory } from "@/lib/permissions";
 import { getInventoryReport } from "@/lib/data/inventory";
@@ -10,22 +11,22 @@ import { buildInventoryPdfModel, renderInventoryPdf } from "@/lib/documents/inve
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handle(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentProfile();
-  if (!profile) return new Response("Non autenticato", { status: 401 });
-  if (!canUseInventory(profile)) return new Response("Non autorizzato", { status: 403 });
+  if (!profile) return documentError(401, "Sessione scaduta: accedi di nuovo al pannello e riprova.");
+  if (!canUseInventory(profile)) return documentError(403, "Il tuo profilo non può aprire questo documento.");
 
   const { id } = await params;
-  if (!isRecordId(id)) return new Response("Identificativo report non valido", { status: 400 });
+  if (!isRecordId(id)) return documentError(400, "Identificativo report non valido");
 
   const supplierParam = new URL(req.url).searchParams.get("supplier");
   if (supplierParam !== null && !isInventorySupplier(supplierParam)) {
-    return new Response("Fornitore non valido", { status: 400 });
+    return documentError(400, "Fornitore non valido");
   }
   const supplier = isInventorySupplier(supplierParam) ? supplierParam : undefined;
 
   const report = await getInventoryReport(id);
-  if (!report) return new Response("Report non trovato", { status: 404 });
+  if (!report) return documentError(404, "Report non trovato");
 
   const buffer = await renderInventoryPdf(buildInventoryPdfModel(report, { supplier }));
   const fileName = supplier ? `giacenza-${report.report_date}-${supplier}.pdf` : `giacenza-${report.report_date}.pdf`;
@@ -39,3 +40,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     },
   });
 }
+
+export const GET = withDocumentErrors("giacenza PDF", handle);

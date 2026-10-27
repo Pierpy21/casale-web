@@ -1,3 +1,4 @@
+import { documentError, withDocumentErrors } from "@/lib/documents/document-response";
 import { getCurrentProfile, isAdmin } from "@/lib/auth";
 import { isRecordId } from "@/lib/pocketbase/helpers";
 import { quoteFileName } from "@/lib/quote-utils";
@@ -8,21 +9,21 @@ import { renderQuotePdf } from "@/lib/documents/quote-pdf";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(
+async function handle(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const profile = await getCurrentProfile();
-  if (!profile) return new Response("Non autenticato", { status: 401 });
-  if (!isAdmin(profile)) return new Response("Non autorizzato", { status: 403 });
+  if (!profile) return documentError(401, "Sessione scaduta: accedi di nuovo al pannello e riprova.");
+  if (!isAdmin(profile)) return documentError(403, "Il tuo profilo non può aprire questo documento.");
 
   const { id } = await params;
   if (!isRecordId(id)) {
-    return new Response("Identificativo preventivo non valido", { status: 400 });
+    return documentError(400, "Identificativo preventivo non valido");
   }
 
   const quote = await getQuote(id);
-  if (!quote) return new Response("Preventivo non trovato", { status: 404 });
+  if (!quote) return documentError(404, "Preventivo non trovato");
 
   const buffer = await renderQuotePdf(buildQuoteDocumentModel(quote));
 
@@ -37,3 +38,5 @@ export async function GET(
     },
   });
 }
+
+export const GET = withDocumentErrors("preventivo PDF", handle);
