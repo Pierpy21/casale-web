@@ -2,16 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
-import { resetOperatorPassword, updateOperator } from "@/app/actions/operators";
+import { deleteOperator, resetOperatorPassword, setOperatorActive, updateOperator } from "@/app/actions/operators";
+import { useOptimisticActive } from "@/components/catalog/useOptimisticActive";
+import { ConfirmAction } from "@/components/bookings/ConfirmAction";
 import {
   Alert,
   Badge,
   Button,
-  Checkbox,
   Field,
   Input,
   Modal,
   Select,
+  Switch,
+  cn,
   fieldIds,
 } from "@/components/ui";
 import { ROLE_LABELS, type Profile, type Role } from "@/lib/types";
@@ -41,10 +44,29 @@ export function OperatorList({ operators }: OperatorListProps) {
 }
 
 function OperatorRow({ operator }: { operator: Profile }) {
+  const router = useRouter();
   const isAdminAccount = operator.role === "admin";
   const [editing, setEditing] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [toggling, startToggle] = useTransition();
+  const { active, setActive, resetActive } = useOptimisticActive(operator.active);
+
+  function toggleActive(next: boolean) {
+    setActive(next);
+    setError(null);
+    setNotice(null);
+    startToggle(async () => {
+      const result = await setOperatorActive(operator.id, next);
+      if (!result.ok) {
+        resetActive();
+        setError(`Impossibile ${next ? "attivare" : "disattivare"} ${operator.full_name}: ${result.error}`);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   return (
     <li className="flex flex-col gap-4 p-4 sm:p-5">
@@ -58,37 +80,57 @@ function OperatorRow({ operator }: { operator: Profile }) {
           onCancel={() => setEditing(false)}
         />
       ) : (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 flex-col gap-1">
-            <p className="truncate font-serif text-xl leading-tight text-ink">{operator.full_name}</p>
-            <p className="truncate text-[14px] text-slate-dark">{operator.email}</p>
+        <div className="flex min-w-0 flex-col gap-3">
+          {/* Riga 1: chi è (a sinistra) e stato dell'account (a destra). */}
+          <div className="flex min-w-0 items-start justify-between gap-4">
+            <div className={cn("flex min-w-0 flex-col gap-1 transition-[opacity,filter] duration-300", !active && "opacity-60 grayscale")}>
+              <p className="truncate font-serif text-xl leading-tight text-ink">{operator.full_name}</p>
+              <p className="truncate text-[14px] text-slate-dark">{operator.email}</p>
+            </div>
+            {!isAdminAccount && (
+              <Switch
+                checked={active}
+                onCheckedChange={toggleActive}
+                disabled={toggling}
+                label={`Account di ${operator.full_name} attivo`}
+                onLabel="Attivo"
+                offLabel="Disattivato"
+              />
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Riga 2: ruolo e azioni, che vanno a capo se lo spazio non basta. */}
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <Badge tone={isAdminAccount ? "bronze" : "petrol"}>{ROLE_LABELS[operator.role]}</Badge>
-            <Badge tone={operator.active ? "success" : "neutral"}>
-              {operator.active ? "Attivo" : "Disattivato"}
-            </Badge>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
             {isAdminAccount ? (
               <span className="text-[13px] text-slate-dark">Account amministratore · non modificabile</span>
             ) : (
-              <>
+              <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
                   Modifica
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setPasswordOpen(true)}>
                   Reimposta password
                 </Button>
-              </>
+                <ConfirmAction
+                  label="Elimina"
+                  variant="danger"
+                  size="sm"
+                  title={`Eliminare ${operator.full_name}?`}
+                  description="L’account verrà eliminato definitivamente e non potrà più accedere. Prenotazioni, storico e giacenze restano, con il suo nome. Per bloccare l’accesso senza eliminare, usa lo switch Attivo."
+                  confirmLabel="Elimina definitivamente"
+                  pendingLabel="Eliminazione…"
+                  run={() => deleteOperator(operator.id)}
+                  onSuccess={() => router.refresh()}
+                />
+              </div>
             )}
           </div>
         </div>
       )}
 
       {notice && <Alert tone="success">{notice}</Alert>}
+      {error && <Alert tone="danger">{error}</Alert>}
 
       {!isAdminAccount && (
         <ResetPasswordDialog
@@ -129,7 +171,7 @@ function EditOperatorForm({
     const input = {
       full_name: String(form.get("full_name") ?? ""),
       role,
-      active: form.get("active") === "on",
+      active: operator.active, // lo stato si cambia con lo switch nella lista
     };
 
     setError(null);
@@ -172,14 +214,6 @@ function EditOperatorForm({
           </Select>
         </Field>
 
-        <div className="flex flex-col justify-end gap-3">
-          <Checkbox
-            id={`edit-active-${operator.id}`}
-            name="active"
-            defaultChecked={operator.active}
-            label="Account attivo"
-          />
-        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -11,6 +11,8 @@ export interface ConfirmActionProps {
   confirmLabel: string;
   pendingLabel?: string;
   variant?: "danger" | "outline";
+  /** Dimensione del bottone che apre la conferma (default md). */
+  size?: "sm" | "md";
   run: () => Promise<ActionResult<unknown>>;
   onSuccess: () => void;
 }
@@ -23,6 +25,7 @@ export function ConfirmAction({
   confirmLabel,
   pendingLabel,
   variant = "danger",
+  size = "md",
   run,
   onSuccess,
 }: ConfirmActionProps) {
@@ -53,7 +56,7 @@ export function ConfirmAction({
     <>
       <Button
         variant={variant === "danger" ? "danger" : "outline"}
-        size="md"
+        size={size}
         onClick={() => {
           setError(null);
           setOpen(true);

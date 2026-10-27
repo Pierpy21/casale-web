@@ -52,3 +52,10 @@ const eurFormatter = new Intl.NumberFormat("it-IT", { style: "currency", currenc
 export function formatEUR(n: number): string {
   return eurFormatter.format(n);
 }
+
+export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** Nome del file del preventivo (stesso nome usato dalle route PDF/DOCX). */
+export function quoteFileName(number: string, ext: "pdf" | "docx"): string {
+  return `Preventivo-${number.replace(/[^A-Za-z0-9._-]/g, "-")}.${ext}`;
+}

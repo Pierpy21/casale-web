@@ -1,5 +1,6 @@
 import { getCurrentProfile, isAdmin } from "@/lib/auth";
 import { isRecordId } from "@/lib/pocketbase/helpers";
+import { quoteFileName } from "@/lib/quote-utils";
 import { getQuote } from "@/lib/data/quotes";
 import { buildQuoteDocumentModel } from "@/lib/documents/quote-model";
 import { renderQuotePdf } from "@/lib/documents/quote-pdf";
@@ -24,13 +25,12 @@ export async function GET(
   if (!quote) return new Response("Preventivo non trovato", { status: 404 });
 
   const buffer = await renderQuotePdf(buildQuoteDocumentModel(quote));
-  const safeNumber = quote.number.replace(/[^A-Za-z0-9._-]/g, "-");
 
   return new Response(new Uint8Array(buffer), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="Preventivo-${safeNumber}.pdf"`,
+      "Content-Disposition": `attachment; filename="${quoteFileName(quote.number, "pdf")}"`,
       "Cache-Control": "no-store",
     },
   });

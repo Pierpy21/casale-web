@@ -11,3 +11,4 @@ export { ErrorState, type ErrorStateProps } from "./ErrorState";
 export { Modal, type ModalProps } from "./Modal";
 export { StatusDot, StatusLegend, type StatusDotProps } from "./StatusDot";
 export { Switch, type SwitchProps } from "./Switch";
+export { DocumentDownload } from "./DocumentDownload";

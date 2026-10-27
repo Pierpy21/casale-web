@@ -7,7 +7,7 @@ import { isAdmin } from "@/lib/permissions";
 import { fetchOne } from "@/lib/pocketbase/queries";
 import type { ActionResult } from "@/lib/types";
 
-/** Crea l'utente (collezione users, email verificata) con il profilo: ruolo, chef, stato. */
+/** Crea l'utente (collezione users) con il profilo: ruolo, chef, stato. */
 export async function createOperator(input: unknown): Promise<ActionResult<{ id: string }>> {
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
@@ -25,7 +25,7 @@ export async function createOperator(input: unknown): Promise<ActionResult<{ id:
       role,
       is_chef,
       active: true,
-      verified: true,
+      // Niente `verified`: lo può impostare solo chi ha la manage rule di users; il login con password non lo richiede.
       emailVisibility: true,
     });
     revalidatePath("/admin/operatori");
@@ -34,6 +34,9 @@ export async function createOperator(input: unknown): Promise<ActionResult<{ id:
     const data = (err as { response?: { data?: Record<string, { code?: string }> } })?.response?.data;
     if (data?.email?.code === "validation_not_unique") {
       return fail("Esiste già un utente con questa email.");
+    }
+    if (data?.password) {
+      return fail("Password non accettata: usa almeno 8 caratteri.");
     }
     return dbFail(err, "Impossibile creare l'utente. Controlla i dati e riprova.");
   }
@@ -86,5 +89,52 @@ export async function resetOperatorPassword(id: string, password: string): Promi
     return fail("Impossibile aggiornare la password. Riprova.");
   }
 
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Elimina definitivamente un operatore. Non si può eliminare l'amministratore né il proprio account.
+ * Prenotazioni, storico, preventivi e giacenze restano: il riferimento all'utente si svuota
+ * (relazioni facoltative), il nome resta nei campi *_name. Notifiche e iscrizioni push vanno via in cascata.
+ */
+export async function deleteOperator(id: string): Promise<ActionResult> {
+  if (!isRecordId(id)) return fail("Operatore non valido.");
+  const auth = await authorize(isAdmin);
+  if (!auth.ok) return auth;
+  if (id === auth.profile.id) return fail("Non puoi eliminare il tuo account.");
+
+  const target = await fetchOne(auth.db, "users", id);
+  if (!target) return fail("Operatore non trovato.");
+  if (target.role === "admin") return fail("Non è possibile eliminare l'amministratore.");
+
+  try {
+    await auth.db.collection("users").delete(id);
+  } catch (err) {
+    return dbFail(err, "Impossibile eliminare l'operatore. Riprova.");
+  }
+
+  revalidatePath("/admin/operatori");
+  return { ok: true, data: undefined };
+}
+
+/** Attiva o disattiva l'accesso di un operatore (switch nella lista). Non per l'amministratore né per sé stessi. */
+export async function setOperatorActive(id: string, active: boolean): Promise<ActionResult> {
+  if (!isRecordId(id)) return fail("Operatore non valido.");
+  const auth = await authorize(isAdmin);
+  if (!auth.ok) return auth;
+  if (id === auth.profile.id) return fail("Non puoi disattivare il tuo account.");
+
+  const target = await fetchOne(auth.db, "users", id);
+  if (!target) return fail("Operatore non trovato.");
+  if (target.role === "admin") return fail("Non è possibile disattivare l'amministratore.");
+
+  try {
+    // authRule (active = true) blocca il login; la sessione esistente viene rifiutata alla prossima verifica.
+    await auth.db.collection("users").update(id, { active: active === true });
+  } catch (err) {
+    return dbFail(err);
+  }
+
+  revalidatePath("/admin/operatori");
   return { ok: true, data: undefined };
 }

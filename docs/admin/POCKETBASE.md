@@ -20,6 +20,8 @@ Le migrazioni sono in `pocketbase/pb_migrations/` del repository:
 - `1793000002_notifications_private.js`: la collezione `notifications` è leggibile solo dall'account di servizio (il browser non la legge più; le notifiche passano dal polling). Idempotente, con down.
 - `1793000003_booking_kinds.js`: tipi di prenotazione (`bookings.kind` = evento | normale | appuntamento, `bookings.event_type`). Le prenotazioni esistenti diventano "evento". Rende `clients.last_name` facoltativo (clienti creati con un solo campo "Nome"). Idempotente.
 - `1793000004_inventory.js`: giacenza (`inventory_products`, `inventory_reports`, `inventory_report_lines`) e campo `notifications.url`. Tutte riservate all'account di servizio. Idempotente, con down.
+- `1793000005_dishes.js`: catalogo piatti (`dishes`) e relazione `menu_items.dish`, con import dei piatti già presenti nei menù. Idempotente, con down.
+- `1793000006_users_manage_rule.js`: manage rule di `users` all'account di servizio (serve per reimpostare la password di un operatore). Idempotente, con down.
 
 Le migrazioni già applicate non si modificano: `1793000000` può essere già in produzione, quindi le modifiche vanno in file nuovi.
 
@@ -29,8 +31,8 @@ Procedura sul server (con l'admin, via SSH). Copia solo le migrazioni nuove o no
 # Dal proprio computer, nella cartella del repo
 scp pocketbase/pb_migrations/179300000*.js <utente>@<host-hetzner>:/tmp/
 
-# Sul server (copia solo quelle non ancora applicate: di norma le ultime, 1793000003 e 1793000004)
-sudo cp /tmp/1793000003_booking_kinds.js /tmp/1793000004_inventory.js /opt/pocketbase/pb_migrations/
+# Sul server (copia solo quelle non ancora applicate: di norma l'ultima, es. 1793000006)
+sudo cp /tmp/1793000006_users_manage_rule.js /opt/pocketbase/pb_migrations/
 sudo docker restart pocketbase
 sudo docker logs --tail 80 pocketbase      # verifica: nessun errore di migrazione
 ```

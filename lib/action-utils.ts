@@ -64,6 +64,8 @@ export function dbFail<T = never>(err: unknown, fallback = "Operazione non riusc
       }
     }
   }
-  console.error("[db]", err);
+  // Il dettaglio per campo di PocketBase (es. { password: { code, message } }) altrimenti nei log appare come [Object].
+  const details = err instanceof ClientResponseError ? JSON.stringify(err.response?.data ?? {}) : "";
+  console.error("[db]", details, err);
   return fail(fallback);
 }

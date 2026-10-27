@@ -15,7 +15,7 @@ import { CreateQuoteButton } from "@/components/bookings/QuoteActions";
 import { CourseList } from "@/components/bookings/MenuPreview";
 import { bookingTitle, formatTime } from "@/components/bookings/format";
 import type { NameLookup } from "@/components/bookings/change-labels";
-import { Alert, Badge, ButtonLink, Card, StatusBadge, buttonClasses, cn } from "@/components/ui";
+import { Alert, Badge, ButtonLink, Card, DocumentDownload, StatusBadge, buttonClasses, cn } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
 import { canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
 import { requireProfile } from "@/lib/auth";
@@ -24,7 +24,7 @@ import { getPayments } from "@/lib/data/payments";
 import { getDishes, getMenus, getRooms } from "@/lib/data/catalog";
 import { getQuotesForBooking } from "@/lib/data/quotes";
 import { getPaymentSummary } from "@/lib/payment-utils";
-import { computeQuoteTotals, formatEUR } from "@/lib/quote-utils";
+import { DOCX_MIME, computeQuoteTotals, formatEUR, quoteFileName } from "@/lib/quote-utils";
 import { SETUP_COLOR_HEX } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -327,12 +327,22 @@ export default async function BookingDetailPage({
                           <ButtonLink href={`/admin/preventivi/${quote.id}`} variant="ghost" size="sm">
                             Apri
                           </ButtonLink>
-                          <a href={`/api/quotes/${quote.id}/pdf`} download className={buttonClasses("outline", "sm")}>
+                          <DocumentDownload
+                            href={`/api/quotes/${quote.id}/pdf`}
+                            fileName={quoteFileName(quote.number, "pdf")}
+                            mimeType="application/pdf"
+                            className={buttonClasses("outline", "sm")}
+                          >
                             PDF
-                          </a>
-                          <a href={`/api/quotes/${quote.id}/docx`} download className={buttonClasses("outline", "sm")}>
+                          </DocumentDownload>
+                          <DocumentDownload
+                            href={`/api/quotes/${quote.id}/docx`}
+                            fileName={quoteFileName(quote.number, "docx")}
+                            mimeType={DOCX_MIME}
+                            className={buttonClasses("outline", "sm")}
+                          >
                             DOCX
-                          </a>
+                          </DocumentDownload>
                         </div>
                       </li>
                     );

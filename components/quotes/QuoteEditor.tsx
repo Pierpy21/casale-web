@@ -6,9 +6,9 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { deleteQuote, updateQuote } from "@/app/actions/quotes";
 import { ConfirmAction } from "@/components/bookings/ConfirmAction";
-import { Alert, Button, Field, Input, Textarea, buttonClasses } from "@/components/ui";
+import { Alert, Button, DocumentDownload, Field, Input, Textarea, buttonClasses } from "@/components/ui";
 import { buildQuoteDocumentModel } from "@/lib/documents/quote-model";
-import { computeQuoteTotals, formatEUR } from "@/lib/quote-utils";
+import { DOCX_MIME, computeQuoteTotals, formatEUR, quoteFileName } from "@/lib/quote-utils";
 import type { QuoteLine, QuoteWithBooking } from "@/lib/types";
 import { QuotePreview } from "./QuotePreview";
 
@@ -249,12 +249,22 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
           </div>
 
           <div className="no-print flex flex-wrap items-center gap-3">
-            <a href={`/api/quotes/${quote.id}/pdf`} download className={buttonClasses("outline", "md")}>
+            <DocumentDownload
+              href={`/api/quotes/${quote.id}/pdf`}
+              fileName={quoteFileName(quote.number, "pdf")}
+              mimeType="application/pdf"
+              className={buttonClasses("outline", "md")}
+            >
               Scarica PDF
-            </a>
-            <a href={`/api/quotes/${quote.id}/docx`} download className={buttonClasses("outline", "md")}>
+            </DocumentDownload>
+            <DocumentDownload
+              href={`/api/quotes/${quote.id}/docx`}
+              fileName={quoteFileName(quote.number, "docx")}
+              mimeType={DOCX_MIME}
+              className={buttonClasses("outline", "md")}
+            >
               Scarica DOCX
-            </a>
+            </DocumentDownload>
           </div>
           {dirty && (
             <p className="text-[13px] text-slate-dark">
