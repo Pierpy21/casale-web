@@ -37,6 +37,11 @@ function pocketbaseImagePatterns() {
 const nextConfig = {
   // Pacchetti con binari/Node-only: non vanno bundlati nel server.
   serverExternalPackages: ['@react-pdf/renderer', 'web-push'],
+  // pdfkit (usato da @react-pdf) carica i font standard (Helvetica…) con un percorso calcolato a runtime:
+  // il tracciamento dei file non li vede e su Vercel mancano ("Cannot find module …/Helvetica.cjs").
+  outputFileTracingIncludes: {
+    '/api/**/*': ['./node_modules/pdfkit/js/standard-fonts/**/*', './node_modules/pdfkit/js/data/**/*'],
+  },
   experimental: {
     serverActions: {
       // Ricevute degli acconti e foto menù: fino a 10 MB più il margine del form.
