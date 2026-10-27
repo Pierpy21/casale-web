@@ -5,6 +5,7 @@ import { dayEndPb, dayStartPb, isRecordId } from "@/lib/pocketbase/helpers";
 import { fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { mapInventoryLine, mapInventoryProduct, mapInventoryReport } from "@/lib/pocketbase/mappers";
 import { canUseInventory, isAdmin } from "@/lib/permissions";
+import { compareInventoryProducts } from "@/lib/inventory-utils";
 import type { InventoryProduct, InventoryReport } from "@/lib/types";
 
 // Giacenza: leggibile da admin e cucina. Gli accessi passano dal client di servizio dopo il controllo del profilo.
@@ -16,7 +17,7 @@ export async function getInventoryProducts(opts?: { includeInactive?: boolean })
   const includeInactive = Boolean(opts?.includeInactive) && isAdmin(me);
   const filter = includeInactive ? "" : db.filter("active = {:a}", { a: true });
   const records = await listAll(db, "inventory_products", filter);
-  return records.map(mapInventoryProduct).sort((a, b) => a.name.localeCompare(b.name, "it"));
+  return records.map(mapInventoryProduct).sort(compareInventoryProducts);
 }
 
 /** Storico dei report (senza righe), più recenti per primi, con filtro per data e paginazione. */

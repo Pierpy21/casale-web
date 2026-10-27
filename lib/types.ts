@@ -104,6 +104,25 @@ export const INVENTORY_STATES = ["presente", "da_ordinare"] as const;
 export type InventoryState = (typeof INVENTORY_STATES)[number];
 export const INVENTORY_STATE_LABELS: Record<InventoryState, string> = { presente: "Presente", da_ordinare: "Da ordinare" };
 
-export interface InventoryProduct { id: string; name: string; unit: string | null; category: string | null; active: boolean; }
-export interface InventoryReportLine { id: string; report_id: string; product_id: string | null; product_name: string; unit: string | null; state: InventoryState; quantity: number; sort: number; }
+/** Fornitori della giacenza (ordine di visualizzazione = ordine dell'array). */
+export const INVENTORY_SUPPLIERS = ["viagrande", "amadori", "vegagel", "altro"] as const;
+export type InventorySupplier = (typeof INVENTORY_SUPPLIERS)[number];
+export const INVENTORY_SUPPLIER_LABELS: Record<InventorySupplier, string> = { viagrande: "Viagrande", amadori: "Amadori", vegagel: "Vegagel", altro: "Altro" };
+
+/** Categorie dei prodotti (ordine di visualizzazione = ordine dell'array). Per la cucina i prodotti si raggruppano così. */
+export const INVENTORY_CATEGORIES = ["ortofrutta", "latticini", "salumi", "carne_uova", "dispensa", "surgelati", "non_food", "altro"] as const;
+export type InventoryCategory = (typeof INVENTORY_CATEGORIES)[number];
+export const INVENTORY_CATEGORY_LABELS: Record<InventoryCategory, string> = {
+  ortofrutta: "Ortofrutta",
+  latticini: "Latticini e formaggi",
+  salumi: "Salumi",
+  carne_uova: "Carne e uova",
+  dispensa: "Dispensa",
+  surgelati: "Surgelati",
+  non_food: "Non food",
+  altro: "Altro",
+};
+
+export interface InventoryProduct { id: string; name: string; unit: string | null; category: InventoryCategory; supplier: InventorySupplier; sort: number; active: boolean; }
+export interface InventoryReportLine { id: string; report_id: string; product_id: string | null; product_name: string; unit: string | null; state: InventoryState; quantity: number; sort: number; supplier: InventorySupplier; category: InventoryCategory; }
 export interface InventoryReport { id: string; created_by: string | null; created_by_name: string; report_date: string; notes: string | null; status: "inviato" | "visto"; seen_by: string | null; seen_at: string | null; created_at: string; lines: InventoryReportLine[]; }

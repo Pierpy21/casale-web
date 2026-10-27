@@ -7,6 +7,7 @@ import { ButtonLink, PageHeader } from "@/components/ui";
 import { requireProfile } from "@/lib/auth";
 import { getInventoryProducts, getInventoryReport, getInventoryReports } from "@/lib/data/inventory";
 import { canManageInventory, canUseInventory } from "@/lib/permissions";
+import { countToOrderBySupplier, formatToOrderSummary, mergeReportLines } from "@/lib/inventory-utils";
 
 export const metadata: Metadata = {
   title: "Giacenza · Casale del Notaio",
@@ -34,11 +35,12 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
   // La lista dei report non include le righe: per i conteggi si leggono i singoli report della pagina.
   const details = await Promise.all(history.items.map((report) => getInventoryReport(report.id)));
   const rows: InventoryHistoryRow[] = history.items.map((report, index) => {
-    const lines = details[index]?.lines ?? [];
+    const order = mergeReportLines(details[index]?.lines ?? []);
     return {
       report,
-      toOrder: lines.filter((line) => line.state === "da_ordinare").length,
-      present: lines.filter((line) => line.state === "presente").length,
+      toOrder: order.filter((row) => (row.to_order ?? 0) > 0).length,
+      present: order.filter((row) => (row.stock ?? 0) > 0).length,
+      toOrderSummary: formatToOrderSummary(countToOrderBySupplier(order)),
     };
   });
 
@@ -64,7 +66,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
             Nuova giacenza
           </h2>
         </div>
-        <InventoryReportForm products={products} today={todayISO()} />
+        <InventoryReportForm products={products} today={todayISO()} groupBy={canManageInventory(profile) ? "supplier" : "category"} />
       </section>
 
       <InventoryHistory

@@ -26,6 +26,7 @@ import {
   type Room,
   type Booking,
 } from "@/lib/types";
+import { normalizeInventoryCategory, normalizeInventorySupplier } from "@/lib/inventory-utils";
 import { fileUrl, nn, num, toDateOnly, toIsoDateTime, type PbRecord } from "./helpers";
 
 export function courseRank(c: Course): number {
@@ -228,7 +229,9 @@ export function mapInventoryProduct(r: PbRecord): InventoryProduct {
     id: r.id,
     name: String(r.name ?? ""),
     unit: nn(r.unit),
-    category: nn(r.category),
+    category: normalizeInventoryCategory(r.category),
+    supplier: normalizeInventorySupplier(r.supplier),
+    sort: num(r.sort),
     active: Boolean(r.active),
   };
 }
@@ -243,6 +246,8 @@ export function mapInventoryLine(r: PbRecord): InventoryReportLine {
     state: r.state as InventoryState,
     quantity: num(r.quantity),
     sort: num(r.sort),
+    supplier: normalizeInventorySupplier(r.supplier),
+    category: normalizeInventoryCategory(r.category),
   };
 }
 

@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { BOOKING_KINDS, INVENTORY_STATES, PAYMENT_METHODS, SETUP_COLORS, type BookingKind } from "./types";
+import {
+  BOOKING_KINDS,
+  INVENTORY_CATEGORIES,
+  INVENTORY_STATES,
+  INVENTORY_SUPPLIERS,
+  PAYMENT_METHODS,
+  SETUP_COLORS,
+  type BookingKind,
+} from "./types";
 
 // ---------------------------------------------------------------------
 // Limiti
@@ -265,31 +273,83 @@ export type BookingInputType = z.infer<typeof BookingInput>;
 // ---------------------------------------------------------------------
 // Giacenza
 // ---------------------------------------------------------------------
+const inventorySupplierSchema = z.enum(INVENTORY_SUPPLIERS, { message: "Fornitore non valido" });
+const inventoryCategorySchema = z.enum(INVENTORY_CATEGORIES, { message: "Categoria non valida" });
+
 export const InventoryProductInput = z.object({
   name: z.string().trim().min(1, "Nome prodotto obbligatorio").max(200, "Nome troppo lungo"),
   unit: z.preprocess(emptyToNull, z.string().max(40, "Unità troppo lunga").nullable()).optional(),
-  category: z.preprocess(emptyToNull, z.string().max(80, "Categoria troppo lunga").nullable()).optional(),
+  /** Vuoto → altro. */
+  category: z.preprocess(emptyToNull, inventoryCategorySchema.nullable()).optional(),
+  /** Solo admin (per la cucina viene ignorato e si usa altro). */
+  supplier: z.preprocess(emptyToNull, inventorySupplierSchema.nullable()).optional(),
 });
 export type InventoryProductInputType = z.infer<typeof InventoryProductInput>;
 
+/** Modifica prodotto (solo admin): tutti i campi facoltativi. Unità vuota → cancellata. */
+export const InventoryProductUpdateInput = z.object({
+  name: z.string().trim().min(1, "Nome prodotto obbligatorio").max(200, "Nome troppo lungo").optional(),
+  unit: z.preprocess(emptyToNull, z.string().max(40, "Unità troppo lunga").nullable()).optional(),
+  category: inventoryCategorySchema.optional(),
+  supplier: inventorySupplierSchema.optional(),
+  sort: intMin0.optional(),
+  active: z.boolean().optional(),
+});
+export type InventoryProductUpdateInputType = z.infer<typeof InventoryProductUpdateInput>;
+
+/** Quantità di giacenza/ordine: vuota o assente = nessuna (0). */
+const inventoryQuantity = z
+  .preprocess(
+    toNumber,
+    z
+      .number(numberError("Quantità non valida"))
+      .min(0, "La quantità non può essere negativa")
+      .max(100000, "Quantità troppo alta"),
+  )
+  .optional();
+
+/**
+ * Riga del report, un prodotto per riga: `stock` (giacenza) e/o `to_order` (da ordinare), almeno uno > 0.
+ * Formato precedente ancora accettato: `state` ("presente" | "da_ordinare") + `quantity` (> 0).
+ * In uscita la riga è sempre normalizzata: { product_id, product_name, unit, category, stock, to_order }.
+ */
 export const InventoryLineInput = z
   .object({
     product_id: z.preprocess(emptyToNull, z.string().regex(/^[a-z0-9]{15}$/, "Prodotto non valido").nullable()).optional(),
     product_name: z.preprocess(emptyToNull, z.string().trim().max(200, "Nome prodotto troppo lungo").nullable()).optional(),
     unit: z.preprocess(emptyToNull, z.string().trim().max(40, "Unità troppo lunga").nullable()).optional(),
-    state: z.enum(INVENTORY_STATES, { message: "Stato non valido (presente o da ordinare)" }),
-    quantity: z.preprocess(
-      toNumber,
-      z
-        .number(numberError("Quantità non valida"))
-        .gt(0, "La quantità deve essere maggiore di zero")
-        .max(100000, "Quantità troppo alta"),
-    ),
+    /** Categoria per i prodotti a testo libero (nuovi). Vuota → altro. */
+    category: z.preprocess(emptyToNull, inventoryCategorySchema.nullable()).optional(),
+    stock: inventoryQuantity,
+    to_order: inventoryQuantity,
+    /** Formato precedente. */
+    state: z.enum(INVENTORY_STATES, { message: "Stato non valido (presente o da ordinare)" }).optional(),
+    quantity: inventoryQuantity,
   })
   .superRefine((v, ctx) => {
     if (!v.product_id && !v.product_name) {
       ctx.addIssue({ code: "custom", message: "Indica il prodotto", path: ["product_name"] });
     }
+    if (v.state !== undefined) {
+      if (!((v.quantity ?? 0) > 0)) {
+        ctx.addIssue({ code: "custom", message: "La quantità deve essere maggiore di zero", path: ["quantity"] });
+      }
+    } else if (!((v.stock ?? 0) > 0) && !((v.to_order ?? 0) > 0)) {
+      ctx.addIssue({ code: "custom", message: "Indica la giacenza o la quantità da ordinare", path: ["stock"] });
+    }
+  })
+  .transform((v) => {
+    // Formato precedente: una sola quantità nello stato indicato.
+    const stock = v.state !== undefined ? (v.state === "presente" ? (v.quantity ?? 0) : 0) : (v.stock ?? 0);
+    const toOrder = v.state !== undefined ? (v.state === "da_ordinare" ? (v.quantity ?? 0) : 0) : (v.to_order ?? 0);
+    return {
+      product_id: v.product_id ?? null,
+      product_name: v.product_name ?? null,
+      unit: v.unit ?? null,
+      category: v.category ?? null,
+      stock,
+      to_order: toOrder,
+    };
   });
 export type InventoryLineInputType = z.infer<typeof InventoryLineInput>;
 

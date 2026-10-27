@@ -1,352 +1,342 @@
 "use client";
 
+import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent, type KeyboardEvent } from "react";
 import { createInventoryProduct, submitInventoryReport } from "@/app/actions/inventory";
-import { CountStepper } from "@/components/bookings/CountStepper";
-import { Alert, Button, Field, Input, Textarea, cn } from "@/components/ui";
-import { INVENTORY_STATE_LABELS, INVENTORY_STATES, type InventoryProduct, type InventoryState } from "@/lib/types";
-import { Check, Plus, Search, Trash2 } from "lucide-react";
+import { Alert, Button, Field, Input, cn } from "@/components/ui";
+import { compareInventoryProducts } from "@/lib/inventory-utils";
+import {
+  INVENTORY_CATEGORIES,
+  INVENTORY_CATEGORY_LABELS,
+  INVENTORY_SUPPLIERS,
+  INVENTORY_SUPPLIER_LABELS,
+  type InventoryCategory,
+  type InventoryProduct,
+  type InventorySupplier,
+} from "@/lib/types";
+import { InventoryCategorySection, type InventoryCountField, type NewInventoryProductInput } from "./InventoryCategorySection";
+import { InventoryNewProductForm } from "./InventoryNewProductForm";
+import {
+  clearInventoryDraft,
+  readInventoryDraft,
+  writeInventoryDraft,
+  type InventoryDraftCount,
+} from "./inventory-draft";
+import { normalizeSearchText } from "./inventory-search";
 
 export interface InventoryReportFormProps {
   /** Prodotti attivi dal catalogo. */
   products: InventoryProduct[];
   /** Data di oggi (YYYY-MM-DD), calcolata sul server per evitare differenze di fuso. */
   today: string;
+  /** Raggruppamento: per categoria (cucina) o per fornitore (admin). */
+  groupBy?: "category" | "supplier";
 }
 
-interface LineDraft {
+type Group = {
   key: string;
-  product_id: string | null;
-  product_name: string;
-  unit: string;
-  state: InventoryState;
-  quantity: number;
-}
-
-type Errors = Record<string, string[]>;
-
-let lineSeq = 0;
-const nextLineKey = (): string => {
-  lineSeq += 1;
-  return `line-${lineSeq}`;
+  label: string;
+  category?: InventoryCategory;
+  supplier?: InventorySupplier;
+  all: InventoryProduct[];
 };
 
-const SUGGESTIONS = 8;
+function buildGroups(products: InventoryProduct[], groupBy: "category" | "supplier"): Group[] {
+  if (groupBy === "supplier") {
+    return INVENTORY_SUPPLIERS.map((supplier) => ({
+      key: supplier,
+      label: INVENTORY_SUPPLIER_LABELS[supplier],
+      supplier,
+      all: products.filter((p) => p.supplier === supplier),
+    }));
+  }
+  return INVENTORY_CATEGORIES.map((category) => ({
+    key: category,
+    label: INVENTORY_CATEGORY_LABELS[category],
+    category,
+    all: products.filter((p) => p.category === category),
+  }));
+}
+
+type Counts = Record<string, InventoryDraftCount>;
+
+const NO_COUNT: InventoryDraftCount = { stock: 0, to_order: 0 };
+/** Ordine dei prodotti aggiunti al volo: in fondo alla propria categoria. */
+const APPENDED_SORT = 1_000_000;
 
 /**
- * Nuova giacenza: data, righe prodotto (dal catalogo o nuovo nome, che entra nel catalogo),
- * stato Presente / Da ordinare, quantità, note. Invio → dettaglio del report.
+ * Nuova giacenza (cucina e admin): date e note in alto, prodotti a fisarmonica per categoria (cucina)
+ * o per fornitore (admin), ricerca che filtra tutte le sezioni, barra di riepilogo e invio fisso in basso.
+ * Le quantità restano in una bozza locale: un ricaricamento non fa perdere il lavoro.
  */
-export function InventoryReportForm({ products: initialProducts, today }: InventoryReportFormProps) {
+export function InventoryReportForm({ products: initialProducts, today, groupBy = "category" }: InventoryReportFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const formRef = useRef<HTMLFormElement>(null);
   const [products, setProducts] = useState<InventoryProduct[]>(initialProducts);
   const [reportDate, setReportDate] = useState(today);
   const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<LineDraft[]>([]);
-  const [query, setQuery] = useState("");
-  const [errors, setErrors] = useState<Errors>({});
-  const [formError, setFormError] = useState<string | null>(null);
-
-  const trimmedQuery = query.trim();
-  const normalized = trimmedQuery.toLowerCase();
-
-  const suggestions = useMemo(
-    () =>
-      products
-        .filter((p) => !normalized || p.name.toLowerCase().includes(normalized))
-        .slice(0, SUGGESTIONS),
-    [products, normalized],
+  const [counts, setCounts] = useState<Counts>({});
+  const [openGroups, setOpenGroups] = useState<Set<string>>(
+    () => new Set(buildGroups(initialProducts, groupBy).filter((g) => g.all.length > 0).slice(0, 1).map((g) => g.key)),
   );
-  const exactProduct = products.find((p) => p.name.trim().toLowerCase() === normalized);
-  const exactMatch = exactProduct !== undefined;
+  const [query, setQuery] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [addingFromSearch, setAddingFromSearch] = useState(false);
 
-  /** Aggiunge un prodotto del catalogo: se la stessa riga (stesso prodotto e stato) esiste, aumenta la quantità. */
-  const addProduct = (product: { id: string; name: string; unit: string | null }) => {
-    setErrors({});
-    setQuery("");
-    setLines((current) => {
-      const existing = current.find((l) => l.product_id === product.id && l.state === "presente");
-      if (existing) {
-        return current.map((l) => (l.key === existing.key ? { ...l, quantity: l.quantity + 1 } : l));
-      }
-      return [
-        ...current,
-        {
-          key: nextLineKey(),
-          product_id: product.id,
-          product_name: product.name,
-          unit: product.unit ?? "",
-          state: "presente",
-          quantity: 1,
-        },
-      ];
+  // Bozza: si legge dopo il primo render (localStorage non esiste sul server) e poi si salva a ogni modifica.
+  useEffect(() => {
+    const draft = readInventoryDraft();
+    if (draft) {
+      setReportDate(draft.reportDate);
+      setNotes(draft.notes);
+      setCounts(draft.counts);
+      setRestored(Object.keys(draft.counts).length > 0 || draft.notes.length > 0);
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    writeInventoryDraft({ reportDate, notes, counts });
+  }, [hydrated, reportDate, notes, counts]);
+
+  const normalizedQuery = normalizeSearchText(query);
+  const searching = normalizedQuery.length > 0;
+  const matches = (p: InventoryProduct) => !searching || normalizeSearchText(p.name).includes(normalizedQuery);
+
+  const groups = buildGroups(products, groupBy).map((group) => ({
+    ...group,
+    shown: group.all.filter(matches),
+    filled: group.all.filter((p) => isFilled(counts[p.id])).length,
+  }));
+  const visibleGroups = searching ? groups.filter((g) => g.shown.length > 0) : groups;
+  const filledTotal = products.filter((p) => isFilled(counts[p.id])).length;
+  const toOrderTotal = products.filter((p) => (counts[p.id]?.to_order ?? 0) > 0).length;
+
+  const isOpen = (key: string) => searching || openGroups.has(key);
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
   };
 
-  /** Nome nuovo: lo crea nel catalogo (così resta disponibile), poi aggiunge la riga. */
-  const createAndAdd = () => {
-    if (!trimmedQuery) return;
+  const changeCount = (productId: string, field: InventoryCountField, value: number) => {
     setFormError(null);
-    startTransition(async () => {
-      const result = await createInventoryProduct({ name: trimmedQuery });
-      if (!result.ok) {
-        setFormError(result.error);
-        return;
-      }
+    setCounts((current) => {
+      const next: InventoryDraftCount = { ...(current[productId] ?? NO_COUNT), [field]: value };
+      const rest = { ...current };
+      if (next.stock === 0 && next.to_order === 0) delete rest[productId];
+      else rest[productId] = next;
+      return rest;
+    });
+  };
+
+  /** Crea un prodotto nel catalogo e lo inserisce nell'elenco (anche se esisteva già: si usa il dato del server). */
+  const createProduct = async (input: NewInventoryProductInput): Promise<string | null> => {
+    const result = await createInventoryProduct({
+      name: input.name,
+      unit: input.unit,
+      category: input.category,
+      ...(input.supplier ? { supplier: input.supplier } : {}),
+    });
+    if (!result.ok) return result.error;
+    const ref = result.data;
+    setProducts((list) => {
+      if (list.some((p) => p.id === ref.id)) return list;
       const created: InventoryProduct = {
-        id: result.data.id,
-        name: result.data.name,
-        unit: result.data.unit,
-        category: null,
+        id: ref.id,
+        name: ref.name,
+        unit: ref.unit,
+        category: ref.category,
+        supplier: ref.supplier,
+        sort: APPENDED_SORT,
         active: true,
       };
-      // Il prodotto entra nel catalogo locale (senza duplicati) prima di aggiungere la riga.
-      setProducts((list) => {
-        if (list.some((p) => p.id === created.id)) return list;
-        return [...list, created].sort((a, b) => a.name.localeCompare(b.name, "it"));
-      });
-      addProduct(created);
+      return [...list, created].sort(compareInventoryProducts);
     });
+    return null;
   };
 
-  const updateLine = (key: string, changes: Partial<Omit<LineDraft, "key">>) => {
-    setErrors({});
-    setLines((current) => current.map((l) => (l.key === key ? { ...l, ...changes } : l)));
+  const discardDraft = () => {
+    clearInventoryDraft();
+    setReportDate(today);
+    setNotes("");
+    setCounts({});
+    setRestored(false);
   };
 
-  const removeLine = (key: string) => {
-    setErrors({});
-    setLines((current) => current.filter((l) => l.key !== key));
-  };
+  const filledLines = products.flatMap((p) => {
+    const c = counts[p.id];
+    return c && isFilled(c) ? [{ product_id: p.id, stock: c.stock, to_order: c.to_order }] : [];
+  });
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
-
-    const local: Errors = {};
-    if (!reportDate) local.report_date = ["Data obbligatoria"];
-    if (lines.length === 0) local._form = ["Aggiungi almeno un prodotto"];
-    lines.forEach((line, index) => {
-      if (!line.product_id && !line.product_name.trim()) local[`lines.${index}.product_name`] = ["Indica il prodotto"];
-      if (!(line.quantity > 0)) local[`lines.${index}.quantity`] = ["La quantità deve essere almeno 1"];
-    });
-    setErrors(local);
-    if (Object.keys(local).length > 0) {
-      setFormError(local._form?.[0] ?? "Controlla le righe evidenziate.");
-      window.setTimeout(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(), 0);
+    if (!reportDate) {
+      setFormError("Indica la data della giacenza.");
       return;
     }
-
-    const payload = {
-      report_date: reportDate,
-      notes: notes.trim() || null,
-      lines: lines.map((l) => ({
-        product_id: l.product_id,
-        product_name: l.product_id ? null : l.product_name.trim(),
-        unit: l.unit.trim() || null,
-        state: l.state,
-        quantity: l.quantity,
-      })),
-    };
-
+    if (filledLines.length === 0) {
+      setFormError("Compila almeno un prodotto: giacenza o quantità da ordinare.");
+      return;
+    }
     startTransition(async () => {
-      const result = await submitInventoryReport(payload);
+      const result = await submitInventoryReport({
+        report_date: reportDate,
+        notes: notes.trim() || null,
+        lines: filledLines,
+      });
       if (!result.ok) {
-        setErrors(result.fieldErrors ?? {});
         setFormError(result.error);
         return;
       }
+      clearInventoryDraft();
       router.push(`/admin/giacenza/${result.data.id}`);
     });
   };
 
-  const lineError = (index: number, field: string) => errors[`lines.${index}.${field}`]?.[0];
-  const toOrder = lines.filter((l) => l.state === "da_ordinare").length;
+  /** Invio nel campo di ricerca o note: non deve inviare il modulo. */
+  const blockEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") event.preventDefault();
+  };
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} noValidate aria-label="Nuova giacenza" className="flex min-w-0 flex-col gap-6">
+    <form onSubmit={onSubmit} noValidate aria-label="Nuova giacenza" className="flex min-w-0 flex-col gap-5">
       {formError && <Alert tone="danger">{formError}</Alert>}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
-        <Field label="Data" htmlFor="report-date" required error={errors.report_date?.[0]}>
+      {restored && (
+        <Alert tone="info">
+          <span className="flex flex-wrap items-center justify-between gap-3">
+            <span>Bozza ripristinata: il modulo riprende da dove l’avevi lasciato.</span>
+            <Button variant="ghost" size="sm" onClick={discardDraft} disabled={pending}>
+              Scarta bozza
+            </Button>
+          </span>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] sm:items-end">
+        <Field label="Data" htmlFor="report-date" required>
           <Input
             id="report-date"
             type="date"
             disabled={pending}
-            invalid={!!errors.report_date}
             value={reportDate}
             onChange={(e) => setReportDate(e.target.value)}
-            className="text-[18px]"
+            className="text-[17px]"
+          />
+        </Field>
+        <Field label="Note" htmlFor="report-notes" hint="Facoltative: visibili nel PDF">
+          <Input
+            id="report-notes"
+            type="text"
+            maxLength={2000}
+            disabled={pending}
+            value={notes}
+            onKeyDown={blockEnter}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Es. consegna Amadori rimandata"
+            className="text-[17px]"
           />
         </Field>
       </div>
 
-      <section aria-labelledby="inventory-search-title" className="flex flex-col gap-3 rounded-[2px] border border-sand bg-paper p-4 sm:p-5">
-        <h2 id="inventory-search-title" className="text-[12px] font-medium uppercase tracking-[0.14em] text-bronze">
-          Aggiungi prodotto
-        </h2>
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4.5rem)] z-10 -mx-4 flex flex-col gap-2 bg-paper px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-10 lg:top-0 lg:px-10">
         <div className="relative">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate" />
+          <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-dark" />
           <Input
             id="inventory-search"
             type="search"
             autoComplete="off"
-            enterKeyHint="done"
+            enterKeyHint="search"
+            aria-label="Cerca un prodotto"
             disabled={pending}
             value={query}
+            onKeyDown={blockEnter}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              // Invio: prodotto esatto → aggiunge; un solo risultato → aggiunge; altrimenti crea il nuovo nome.
-              if (exactProduct) addProduct(exactProduct);
-              else if (suggestions.length === 1) addProduct(suggestions[0]);
-              else if (trimmedQuery) createAndAdd();
-            }}
-            placeholder="Cerca o scrivi un prodotto…"
+            placeholder="Cerca un prodotto…"
             className="h-12 pl-12 text-[17px]"
           />
         </div>
+      </div>
 
-        {trimmedQuery && (
-          <ul aria-label="Risultati" className="flex max-h-72 flex-col divide-y divide-sand overflow-y-auto rounded-btn border border-sand">
-            {suggestions.map((product) => (
-              <li key={product.id}>
-                <button
-                  type="button"
-                  onClick={() => addProduct(product)}
-                  disabled={pending}
-                  className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-[17px] text-ink transition-colors hover:bg-cream"
-                >
-                  <span className="min-w-0 wrap-anywhere">{product.name}</span>
-                  {product.unit && <span className="shrink-0 text-[14px] text-slate-dark">{product.unit}</span>}
-                </button>
-              </li>
-            ))}
-            {!exactMatch && (
-              <li>
-                <button
-                  type="button"
-                  onClick={createAndAdd}
-                  disabled={pending}
-                  className="flex min-h-12 w-full items-center gap-3 px-4 py-2.5 text-left text-[17px] font-medium text-petrol transition-colors hover:bg-cream"
-                >
-                  <Plus aria-hidden="true" className="size-5 shrink-0" />
-                  <span className="min-w-0 wrap-anywhere">Nuovo prodotto: «{trimmedQuery}»</span>
-                </button>
-              </li>
-            )}
-          </ul>
+      {searching && visibleGroups.length === 0 && (
+        <div className="flex flex-col gap-3 border border-dashed border-slate/40 bg-paper px-4 py-6 sm:px-6">
+          <p className="text-[16px] text-ink">
+            Nessun prodotto corrisponde a «<span className="wrap-anywhere">{query.trim()}</span>».
+          </p>
+          {addingFromSearch ? (
+            <InventoryNewProductForm
+              idPrefix="inventory-search-new"
+              defaultName={query.trim()}
+              onCreate={createProduct}
+              onClose={() => setAddingFromSearch(false)}
+              disabled={pending}
+            />
+          ) : (
+            <div>
+              <Button variant="outline" size="md" onClick={() => setAddingFromSearch(true)} disabled={pending} className="min-h-11 max-w-full">
+                <span className="truncate">Aggiungi «{query.trim()}» come nuovo prodotto</span>
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-col gap-3" aria-label={groupBy === "supplier" ? "Prodotti per fornitore" : "Prodotti per categoria"}>
+        {visibleGroups.map((group) => (
+          <InventoryCategorySection
+            key={group.key}
+            category={group.category}
+            supplier={group.supplier}
+            label={group.label}
+            products={group.shown}
+            totalCount={group.all.length}
+            filledCount={group.filled}
+            counts={counts}
+            open={isOpen(group.key)}
+            onToggle={() => toggleGroup(group.key)}
+            onChangeCount={changeCount}
+            onCreate={createProduct}
+            disabled={pending}
+          />
+        ))}
+      </div>
+
+      <div
+        className={cn(
+          "sticky bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-20 -mx-4 flex flex-col gap-3 border-t border-sand bg-paper/95 px-4 py-3 shadow-[0_-10px_24px_-18px_rgba(28,43,45,0.45)] backdrop-blur",
+          "sm:-mx-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:bottom-0 lg:-mx-10 lg:px-10",
         )}
-      </section>
-
-      {lines.length === 0 ? (
-        <p className="border border-dashed border-slate/40 px-5 py-8 text-center text-[16px] text-slate-dark">
-          Nessun prodotto ancora. Cerca un prodotto qui sopra o scrivine il nome.
+      >
+        <p role="status" aria-live="polite" className="text-[15px] tabular-nums text-slate-dark">
+          <span className="font-semibold text-ink">{filledTotal} {filledTotal === 1 ? "prodotto" : "prodotti"}</span>
+          {" · "}
+          <span className="font-semibold text-ink">{toOrderTotal} da ordinare</span>
         </p>
-      ) : (
-        <ul aria-label="Prodotti della giacenza" className="flex flex-col gap-3">
-          {lines.map((line, index) => (
-            <li
-              key={line.key}
-              data-invalid={lineError(index, "product_name") || lineError(index, "quantity") ? "true" : undefined}
-              className={cn(
-                "flex min-w-0 flex-col gap-4 rounded-[2px] border bg-paper p-4 shadow-sm shadow-ink/5",
-                line.state === "da_ordinare" ? "border-l-[6px] border-l-warning border-sand" : "border-sand",
-              )}
-            >
-              <div className="flex min-w-0 items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <p className="wrap-anywhere font-serif text-2xl leading-tight text-ink">{line.product_name}</p>
-                  {lineError(index, "product_name") && <p className="text-[13px] text-danger">{lineError(index, "product_name")}</p>}
-                </div>
-                <button
-                  type="button"
-                  aria-label={`Rimuovi ${line.product_name}`}
-                  onClick={() => removeLine(line.key)}
-                  disabled={pending}
-                  className="grid size-11 shrink-0 place-items-center rounded-[2px] text-slate-dark transition-colors hover:bg-cream hover:text-danger"
-                >
-                  <Trash2 aria-hidden="true" className="size-5" />
-                </button>
-              </div>
-
-              <div role="group" aria-label={`Stato di ${line.product_name}`} className="grid grid-cols-2 gap-2">
-                {INVENTORY_STATES.map((state) => {
-                  const active = line.state === state;
-                  return (
-                    <button
-                      key={state}
-                      type="button"
-                      aria-pressed={active}
-                      disabled={pending}
-                      onClick={() => updateLine(line.key, { state })}
-                      className={cn(
-                        "flex min-h-12 items-center justify-center gap-2 rounded-btn border px-3 text-[15px] font-semibold uppercase tracking-[0.08em] transition-colors",
-                        active
-                          ? state === "da_ordinare"
-                            ? "border-warning bg-warning text-ink"
-                            : "border-petrol bg-petrol text-paper"
-                          : "border-slate/50 bg-paper text-slate-dark hover:border-slate",
-                      )}
-                    >
-                      {active && <Check aria-hidden="true" className="size-4" />}
-                      {INVENTORY_STATE_LABELS[state]}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,12rem)]">
-                <CountStepper
-                  id={`qty-${line.key}`}
-                  label="Quantità"
-                  value={line.quantity}
-                  min={1}
-                  onChange={(n) => updateLine(line.key, { quantity: n })}
-                  error={lineError(index, "quantity")}
-                />
-                <Field label="Unità" htmlFor={`unit-${line.key}`} hint="Es. kg, g, bottiglie">
-                  <Input
-                    id={`unit-${line.key}`}
-                    disabled={pending}
-                    value={line.unit}
-                    maxLength={40}
-                    onChange={(e) => updateLine(line.key, { unit: e.target.value })}
-                    placeholder="es. 500 g"
-                  />
-                </Field>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {lines.length > 0 && (
-        <p className="text-[15px] text-slate-dark">
-          {lines.length} {lines.length === 1 ? "prodotto" : "prodotti"} · <span className="font-semibold text-ink">{toOrder} da ordinare</span>
-        </p>
-      )}
-
-      <Field label="Note" htmlFor="report-notes" hint="Facoltative: visibili nel PDF">
-        <Textarea id="report-notes" rows={3} disabled={pending} value={notes} onChange={(e) => setNotes(e.target.value)} />
-      </Field>
-
-      <div className="flex flex-col-reverse gap-3 border-t border-sand pt-6 sm:flex-row sm:items-center sm:justify-end">
         <Button
           type="submit"
           variant="primary"
           size="lg"
-          disabled={pending || lines.length === 0}
+          disabled={pending || filledTotal === 0}
           aria-busy={pending || undefined}
-          className="w-full sm:w-auto"
+          className="min-h-12 w-full sm:w-auto"
         >
           {pending ? "Invio in corso…" : "Invia giacenza"}
         </Button>
       </div>
     </form>
   );
+}
+
+function isFilled(count: InventoryDraftCount | undefined): boolean {
+  return !!count && (count.stock > 0 || count.to_order > 0);
 }

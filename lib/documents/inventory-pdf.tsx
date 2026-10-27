@@ -11,9 +11,11 @@ import {
 } from "@react-pdf/renderer";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import type { InventoryReport, InventoryReportLine } from "@/lib/types";
+import { groupOrderRowsBySupplier, mergeReportLines, type InventoryOrderRow } from "@/lib/inventory-utils";
+import { INVENTORY_SUPPLIER_LABELS, type InventoryReport, type InventorySupplier } from "@/lib/types";
 
 // Report di giacenza in PDF: stessa impostazione tipografica del preventivo (lib/documents/quote-pdf.tsx).
+// Un blocco per fornitore (solo quelli con prodotti); ogni prodotto appare una volta, con giacenza e da ordinare.
 
 const COLOR = {
   ink: "#1C2B2D",
@@ -66,8 +68,9 @@ const styles = StyleSheet.create({
   tableHeadText: { fontFamily: FONT.sansBold, fontSize: 8, color: COLOR.ink, textTransform: "uppercase", letterSpacing: 0.8 },
   tableRow: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: COLOR.line, paddingVertical: 6 },
   cellName: { flexGrow: 4, paddingRight: 8, fontSize: 9.5 },
-  cellUnit: { width: 90, fontSize: 9.5 },
-  cellQty: { width: 90, textAlign: "right", fontSize: 9.5 },
+  cellUnit: { width: 80, fontSize: 9.5 },
+  cellStock: { width: 80, textAlign: "right", fontSize: 9.5 },
+  cellToOrder: { width: 90, textAlign: "right", fontSize: 9.5 },
   empty: { fontSize: 9.5, color: COLOR.slate, fontFamily: FONT.serifItalic },
   bodyText: { fontSize: 9.5, color: COLOR.ink },
   footer: {
@@ -87,7 +90,16 @@ const styles = StyleSheet.create({
 export interface InventoryPdfRow {
   name: string;
   unit: string;
-  quantity: string;
+  /** Giacenza formattata, "—" se non indicata. */
+  stock: string;
+  /** Da ordinare formattata, "—" se non indicata. */
+  toOrder: string;
+}
+
+export interface InventoryPdfSection {
+  supplier: InventorySupplier;
+  label: string;
+  rows: InventoryPdfRow[];
 }
 
 export interface InventoryPdfModel {
@@ -96,35 +108,48 @@ export interface InventoryPdfModel {
   createdBy: string;
   sentAt: string;
   notes: string | null;
-  toOrder: InventoryPdfRow[];
-  present: InventoryPdfRow[];
+  /** Sezioni per fornitore (solo quelle con prodotti). */
+  sections: InventoryPdfSection[];
+}
+
+export interface InventoryPdfOptions {
+  /** Esporta solo i prodotti di un fornitore (lista d'ordine). */
+  supplier?: InventorySupplier;
 }
 
 const capitalize = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
-function toRow(line: InventoryReportLine): InventoryPdfRow {
+const formatQuantity = (n: number | null): string =>
+  n === null ? "—" : n.toLocaleString("it-IT", { maximumFractionDigits: 3 });
+
+function toRow(row: InventoryOrderRow): InventoryPdfRow {
   return {
-    name: line.product_name,
-    unit: line.unit ?? "",
-    quantity: line.quantity.toLocaleString("it-IT", { maximumFractionDigits: 3 }),
+    name: row.name,
+    unit: row.unit ?? "",
+    stock: formatQuantity(row.stock),
+    toOrder: formatQuantity(row.to_order),
   };
 }
 
 /** Dati del report pronti per il PDF (puro: testo già formattato in italiano). */
-export function buildInventoryPdfModel(report: InventoryReport): InventoryPdfModel {
+export function buildInventoryPdfModel(report: InventoryReport, opts: InventoryPdfOptions = {}): InventoryPdfModel {
   const [y, m, d] = report.report_date.split("-").map(Number);
   const day = new Date(y, m - 1, d);
-  const byName = (a: InventoryReportLine, b: InventoryReportLine) => a.product_name.localeCompare(b.product_name, "it");
+  const rows = mergeReportLines(report.lines);
+  const scoped = opts.supplier ? rows.filter((r) => r.supplier === opts.supplier) : rows;
   return {
-    title: "Giacenza",
+    title: opts.supplier ? `Ordine ${INVENTORY_SUPPLIER_LABELS[opts.supplier]}` : "Giacenza",
     reportDate: capitalize(format(day, "EEEE d MMMM yyyy", { locale: it })),
     createdBy: report.created_by_name || "—",
     sentAt: report.created_at
       ? capitalize(format(new Date(report.created_at), "d MMM yyyy 'alle' HH:mm", { locale: it }))
       : "",
     notes: report.notes,
-    toOrder: report.lines.filter((l) => l.state === "da_ordinare").sort(byName).map(toRow),
-    present: report.lines.filter((l) => l.state === "presente").sort(byName).map(toRow),
+    sections: groupOrderRowsBySupplier(scoped).map((g) => ({
+      supplier: g.key,
+      label: g.label,
+      rows: g.items.map(toRow),
+    })),
   };
 }
 
@@ -137,20 +162,21 @@ function loadLogo(): Promise<Buffer> {
   return logoCache;
 }
 
-function RowsTable({ rows }: { rows: InventoryPdfRow[] }) {
-  if (rows.length === 0) return <Text style={styles.empty}>Nessun prodotto.</Text>;
+function SupplierTable({ rows }: { rows: InventoryPdfRow[] }) {
   return (
     <View>
       <View style={styles.tableHead}>
-        <Text style={[styles.tableHeadText, styles.cellName]}>Prodotto</Text>
+        <Text style={[styles.tableHeadText, styles.cellName]}>Articolo</Text>
         <Text style={[styles.tableHeadText, styles.cellUnit]}>Unità</Text>
-        <Text style={[styles.tableHeadText, styles.cellQty]}>Quantità</Text>
+        <Text style={[styles.tableHeadText, styles.cellStock]}>Giacenza</Text>
+        <Text style={[styles.tableHeadText, styles.cellToOrder]}>Da ordinare</Text>
       </View>
       {rows.map((row, i) => (
         <View key={i} style={styles.tableRow} wrap={false}>
           <Text style={styles.cellName}>{row.name}</Text>
           <Text style={styles.cellUnit}>{row.unit}</Text>
-          <Text style={styles.cellQty}>{row.quantity}</Text>
+          <Text style={styles.cellStock}>{row.stock}</Text>
+          <Text style={styles.cellToOrder}>{row.toOrder}</Text>
         </View>
       ))}
     </View>
@@ -159,7 +185,7 @@ function RowsTable({ rows }: { rows: InventoryPdfRow[] }) {
 
 function InventoryDocument({ model, logo }: { model: InventoryPdfModel; logo: Buffer }) {
   return (
-    <Document title={`Giacenza ${model.reportDate}`} author="Casale del Notaio" creator="Casale del Notaio">
+    <Document title={`${model.title} ${model.reportDate}`} author="Casale del Notaio" creator="Casale del Notaio">
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
@@ -184,15 +210,16 @@ function InventoryDocument({ model, logo }: { model: InventoryPdfModel; logo: Bu
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Da ordinare</Text>
-          <RowsTable rows={model.toOrder} />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Presente</Text>
-          <RowsTable rows={model.present} />
-        </View>
+        {model.sections.length === 0 ? (
+          <Text style={styles.empty}>Nessun prodotto.</Text>
+        ) : (
+          model.sections.map((section) => (
+            <View key={section.supplier} style={styles.section}>
+              <Text style={styles.sectionTitle}>{section.label}</Text>
+              <SupplierTable rows={section.rows} />
+            </View>
+          ))
+        )}
 
         {model.notes ? (
           <View style={styles.section} wrap={false}>

@@ -5,9 +5,12 @@ import type { InventoryReport } from "@/lib/types";
 
 export interface InventoryHistoryRow {
   report: InventoryReport;
-  /** Righe "da ordinare" e "presenti" del report (il dato della lista non contiene le righe). */
+  /** Prodotti da ordinare del report (il dato della lista non contiene le righe). */
   toOrder: number;
+  /** Prodotti con giacenza indicata. */
   present: number;
+  /** "Viagrande 5, Amadori 3" (vuoto se non c'è nulla da ordinare). */
+  toOrderSummary: string;
 }
 
 export interface InventoryHistoryProps {
@@ -67,21 +70,30 @@ export function InventoryHistory({ rows, page, totalPages, totalItems, from, to 
         <>
           <p className="text-[13px] text-slate-dark tabular-nums">{totalItems} report in archivio</p>
           <ul className="flex flex-col divide-y divide-sand border border-sand bg-paper">
-            {rows.map(({ report, toOrder, present }) => (
+            {rows.map(({ report, toOrder, present, toOrderSummary }) => (
               <li key={report.id}>
                 <Link
                   href={`/admin/giacenza/${report.id}`}
-                  className="flex min-h-16 flex-col gap-2 px-4 py-3.5 transition-colors hover:bg-cream sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                  className="flex min-h-16 flex-col gap-2 px-4 py-3.5 transition-colors hover:bg-cream sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-5"
                 >
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="font-serif text-xl leading-tight text-ink">
                       {capitalize(formatIt(toDate(report.report_date), "EEEE d MMMM yyyy"))}
                     </span>
                     <span className="text-[13px] text-slate-dark wrap-anywhere">Da {report.created_by_name}</span>
+                    <span className="text-[14px] text-ink wrap-anywhere">
+                      {toOrder > 0 ? (
+                        <>
+                          Da ordinare: <span className="font-semibold">{toOrderSummary}</span>
+                        </>
+                      ) : (
+                        <span className="text-slate-dark">Nessun prodotto da ordinare</span>
+                      )}
+                    </span>
                   </span>
-                  <span className="flex flex-wrap items-center gap-2 text-[14px]">
-                    <span className="tabular-nums text-ink">
-                      <span className="font-semibold">{toOrder}</span> da ordinare · <span className="tabular-nums">{present}</span> presenti
+                  <span className="flex shrink-0 flex-wrap items-center gap-2 text-[14px]">
+                    <span className="tabular-nums text-slate-dark">
+                      {present} {present === 1 ? "presente" : "presenti"}
                     </span>
                     {report.status === "visto" ? (
                       <Badge tone="success">Visto</Badge>
