@@ -1,8 +1,9 @@
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { EmptyState, StatusLegend } from "@/components/ui";
-import type { BookingListItem } from "@/lib/types";
+import type { BookingListItem, Room } from "@/lib/types";
 import { DaySummary } from "./DaySummary";
 import { MobileCalendar } from "./MobileCalendar";
+import { ReservationList } from "./ReservationList";
 import { SwipeDay } from "./SwipeDay";
 import { capitalize, formatIt, shiftPeriod, toDate } from "./agenda-utils";
 
@@ -11,13 +12,18 @@ export interface MobileAgendaProps {
   today: string;
   byDate: Map<string, BookingListItem[]>;
   isAdmin: boolean;
+  rooms: Room[];
+  /** Permesso di assegnare la sala alle prenotazioni normali. */
+  canAssignRooms: boolean;
   onNavigate: (iso: string) => void;
 }
 
 /** Agenda mobile (< lg): calendario mensile in alto, lista del giorno sotto. La creazione è nel pulsante + globale (layout admin). */
-export function MobileAgenda({ selected, today, byDate, isAdmin, onNavigate }: MobileAgendaProps) {
+export function MobileAgenda({ selected, today, byDate, isAdmin, rooms, canAssignRooms, onNavigate }: MobileAgendaProps) {
   const selectedDate = toDate(selected);
   const items = byDate.get(selected) ?? [];
+  const cards = items.filter((b) => b.kind !== "normale");
+  const reservations = items.filter((b) => b.kind === "normale");
   const dayLabel = capitalize(formatIt(selectedDate, "EEEE d MMMM"));
 
   return (
@@ -56,10 +62,11 @@ export function MobileAgenda({ selected, today, byDate, isAdmin, onNavigate }: M
               }
             />
           ) : (
-            <div className="flex flex-col gap-4">
-              {items.map((booking) => (
+            <div className="flex min-w-0 flex-col gap-4">
+              {cards.map((booking) => (
                 <BookingCard key={booking.id} booking={booking} variant="full" dishes="collapsible" wholeCardLink />
               ))}
+              {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} canAssign={canAssignRooms} />}
             </div>
           )}
         </SwipeDay>

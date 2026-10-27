@@ -204,6 +204,8 @@ export function mapQuote(r: PbRecord): Quote {
     lines: normalizeQuoteLines(r.lines),
     discount: num(r.discount),
     vat_rate: num(r.vat_rate),
+    // PocketBase non distingue null da 0 nei campi numero: 0 = nessun prezzo finale (calcolo automatico).
+    final_total: num(r.final_total) > 0 ? num(r.final_total) : null,
     notes: nn(r.notes),
     created_at: toIsoDateTime(r.created),
   };

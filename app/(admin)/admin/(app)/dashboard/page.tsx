@@ -39,7 +39,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
 
   const [stats, upcoming, rooms, weekBookings, deletions] = await Promise.all([
     getDashboardStats(),
-    getUpcomingBookings(8),
+    getUpcomingBookings(8, { kinds: ["evento"] }),
     getRooms(),
     getBookingsInRange(week.startIso, week.endIso),
     getDeletionLog(5),
@@ -62,9 +62,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
       hint: "Adulti e bambini nei prossimi sette giorni",
     },
     {
-      label: "In attesa di conferma",
+      label: "Eventi senza acconto",
       value: stats.pendingOptions,
-      hint: stats.pendingOptions > 0 ? "Richiedono una conferma" : "Nessuna prenotazione in attesa",
+      hint: stats.pendingOptions > 0 ? "In attesa del primo acconto" : "Tutti gli eventi hanno un acconto",
       highlight: stats.pendingOptions > 0,
     },
   ];

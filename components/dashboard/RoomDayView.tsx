@@ -139,7 +139,7 @@ export function RoomDayView({ rooms, days, selectedDay, todayIso, bookings, onSe
                   className="flex flex-col gap-1.5 rounded-btn border border-dashed border-slate/50 bg-paper px-4 py-3 hover:bg-cream"
                 >
                   <span className="flex items-start gap-2">
-                    <StatusDot status={booking.status} size="sm" className="mt-2" />
+                    {booking.kind !== "normale" && <StatusDot status={booking.status} size="sm" className="mt-2" />}
                     <span className="min-w-0 font-serif text-lg leading-tight break-words">
                       {booking.menu?.name ?? "Menù da definire"}
                     </span>
@@ -168,7 +168,7 @@ function BookingBlock({ booking, capacity }: { booking: BookingListItem; capacit
       className="flex flex-col gap-2 bg-petrol px-4 py-4 text-paper transition-colors duration-200 hover:bg-petrol-hover"
     >
       <span className="flex items-start gap-2.5">
-        <StatusDot status={booking.status} onDark className="mt-2" />
+        {booking.kind !== "normale" && <StatusDot status={booking.status} onDark className="mt-2" />}
         {menuName ? (
           <span className="min-w-0 font-serif text-xl leading-tight break-words">{menuName}</span>
         ) : (

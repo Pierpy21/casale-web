@@ -22,7 +22,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   if (!quote) notFound();
 
   // Chiave sulla versione salvata: dopo un salvataggio l'editor riparte dai dati del server.
-  const version = JSON.stringify([quote.issued_at, quote.valid_until, quote.discount, quote.vat_rate, quote.notes, quote.lines]);
+  const version = JSON.stringify([quote.issued_at, quote.valid_until, quote.discount, quote.final_total, quote.vat_rate, quote.notes, quote.lines]);
 
   return (
     <div className="flex flex-col gap-6">

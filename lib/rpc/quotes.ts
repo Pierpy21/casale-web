@@ -112,6 +112,8 @@ export async function createQuote(
         lines,
         discount: draft?.discount ?? 0,
         vat_rate: draft?.vat_rate ?? 10,
+        // 0 = nessun prezzo finale (in PocketBase lo zero e' il valore vuoto dei campi numero).
+        final_total: draft?.final_total ?? 0,
         notes: draft?.notes ?? "",
         created_by: actor.id,
       });
@@ -139,6 +141,7 @@ export async function updateQuoteRecord(db: PocketBase, id: string, input: Quote
     lines: input.lines,
     discount: input.discount,
     vat_rate: input.vat_rate,
+    final_total: input.final_total ?? 0,
     notes: input.notes ?? "",
   });
   return String(quote.booking);

@@ -259,7 +259,7 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
           <View style={styles.totalsWrap} wrap={false}>
             <View style={styles.totalsBox}>
               <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>Subtotale (IVA inclusa)</Text>
+                <Text style={styles.totalsLabel}>{totals.subtotalLabel}</Text>
                 <Text style={styles.totalsValue}>{totals.subtotal}</Text>
               </View>
               {totals.hasDiscount ? (
@@ -277,7 +277,7 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
                 <Text style={styles.totalsValue}>{totals.vat}</Text>
               </View>
               <View style={styles.totalsGrandRow}>
-                <Text style={styles.totalsGrandLabel}>Totale</Text>
+                <Text style={styles.totalsGrandLabel}>{totals.totalLabel}</Text>
                 <Text style={styles.totalsGrandValue}>{totals.total}</Text>
               </View>
             </View>

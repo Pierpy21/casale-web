@@ -70,13 +70,18 @@ export interface QuoteDocumentModel {
   };
   lines: QuoteDocumentLine[];
   totals: {
+    /** Con prezzo finale: "Valore delle voci (IVA inclusa)"; altrimenti "Subtotale (IVA inclusa)". */
+    subtotalLabel: string;
     subtotal: string;
     discount: string;
     hasDiscount: boolean;
     taxable: string;
     vat: string;
     vatRate: string;
+    /** Con prezzo finale: "Totale concordato (IVA inclusa)"; altrimenti "Totale". */
+    totalLabel: string;
     total: string;
+    overridden: boolean;
   };
   notes: string | null;
   conditions: string[];
@@ -188,13 +193,16 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
       amount: formatEUR(round2(line.quantity * line.unit_price)),
     })),
     totals: {
+      subtotalLabel: totals.overridden ? "Valore delle voci (IVA inclusa)" : "Subtotale (IVA inclusa)",
       subtotal: formatEUR(totals.subtotal),
       discount: formatEUR(totals.discount),
-      hasDiscount: totals.discount > 0,
+      hasDiscount: !totals.overridden && totals.discount > 0,
       taxable: formatEUR(totals.taxable),
       vat: formatEUR(totals.vat),
       vatRate: `${formatQuantity(q.vat_rate)}%`,
+      totalLabel: totals.overridden ? "Totale concordato (IVA inclusa)" : "Totale",
       total: formatEUR(totals.total),
+      overridden: totals.overridden,
     },
     notes: orNull(q.notes),
     conditions: [...CONDITIONS],

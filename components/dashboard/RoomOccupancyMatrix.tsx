@@ -71,7 +71,7 @@ export function RoomOccupancyMatrix({ rooms, days, bookings }: RoomOccupancyMatr
                       className="flex min-h-20 flex-col justify-center gap-1.5 rounded-[2px] bg-petrol px-3 py-2.5 text-paper transition-colors duration-200 hover:bg-petrol-hover"
                     >
                       <span className="flex min-w-0 items-start gap-2">
-                        <StatusDot status={booking.status} size="sm" onDark className="mt-1.5" />
+                        {booking.kind !== "normale" && <StatusDot status={booking.status} size="sm" onDark className="mt-1.5" />}
                         <span className="line-clamp-2 min-w-0 font-serif text-[15px] font-semibold leading-snug break-words">
                           {menuName}
                         </span>

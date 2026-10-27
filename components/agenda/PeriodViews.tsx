@@ -1,9 +1,10 @@
 import { format } from "date-fns";
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { EmptyState, cn } from "@/components/ui";
-import type { BookingListItem } from "@/lib/types";
+import type { BookingListItem, Room } from "@/lib/types";
 import { formatIt, toISO } from "./agenda-utils";
 import { DaySummary } from "./DaySummary";
+import { ReservationList } from "./ReservationList";
 
 /** Vista settimana desktop: 7 colonne con card ricche (menù per portata, allergie). */
 export function WeekView({
@@ -60,8 +61,11 @@ export function WeekView({
   );
 }
 
-/** Vista giorno desktop: card ricche in griglia a due colonne. */
-export function DayView({ items }: { items: BookingListItem[] }) {
+/**
+ * Vista giorno desktop: eventi e appuntamenti come card ricche in griglia a due colonne;
+ * le prenotazioni normali sotto, come lista compatta con la sala assegnabile.
+ */
+export function DayView({ items, rooms, canAssignRooms }: { items: BookingListItem[]; rooms: Room[]; canAssignRooms: boolean }) {
   if (items.length === 0) {
     return (
       <EmptyState
@@ -70,14 +74,19 @@ export function DayView({ items }: { items: BookingListItem[] }) {
       />
     );
   }
+  const cards = items.filter((b) => b.kind !== "normale");
+  const reservations = items.filter((b) => b.kind === "normale");
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <DaySummary bookings={items} />
-      <section aria-label="Banchetti della giornata" className="grid gap-5 xl:grid-cols-2">
-        {items.map((booking) => (
-          <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" />
-        ))}
-      </section>
+      {cards.length > 0 && (
+        <section aria-label="Banchetti della giornata" className="grid gap-5 xl:grid-cols-2">
+          {cards.map((booking) => (
+            <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" />
+          ))}
+        </section>
+      )}
+      {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} canAssign={canAssignRooms} />}
     </div>
   );
 }

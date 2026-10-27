@@ -37,14 +37,19 @@ export const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 1
  * Totali del preventivo. Prezzi IVA inclusa:
  * subtotal = Σ quantity × unit_price; discount è un importo in EUR (limitato al subtotale);
  * total = subtotal − discount; taxable = total / (1 + vat/100); vat = total − taxable.
+ * Con prezzo finale (final_total numerico ≥ 0): total = final_total, sconto 0, overridden = true;
+ * subtotal resta la somma delle righe (indicativa).
  */
-export function computeQuoteTotals(q: Pick<Quote, "lines" | "discount" | "vat_rate">): QuoteTotals {
+export function computeQuoteTotals(
+  q: Pick<Quote, "lines" | "discount" | "vat_rate"> & { final_total?: number | null },
+): QuoteTotals {
   const subtotal = round2(q.lines.reduce((acc, l) => acc + l.quantity * l.unit_price, 0));
-  const discount = round2(Math.min(Math.max(q.discount, 0), subtotal));
-  const total = round2(subtotal - discount);
+  const hasFinal = typeof q.final_total === "number" && Number.isFinite(q.final_total) && q.final_total >= 0;
+  const discount = hasFinal ? 0 : round2(Math.min(Math.max(q.discount, 0), subtotal));
+  const total = hasFinal ? round2(q.final_total as number) : round2(subtotal - discount);
   const taxable = round2(total / (1 + q.vat_rate / 100));
   const vat = round2(total - taxable);
-  return { subtotal, discount, total, taxable, vat };
+  return { subtotal, discount, total, taxable, vat, overridden: hasFinal };
 }
 
 const eurFormatter = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
