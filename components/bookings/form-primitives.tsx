@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Button, ButtonLink, Field, Input, cn } from "@/components/ui";
+import { Button, ButtonLink, Disclosure, Field, Input, cn } from "@/components/ui";
 import { SETUP_COLORS, SETUP_COLOR_HEX, type ClientOption, type ClientSuggestion } from "@/lib/types";
 import {
   describedBy,
@@ -149,6 +149,9 @@ export function MenuChoice({
   items,
   checked,
   onSelect,
+  onEdit,
+  customized = false,
+  onReset,
 }: {
   name: string;
   title: string;
@@ -156,12 +159,65 @@ export function MenuChoice({
   items: Parameters<typeof CourseList>[0]["items"];
   checked: boolean;
   onSelect: () => void;
+  /** Matita sul menù selezionato: modifica i piatti solo per questo evento. */
+  onEdit?: () => void;
+  /** I piatti mostrati sono personalizzati per l'evento (non quelli del catalogo). */
+  customized?: boolean;
+  /** Torna ai piatti del menù. */
+  onReset?: () => void;
 }) {
+  const dishes = <CourseList items={items} className="text-[13px]" />;
   return (
-    <ChoiceCard name={name} title={title} checked={checked} onSelect={onSelect}>
-      <span className="text-[14px] font-medium text-petrol">{price}</span>
-      <CourseList items={items} className="text-[13px]" />
-    </ChoiceCard>
+    <div
+      className={cn(
+        "relative flex min-w-0 flex-col gap-3 rounded-btn border bg-paper p-4 transition-colors duration-200 hover:border-slate focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-petrol",
+        checked ? "border-petrol bg-petrol/5 ring-1 ring-petrol" : "border-sand",
+      )}
+    >
+      {/* L'overlay dell'etichetta rende cliccabile tutta la card; matita e tendina dei piatti stanno sopra (z-10). */}
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <label className="flex min-w-0 flex-1 cursor-pointer flex-col gap-3 after:absolute after:inset-0 after:content-['']">
+          <input type="radio" name={name} checked={checked} onChange={() => onSelect()} className="sr-only" />
+          <span className="min-w-0 wrap-anywhere font-serif text-xl leading-tight text-ink">{title}</span>
+          <span className="text-[14px] font-medium text-petrol">{price}</span>
+        </label>
+        {checked && (
+          <div className="relative z-10 -mr-1.5 -mt-1.5 flex shrink-0 items-center gap-1">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                aria-label={`Modifica i piatti di ${title} solo per questo evento`}
+                title="Modifica i piatti per questo evento"
+                className="grid size-10 place-items-center rounded-btn text-petrol transition-colors duration-200 hover:bg-petrol/10 focus-visible:outline-2 focus-visible:outline-petrol"
+              >
+                <Pencil aria-hidden="true" className="size-4" />
+              </button>
+            )}
+            <Check aria-hidden="true" className="mr-1.5 size-5 text-petrol" />
+          </div>
+        )}
+      </div>
+      {customized && (
+        <p className="relative z-10 flex flex-wrap items-center gap-x-2 text-[12px] text-bronze">
+          <span>Piatti personalizzati per questo evento</span>
+          {onReset && (
+            <button type="button" onClick={onReset} className="font-medium text-petrol underline underline-offset-2 hover:text-ink">
+              Ripristina
+            </button>
+          )}
+        </p>
+      )}
+      {items.length > 0 && (
+        <>
+          {/* Mobile e tablet: piatti compressi. Da xl sempre visibili. */}
+          <Disclosure className="relative z-10 -my-1 border-t border-sand xl:hidden" summary={`Vedi piatti (${items.length})`}>
+            <div className="pb-1 pt-1">{dishes}</div>
+          </Disclosure>
+          <div className="hidden xl:block">{dishes}</div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -538,49 +594,55 @@ export function BookingFormHeader({
   submit?: { label: string; pendingLabel: string; pending: boolean };
 }) {
   return (
-    <header className="flex min-w-0 flex-col gap-4 border-b border-sand pb-5 sm:flex-row sm:items-end sm:justify-between">
+    // Griglia a posizioni fisse (niente flex-wrap: a larghezze intermedie andava a capo a caso).
+    // Mobile: una colonna. Da sm: titolo | indietro, poi data | invio. Da xl: tutto su una riga.
+    <header className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 border-b border-sand pb-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end xl:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
       <h1 className="min-w-0 text-3xl leading-tight wrap-anywhere lg:text-4xl">{title}</h1>
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 sm:justify-end">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <label htmlFor={BOOKING_DATE_ID} className="text-[12px] font-medium uppercase tracking-[0.14em] text-bronze">
-            Data
-          </label>
-          <input
-            id={BOOKING_DATE_ID}
-            type="date"
-            value={date}
-            onChange={(e) => onDateChange(e.target.value)}
-            aria-invalid={dateError ? true : undefined}
-            aria-describedby={dateError ? `${BOOKING_DATE_ID}-error` : undefined}
-            className={cn(
-              "min-h-11 min-w-0 rounded-btn border border-transparent bg-transparent px-1 font-serif text-2xl leading-tight transition-[border-color,box-shadow] duration-200 focus:outline-none focus:ring-[3px] sm:text-3xl",
-              dateError
-                ? "text-danger focus:border-danger focus:ring-danger/25"
-                : "text-ink focus:border-petrol focus:ring-petrol/25",
-            )}
-          />
-          {dateError && (
-            <p id={`${BOOKING_DATE_ID}-error`} className="text-[13px] text-danger">
-              {dateError}
-            </p>
+      <ButtonLink
+        href={backHref}
+        variant="ghost"
+        size="sm"
+        className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end sm:self-center xl:col-start-3 xl:self-end"
+      >
+        ← {backLabel}
+      </ButtonLink>
+      <div className="flex min-w-0 flex-col gap-1.5 xl:col-start-2 xl:row-start-1">
+        <label htmlFor={BOOKING_DATE_ID} className="text-[12px] font-medium uppercase tracking-[0.14em] text-bronze">
+          Data
+        </label>
+        <input
+          id={BOOKING_DATE_ID}
+          type="date"
+          value={date}
+          onChange={(e) => onDateChange(e.target.value)}
+          aria-invalid={dateError ? true : undefined}
+          aria-describedby={dateError ? `${BOOKING_DATE_ID}-error` : undefined}
+          className={cn(
+            // appearance-none: Safari iOS/iPad altrimenti ignora la larghezza dei campi data.
+            "block min-h-11 w-full min-w-0 max-w-[16rem] appearance-none rounded-btn border border-transparent bg-transparent px-1 text-left font-serif text-2xl leading-tight transition-[border-color,box-shadow] duration-200 focus:outline-none focus:ring-[3px] sm:text-3xl",
+            dateError
+              ? "text-danger focus:border-danger focus:ring-danger/25"
+              : "text-ink focus:border-petrol focus:ring-petrol/25",
           )}
-        </div>
-        <ButtonLink href={backHref} variant="ghost" size="sm">
-          ← {backLabel}
-        </ButtonLink>
-        {submit && (
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            disabled={submit.pending}
-            aria-busy={submit.pending || undefined}
-            className="w-full sm:w-auto"
-          >
-            {submit.pending ? submit.pendingLabel : submit.label}
-          </Button>
+        />
+        {dateError && (
+          <p id={`${BOOKING_DATE_ID}-error`} className="text-[13px] text-danger">
+            {dateError}
+          </p>
         )}
       </div>
+      {submit && (
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          disabled={submit.pending}
+          aria-busy={submit.pending || undefined}
+          className="w-full sm:w-auto sm:self-end xl:col-start-4 xl:row-start-1"
+        >
+          {submit.pending ? submit.pendingLabel : submit.label}
+        </Button>
+      )}
     </header>
   );
 }

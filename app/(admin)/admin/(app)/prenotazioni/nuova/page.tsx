@@ -6,8 +6,8 @@ import { occupancyWindow } from "@/components/bookings/booking-window";
 import { requireProfile } from "@/lib/auth";
 import { getRoomBookingSlots } from "@/lib/data/bookings";
 import { getClient } from "@/lib/data/clients";
-import { getMenus, getRooms } from "@/lib/data/catalog";
-import { canCreateAnyBooking, canCreateBooking, isAdmin } from "@/lib/permissions";
+import { getDishes, getMenus, getRooms } from "@/lib/data/catalog";
+import { canCreateAnyBooking, canCreateBooking, canEditDishes, isAdmin } from "@/lib/permissions";
 import type { BookingKind } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -46,10 +46,12 @@ export default async function NewBookingPage({ searchParams }: { searchParams: S
       }
     : undefined;
 
-  const [rooms, menus, occupancy] = await Promise.all([
+  const [rooms, menus, occupancy, dishCatalog] = await Promise.all([
     getRooms({ includeInactive: true }),
     kind === "evento" ? getMenus({ includeInactive: true }) : Promise.resolve([]),
     kind === "appuntamento" ? Promise.resolve([]) : getRoomBookingSlots(range.from, range.to),
+    // Catalogo piatti per personalizzare i piatti dell'evento già in creazione.
+    kind === "evento" && canEditDishes(profile) ? getDishes() : Promise.resolve([]),
   ]);
 
   return (
@@ -63,6 +65,7 @@ export default async function NewBookingPage({ searchParams }: { searchParams: S
       initialDate={date}
       prefill={prefill}
       isAdmin={isAdmin(profile)}
+      dishCatalog={dishCatalog}
     />
   );
 }

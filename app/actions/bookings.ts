@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
-import { BookingAllergiesInput, BookingInput, BookingNoteBody, coversInputFor, DishesInput } from "@/lib/validation";
+import { BookingAllergiesInput, BookingInput, BookingNoteBody, coversInputFor, DishesInput, type DishInputType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } from "@/lib/action-utils";
 import { createQuote } from "@/lib/rpc/quotes";
 import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canSeeAppointments, isAdmin } from "@/lib/permissions";
@@ -40,8 +40,13 @@ function kindOf(record: Record<string, unknown> | null): BookingKind {
  * Crea una prenotazione di qualunque tipo (admin) o una prenotazione normale (sala).
  * Il cliente: rubrica (client_id, solo admin) oppure nuovo cliente (new_client), riusato se il telefono esiste gia'.
  */
+/**
+ * Crea una prenotazione. `dishes` (solo eventi, facoltativo): piatti personalizzati nel form di creazione,
+ * salvati al posto della copia del menù prima del preventivo.
+ */
 export async function createBooking(
   input: unknown,
+  dishes?: unknown,
 ): Promise<ActionResult<{ id: string; quote_id: string | null; warnings: string[] }>> {
   const auth = await authorize(canCreateAnyBooking, "Non sei autorizzato a creare prenotazioni.");
   if (!auth.ok) return auth;
@@ -51,6 +56,16 @@ export async function createBooking(
 
   if (!canCreateBooking(auth.profile, parsed.data.kind)) {
     return fail("Non sei autorizzato a creare questo tipo di prenotazione.");
+  }
+  // Piatti personalizzati: validati prima di creare, così un errore non lascia un evento a metà.
+  let customDishes: DishInputType[] | null = null;
+  if (dishes !== undefined && dishes !== null) {
+    if (parsed.data.kind !== "evento" || !canEditDishes(auth.profile)) {
+      return fail("I piatti si personalizzano solo sugli eventi, dall'amministratore.");
+    }
+    const parsedDishes = DishesInput.safeParse(dishes);
+    if (!parsedDishes.success) return invalidInput(parsedDishes.error);
+    customDishes = parsedDishes.data;
   }
   // La rubrica clienti e' riservata all'admin: la sala indica sempre il cliente come nuovo cliente.
   if (!isAdmin(auth.profile) && parsed.data.client_id) {
@@ -64,8 +79,23 @@ export async function createBooking(
     return dbFail(err);
   }
 
-  // Preventivo (solo eventi, se richiesto). La prenotazione e' gia' salvata: un errore qui e' un avviso, non un annullamento.
   const warnings: string[] = [];
+  // Piatti personalizzati al posto della copia del menu'. Come per il preventivo: un errore e' un avviso.
+  if (customDishes) {
+    try {
+      await saveBookingDishes(
+        auth.db,
+        id,
+        customDishes.map((d, index) => ({ ...d, sort: index })),
+        { id: auth.profile.id, full_name: auth.profile.full_name },
+      );
+    } catch (err) {
+      console.error("[bookings] piatti personalizzati non salvati:", err);
+      warnings.push("Piatti personalizzati non salvati: l'evento ha i piatti del menù, modificali dalla pagina della prenotazione.");
+    }
+  }
+
+  // Preventivo (solo eventi, se richiesto). La prenotazione e' gia' salvata: un errore qui e' un avviso, non un annullamento.
   let quoteId: string | null = null;
   if (parsed.data.kind === "evento" && parsed.data.create_quote) {
     try {

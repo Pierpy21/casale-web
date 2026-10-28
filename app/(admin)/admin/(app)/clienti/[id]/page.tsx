@@ -50,7 +50,7 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
         }
       />
 
-      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+      <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
         <section aria-labelledby="dati-cliente" className="flex flex-col gap-5">
           <h2 id="dati-cliente" className="text-2xl">
             Dati del cliente

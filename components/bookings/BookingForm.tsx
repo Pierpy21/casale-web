@@ -1,4 +1,4 @@
-import type { BookingDetail, BookingKind, ClientOption, Menu, Room, RoomBookingSlot } from "@/lib/types";
+import type { BookingDetail, BookingKind, ClientOption, Dish, Menu, Room, RoomBookingSlot } from "@/lib/types";
 import type { NewClientDraft } from "./booking-form-model";
 import { EventForm } from "./EventForm";
 import { SimpleBookingForm } from "./SimpleBookingForm";
@@ -18,10 +18,12 @@ export interface BookingFormProps {
   prefill?: NewClientDraft;
   /** Creazione: l'admin invia il cliente scelto dai suggerimenti come client_id (la sala come nuovo cliente). */
   isAdmin?: boolean;
+  /** Solo eventi in creazione: catalogo piatti per personalizzare i piatti dell'evento. */
+  dishCatalog?: Dish[];
 }
 
 /** Sceglie il form in base al tipo: evento (menù, preventivo) oppure prenotazione normale / appuntamento. */
-export function BookingForm({ mode, kind, booking, clients, rooms, menus, occupancy, initialDate, prefill, isAdmin }: BookingFormProps) {
+export function BookingForm({ mode, kind, booking, clients, rooms, menus, occupancy, initialDate, prefill, isAdmin, dishCatalog }: BookingFormProps) {
   if (kind === "evento") {
     return (
       <EventForm
@@ -34,6 +36,7 @@ export function BookingForm({ mode, kind, booking, clients, rooms, menus, occupa
         initialDate={initialDate}
         prefill={prefill}
         isAdmin={isAdmin}
+        dishCatalog={dishCatalog}
       />
     );
   }

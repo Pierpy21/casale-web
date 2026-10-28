@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { setMenuActive } from "@/app/actions/catalog";
-import { Alert, Badge, Button, cn, EmptyState, Modal, Switch } from "@/components/ui";
+import { Alert, Badge, Button, cn, Disclosure, EmptyState, Modal, Switch } from "@/components/ui";
 import { formatEUR } from "@/lib/quote-utils";
 import { COURSE_LABELS, COURSE_ORDER, type Dish, type Menu } from "@/lib/types";
 import { MenuEditor } from "./MenuEditor";
@@ -84,6 +84,7 @@ export function MenusPanel({ menus, dishes }: MenusPanelProps) {
         onClose={() => setEditorOpen(false)}
         title={editing ? "Modifica menù" : "Nuovo menù"}
         size="xl"
+        bare
       >
         {editorOpen && (
           <MenuEditor
@@ -115,6 +116,26 @@ function MenuCard({
     course,
     items: menu.items.filter((item) => item.course === course),
   })).filter((group) => group.items.length > 0);
+
+  const dishCount = groups.reduce((sum, group) => sum + group.items.length, 0);
+  const dishList = (
+    <dl className="flex flex-col gap-3">
+      {groups.map((group) => (
+        <div key={group.course}>
+          <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+            {COURSE_LABELS[group.course]}
+          </dt>
+          <dd>
+            <ul className="text-[14px] leading-snug text-ink">
+              {group.items.map((item) => (
+                <li key={item.id}>{item.name}</li>
+              ))}
+            </ul>
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 
   function toggle(next: boolean) {
     setActive(next);
@@ -169,18 +190,11 @@ function MenuCard({
           />
         </div>
 
-        <div
-          className={cn(
-            "flex flex-wrap items-start justify-between gap-3 transition-[opacity,filter] duration-300",
-            !active && "opacity-60 grayscale",
-          )}
-        >
-          <div className="flex flex-wrap gap-2">{menu.is_kids && <Badge tone="bronze">Bambini</Badge>}</div>
-          <p className="text-right">
-            <span className="font-serif text-2xl tabular-nums text-ink">{formatEUR(menu.price_per_person)}</span>
-            <span className="block text-[12px] text-slate-dark">a persona</span>
-          </p>
-        </div>
+        {menu.is_kids && (
+          <div className={cn("flex flex-wrap gap-2 transition-[opacity,filter] duration-300", !active && "opacity-60 grayscale")}>
+            <Badge tone="bronze">Bambini</Badge>
+          </div>
+        )}
       </header>
 
       <div
@@ -192,29 +206,28 @@ function MenuCard({
         {groups.length === 0 ? (
           <p className="text-[14px] text-slate-dark">Nessun piatto inserito.</p>
         ) : (
-          <dl className="flex flex-col gap-3 border-t border-sand pt-4">
-            {groups.map((group) => (
-              <div key={group.course}>
-                <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
-                  {COURSE_LABELS[group.course]}
-                </dt>
-                <dd>
-                  <ul className="text-[14px] leading-snug text-ink">
-                    {group.items.map((item) => (
-                      <li key={item.id}>{item.name}</li>
-                    ))}
-                  </ul>
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <>
+            {/* Mobile e tablet: piatti compressi, si aprono con la freccia. Da xl (desktop) sempre visibili. */}
+            <Disclosure
+              className="-mb-3 border-t border-sand pt-2 xl:hidden"
+              summary={`Visualizza piatti (${dishCount})`}
+            >
+              {/* Padding dentro il contenuto: sul pannello resterebbe visibile anche da chiuso. */}
+              <div className="pb-1 pt-2">{dishList}</div>
+            </Disclosure>
+            <div className="hidden border-t border-sand pt-4 xl:block">{dishList}</div>
+          </>
         )}
       </div>
 
-      <div className="mt-auto flex flex-wrap gap-2 border-t border-sand pt-4">
+      <div className="mt-auto flex items-end justify-between gap-3 border-t border-sand pt-4">
         <Button variant="outline" size="sm" onClick={onEdit} disabled={pending}>
           Modifica
         </Button>
+        <p className={cn("text-right transition-[opacity,filter] duration-300", !active && "opacity-60 grayscale")}>
+          <span className="font-serif text-2xl tabular-nums leading-none text-ink">{formatEUR(menu.price_per_person)}</span>
+          <span className="block text-[12px] text-slate-dark">a persona</span>
+        </p>
       </div>
     </li>
   );

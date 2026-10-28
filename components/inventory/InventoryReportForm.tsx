@@ -223,12 +223,15 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] sm:items-end">
+      {/* items-start: etichette e campi allineati in alto (le note hanno un suggerimento sotto). */}
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
         <Field label="Data" htmlFor="report-date" required>
+          {/* Safari iPad/iOS ignora la larghezza dei campi data con l'aspetto nativo e invade la colonna accanto. */}
           <Input
             id="report-date"
             type="date"
             large
+            className="block appearance-none"
             disabled={pending}
             value={reportDate}
             onChange={(e) => setReportDate(e.target.value)}
@@ -251,7 +254,7 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
 
       {/* top = altezza dell'header mobile (0.75rem + campanella 2.5rem + 0.75rem) meno 1px: la barra passa appena sotto
           l'header (z-30), così con pixel frazionari non resta una giunzione che sfarfalla durante lo scroll. */}
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-10 transform-gpu -mx-4 flex flex-col gap-2 bg-paper px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-10 lg:top-0 lg:px-10">
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-10 -mx-4 flex flex-col gap-2 bg-paper px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-10 lg:top-0 lg:px-10">
         <div className="relative">
           <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-dark" />
           <Input

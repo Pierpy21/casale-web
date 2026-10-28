@@ -289,80 +289,92 @@ export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps)
       onSubmit={handleSubmit}
       noValidate
       aria-label={menu ? "Modifica menù" : "Nuovo menù"}
-      // Annulla il padding del corpo della finestra: il piè di pagina arriva ai bordi e resta in basso.
-      className="-mx-6 -my-5 flex flex-col"
+      // Nella finestra "bare": scorre solo il contenuto, il piè di pagina resta fisso in fondo.
+      className="flex min-h-0 flex-1 flex-col"
     >
-      <div className="flex flex-col gap-6 px-6 py-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-6 py-5">
         {formError && <Alert tone="danger">{formError}</Alert>}
         {errors._form && <Alert tone="danger">{errors._form}</Alert>}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field
-            label="Nome del menù"
-            htmlFor={fieldId("name")}
-            required
-            error={errors.name}
-            className="sm:col-span-2 lg:col-span-2"
-          >
-            <Input id={fieldId("name")} name="name" defaultValue={menu?.name ?? ""} required invalid={!!errors.name} />
-          </Field>
-          <Field label="Stagione" htmlFor={fieldId("season")} error={errors.season} className="lg:col-span-2">
-            <Input
-              id={fieldId("season")}
-              name="season"
-              defaultValue={menu?.season ?? ""}
-              placeholder="Es. Autunno 2026"
-              invalid={!!errors.season}
-            />
-          </Field>
-          <Field label="Prezzo a persona (€)" htmlFor={fieldId("price")} required error={errors.price_per_person}>
-            <Input
-              id={fieldId("price")}
-              name="price_per_person"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min={0}
-              defaultValue={menu ? String(menu.price_per_person) : ""}
+        <div className="flex flex-col gap-4">
+          {/* Nome con l'ordine in elenco (campo piccolo) a fianco. */}
+          <div className="flex min-w-0 items-start gap-4">
+            <Field
+              label="Nome del menù"
+              htmlFor={fieldId("name")}
               required
-              invalid={!!errors.price_per_person}
-            />
-          </Field>
-          <Field label="Ordine in elenco" htmlFor={fieldId("sort")} error={errors.sort}>
-            <Input
-              id={fieldId("sort")}
-              name="sort"
-              type="number"
-              min={0}
-              step={1}
-              defaultValue={String(menu?.sort ?? 0)}
-              invalid={!!errors.sort}
-            />
-          </Field>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className={LABEL_CLASS}>Menù bambini</span>
-            <div className="flex h-11 items-center">
-              <Switch
-                checked={isKids}
-                onCheckedChange={setIsKids}
-                disabled={pending}
-                label="Menù bambini"
-                onLabel="Sì"
-                offLabel="No"
+              error={errors.name}
+              className="min-w-0 flex-1"
+            >
+              <Input id={fieldId("name")} name="name" defaultValue={menu?.name ?? ""} required invalid={!!errors.name} />
+            </Field>
+            <Field label="Ordine" htmlFor={fieldId("sort")} error={errors.sort} className="w-20 shrink-0">
+              <Input
+                id={fieldId("sort")}
+                name="sort"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                defaultValue={String(menu?.sort ?? 0)}
+                invalid={!!errors.sort}
               />
-            </div>
+            </Field>
           </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className={LABEL_CLASS}>Visibilità</span>
-            <div className="flex h-11 items-center">
-              <Switch
-                checked={visible}
-                onCheckedChange={setVisible}
-                disabled={pending}
-                label="Visibilità del menù"
-                onLabel="Visibile"
-                offLabel="Nascosto"
+
+          {/* items-end: se un'etichetta va a capo i campi restano allineati. */}
+          <div className="grid grid-cols-2 items-end gap-4">
+            <Field label="Stagione" htmlFor={fieldId("season")} error={errors.season} className="min-w-0">
+              <Input
+                id={fieldId("season")}
+                name="season"
+                defaultValue={menu?.season ?? ""}
+                placeholder="Es. Autunno 2026"
+                invalid={!!errors.season}
               />
+            </Field>
+            <Field label="Prezzo a persona (€)" htmlFor={fieldId("price")} required error={errors.price_per_person} className="min-w-0">
+              <Input
+                id={fieldId("price")}
+                name="price_per_person"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min={0}
+                defaultValue={menu ? String(menu.price_per_person) : ""}
+                required
+                invalid={!!errors.price_per_person}
+              />
+            </Field>
+          </div>
+
+          {/* Menù bambini e visibilità affiancati. */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className={LABEL_CLASS}>Menù bambini</span>
+              <div className="flex h-11 items-center">
+                <Switch
+                  checked={isKids}
+                  onCheckedChange={setIsKids}
+                  disabled={pending}
+                  label="Menù bambini"
+                  onLabel="Sì"
+                  offLabel="No"
+                />
+              </div>
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className={LABEL_CLASS}>Visibilità</span>
+              <div className="flex h-11 items-center">
+                <Switch
+                  checked={visible}
+                  onCheckedChange={setVisible}
+                  disabled={pending}
+                  label="Visibilità del menù"
+                  onLabel="Visibile"
+                  offLabel="Nascosto"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -488,7 +500,7 @@ export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps)
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 flex gap-3 border-t border-sand bg-paper px-6 py-4 sm:justify-end">
+      <div className="flex shrink-0 gap-3 border-t border-sand bg-paper px-6 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:justify-end sm:pb-4">
         <Button variant="ghost" size="md" onClick={onCancel} disabled={pending} className="flex-1 sm:flex-none">
           Annulla
         </Button>
