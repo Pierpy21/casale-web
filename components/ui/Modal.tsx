@@ -9,7 +9,7 @@ export type ModalSize = "md" | "lg" | "xl";
 
 const SIZE_CLASSES: Record<ModalSize, string> = {
   // Larghezza di default (invariata per le finestre esistenti).
-  md: "w-[min(92vw,32rem)]",
+  md: "w-[min(92vw,32rem)] max-h-[calc(100dvh-2rem)]",
   lg: "w-[min(92vw,44rem)] max-h-[calc(100dvh-3rem)]",
   // Telefono: schermo intero. Da sm in su: finestra larga con margine e corpo a scorrimento.
   xl: "h-dvh max-h-none w-dvw max-w-none sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:w-[min(94vw,64rem)]",
@@ -23,10 +23,15 @@ export interface ModalProps {
   footer?: ReactNode;
   /** Larghezza della finestra (default "md"). */
   size?: ModalSize;
+  /**
+   * Corpo senza padding né scroll: il contenuto (es. un form con piè di pagina proprio) gestisce da sé
+   * l'area che scorre con `min-h-0 flex-1 overflow-y-auto` e resta in colonna fino al fondo della finestra.
+   */
+  bare?: boolean;
 }
 
 /** Dialog nativo (focus trap, Esc, inert del resto della pagina gestiti dal browser). */
-export function Modal({ open, onClose, title, children, footer, size = "md" }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, size = "md", bare = false }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -56,7 +61,7 @@ export function Modal({ open, onClose, title, children, footer, size = "md" }: M
           <X aria-hidden="true" className="size-4" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+      <div className={bare ? "flex min-h-0 flex-1 flex-col" : "min-h-0 flex-1 overflow-y-auto px-6 py-5"}>{children}</div>
       {footer && (
         <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-sand px-6 py-4">
           {footer}

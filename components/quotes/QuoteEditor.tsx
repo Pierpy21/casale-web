@@ -175,7 +175,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start">
+    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] xl:items-start">
       <form onSubmit={onSubmit} noValidate className="no-print flex min-w-0 flex-col gap-6" aria-label="Modifica preventivo">
         {formError && <Alert tone="danger">{formError}</Alert>}
 
@@ -316,7 +316,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
         </div>
       </form>
 
-      <aside aria-label="Anteprima" className="min-w-0 lg:sticky lg:top-8">
+      <aside aria-label="Anteprima" className="min-w-0 xl:sticky xl:top-8">
         <p className="no-print mb-3 text-[12px] font-medium uppercase tracking-[0.14em] text-bronze">Anteprima</p>
         <QuotePreview model={previewModel} />
       </aside>

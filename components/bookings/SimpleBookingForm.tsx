@@ -69,8 +69,6 @@ export interface SimpleBookingFormProps {
 
 interface SimpleValues {
   event_date: string;
-  /** Titolo dell'appuntamento (non usato per le prenotazioni normali). */
-  title: string;
   eventType: EventTypeState;
   event_time: string;
   status: BookingStatus;
@@ -86,7 +84,6 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
   if (!booking) {
     return {
       event_date: initialDate,
-      title: "",
       eventType: { choice: "", custom: "" },
       event_time: "",
       status: "opzione",
@@ -100,7 +97,6 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
   }
   return {
     event_date: booking.event_date,
-    title: booking.event_name ?? "",
     eventType: eventTypeState(booking.event_type),
     event_time: timeInputValue(booking.event_time),
     status: booking.status,
@@ -199,7 +195,6 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
     if (!values.event_date) add("event_date", "Data obbligatoria");
     if (!values.event_time) add("event_time", "Indica l’ora");
     if (isAppointment) {
-      if (!values.title.trim()) add("event_name", "Inserisci il titolo dell’appuntamento");
       if (!eventType) add("event_type", "Scegli il tipo");
     } else {
       if (covers < 1) add("adults", "Indicare almeno un coperto");
@@ -221,7 +216,8 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
         : isAdmin && linkedClient
           ? { client_id: linkedClient.id }
           : { new_client: newClientPayload(newClient) }),
-      event_name: isAppointment ? values.title.trim() : null,
+      // Gli appuntamenti non hanno più un titolo: in agenda compare il cliente. In modifica resta quello già salvato.
+      event_name: isAppointment ? (booking?.event_name ?? null) : null,
       event_type: isAppointment ? eventType : null,
       event_date: values.event_date,
       event_time: values.event_time || null,
@@ -310,21 +306,6 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
 
       <FormCard label={isAppointment ? "Appuntamento" : "Prenotazione"}>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          {isAppointment && (
-            <Field label="Titolo" htmlFor="appointment-title" required error={first(errors.event_name)} className="sm:col-span-2">
-              <Input
-                id="appointment-title"
-                autoComplete="off"
-                invalid={!!errors.event_name}
-                aria-describedby={describedBy("appointment-title", !!errors.event_name, false)}
-                value={values.title}
-                onChange={(e) => change({ title: e.target.value })}
-                placeholder="es. Sopralluogo, degustazione…"
-                maxLength={200}
-              />
-            </Field>
-          )}
-
           <Field label="Ora" htmlFor="booking-time" required error={first(errors.event_time)}>
             <Input
               id="booking-time"

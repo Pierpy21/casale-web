@@ -297,7 +297,6 @@ export const BookingInput = z
       checkCovers(v, ctx);
     } else {
       // appuntamento: incontro con il cliente, niente coperti obbligatori, niente menù.
-      if (!v.event_name) issue("event_name", "Titolo dell'appuntamento obbligatorio");
       if (!v.event_type) issue("event_type", "Tipo obbligatorio");
       if (!v.event_time) issue("event_time", "Ora obbligatoria");
       if (v.menu_id || v.kids_menu_id) issue("menu_id", "Gli appuntamenti non hanno menù");

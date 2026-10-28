@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { createBooking, updateBooking } from "@/app/actions/bookings";
-import { Alert, Field, Input, Select, Textarea, cn } from "@/components/ui";
+import { Alert, Field, Input, Modal, Select, Textarea, cn } from "@/components/ui";
 import {
   EVENT_TYPES,
   STATUS_LABELS,
@@ -11,6 +12,7 @@ import {
   type BookingStatus,
   type ClientOption,
   type ClientSuggestion,
+  type Dish,
   type Menu,
   type Room,
   type RoomBookingSlot,
@@ -53,6 +55,7 @@ import {
   newAllergyRow,
   type ClientLink,
 } from "./form-primitives";
+import { DishesEditor, type DishPayload } from "./DishesEditor";
 import { QuotePanel } from "./QuotePanel";
 import { EMPTY_QUOTE_DRAFT, autoQuoteLines, buildQuotePayload, type QuoteDraft, type QuotePayload } from "./quote-draft";
 
@@ -72,6 +75,8 @@ export interface EventFormProps {
    * La sala invia sempre new_client (il server riusa il cliente per telefono).
    */
   isAdmin?: boolean;
+  /** Catalogo piatti attivi: per personalizzare i piatti dell'evento già in creazione. */
+  dishCatalog?: Dish[];
 }
 
 interface EventValues {
@@ -150,6 +155,7 @@ export function EventForm({
   initialDate,
   prefill,
   isAdmin = false,
+  dishCatalog = [],
 }: EventFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -164,6 +170,9 @@ export function EventForm({
   const [quote, setQuote] = useState<QuoteDraft>(EMPTY_QUOTE_DRAFT);
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  // Solo creazione: piatti personalizzati per questo evento (null = copia del menù scelto). Il catalogo non cambia.
+  const [customDishes, setCustomDishes] = useState<DishPayload[] | null>(null);
+  const [dishesEditorOpen, setDishesEditorOpen] = useState(false);
 
   /** Ogni modifica dell'utente toglie gli errori visibili: si ricalcolano alla prossima pressione di "salva". */
   const change = (changes: Partial<EventValues>) => {
@@ -232,6 +241,18 @@ export function EventForm({
       kids_menu_id: values.kids_menu_id ?? (kidsMenus > 0 ? soleKidsMenuId : null),
     });
   };
+
+  // Cambiare menù riparte dai piatti del nuovo menù: le personalizzazioni erano sul menù precedente.
+  const selectMenu = (menuId: string | null) => {
+    if (menuId === values.menu_id) return;
+    change({ menu_id: menuId });
+    setCustomDishes(null);
+  };
+  const menuDishes: DishPayload[] = (selectedMenu?.items ?? [])
+    .slice()
+    .sort((a, b) => a.sort - b.sort)
+    .map((item) => ({ course: item.course, name: item.name, sort: item.sort, ...(item.description ? { description: item.description } : {}) }));
+  const customPreview = (customDishes ?? []).map((dish, index) => ({ ...dish, id: `custom-${index}` }));
 
   const cancelHref = isEdit && booking
     ? `/admin/prenotazioni/${booking.id}`
@@ -329,7 +350,7 @@ export function EventForm({
         return;
       }
 
-      const result = await createBooking(payload);
+      const result = await createBooking(payload, customDishes ?? undefined);
       if (!result.ok) {
         applyError(result);
         return;
@@ -361,7 +382,7 @@ export function EventForm({
 
       {formError && <Alert tone="danger">{formError}</Alert>}
 
-      <div className={cn("grid min-w-0 gap-6", !isEdit && "lg:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] lg:items-start")}>
+      <div className={cn("grid min-w-0 gap-6", !isEdit && "xl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] xl:items-start")}>
         <div className="flex min-w-0 flex-col gap-6">
           <FormCard>
             <ClientSection
@@ -497,7 +518,7 @@ export function EventForm({
             <div data-invalid={errors.menu_id ? "true" : undefined} className="flex flex-col gap-3">
               <GroupLabel>Menù adulti</GroupLabel>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <ChoiceCard name="menu_id" title="Nessun menù" checked={values.menu_id === null} onSelect={() => change({ menu_id: null })}>
+                <ChoiceCard name="menu_id" title="Nessun menù" checked={values.menu_id === null} onSelect={() => selectMenu(null)}>
                   <span className="text-[14px] text-slate-dark">Il menù si può scegliere anche più avanti</span>
                 </ChoiceCard>
                 {adultMenus.map((menu) => (
@@ -506,9 +527,12 @@ export function EventForm({
                     name="menu_id"
                     title={menu.name}
                     price={`${formatEUR(menu.price_per_person)} a persona`}
-                    items={menu.items}
+                    items={values.menu_id === menu.id && customDishes ? customPreview : menu.items}
                     checked={values.menu_id === menu.id}
-                    onSelect={() => change({ menu_id: menu.id })}
+                    onSelect={() => selectMenu(menu.id)}
+                    onEdit={isEdit ? undefined : () => setDishesEditorOpen(true)}
+                    customized={values.menu_id === menu.id && customDishes !== null}
+                    onReset={() => setCustomDishes(null)}
                   />
                 ))}
               </div>
@@ -541,8 +565,24 @@ export function EventForm({
             <p className="rounded-btn bg-cream/70 px-4 py-3 text-[14px] leading-relaxed text-slate-dark">
               {isEdit
                 ? "Cambiando menù, i piatti dell’evento vengono riallineati al nuovo menù. Le personalizzazioni si gestiscono dalla pagina della prenotazione."
-                : "Alla creazione i piatti dell’evento vengono copiati dal menù scelto e possono essere personalizzati dalla pagina della prenotazione."}
+                : "Con la matita sul menù selezionato cambi i piatti solo per questo evento: il menù in catalogo non cambia."}
             </p>
+
+            {/* Portale nel body: l'editor è un form e non può stare dentro il form dell'evento. */}
+            {dishesEditorOpen &&
+              createPortal(
+                <Modal open onClose={() => setDishesEditorOpen(false)} title="Piatti dell’evento" size="lg">
+                  <DishesEditor
+                    dishes={customDishes ?? menuDishes}
+                    hasMenu={false}
+                    catalog={dishCatalog}
+                    submitLabel="Applica piatti"
+                    onApply={(dishes) => setCustomDishes(dishes)}
+                    onClose={() => setDishesEditorOpen(false)}
+                  />
+                </Modal>,
+                document.body,
+              )}
           </FormCard>
 
           <FormCard label="Allestimento">
@@ -580,7 +620,7 @@ export function EventForm({
         </div>
 
         {!isEdit && (
-          <div className="min-w-0 lg:sticky lg:top-6">
+          <div className="min-w-0 xl:sticky xl:top-6">
             <QuotePanel
               enabled={createQuote}
               onEnabledChange={setCreateQuote}

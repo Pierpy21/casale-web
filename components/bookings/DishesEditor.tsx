@@ -21,8 +21,21 @@ interface DishDraft {
   showDescription: boolean;
 }
 
+/** Piatto come lo salva il server (ordine già nelle portate). */
+export interface DishPayload {
+  course: Course;
+  name: string;
+  sort: number;
+  description?: string;
+}
+
 export interface DishesEditorProps {
-  bookingId: string;
+  /** Prenotazione da aggiornare sul server. Senza (crea evento): i piatti vanno a `onApply`. */
+  bookingId?: string;
+  /** Modalità locale: riceve i piatti al posto del salvataggio sul server. */
+  onApply?: (dishes: DishPayload[]) => void;
+  /** Testo del pulsante di conferma (default "Salva piatti"). */
+  submitLabel?: string;
   dishes: Pick<BookingDish, "course" | "name" | "description">[];
   hasMenu: boolean;
   /** Catalogo piatti attivi (admin): serve solo per la scelta, il testo resta libero. */
@@ -37,7 +50,7 @@ export interface DishesEditorProps {
  * Il componente va montato con `key` legata alla versione dei piatti salvati: dopo un salvataggio
  * o un ripristino si riparte dai dati del server.
  */
-export function DishesEditor({ bookingId, dishes, hasMenu, catalog, onClose }: DishesEditorProps) {
+export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti", dishes, hasMenu, catalog, onClose }: DishesEditorProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const nextKey = useRef(0);
@@ -128,13 +141,15 @@ export function DishesEditor({ bookingId, dishes, hasMenu, catalog, onClose }: D
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // In una modale dentro un altro form (crea evento) l'invio non deve risalire al form esterno.
+    event.stopPropagation();
     setFormError(null);
     if (duplicateKeys.size > 0) {
       setFormError("Alcuni piatti compaiono più di una volta nell’elenco: rimuovi i duplicati prima di salvare.");
       return;
     }
 
-    const payload = saveRows.map((item, index) => {
+    const payload: DishPayload[] = saveRows.map((item, index) => {
       const description = item.description.trim();
       return {
         course: item.course,
@@ -143,6 +158,12 @@ export function DishesEditor({ bookingId, dishes, hasMenu, catalog, onClose }: D
         ...(description ? { description } : {}),
       };
     });
+
+    if (onApply || !bookingId) {
+      onApply?.(payload);
+      onClose(true);
+      return;
+    }
 
     startTransition(async () => {
       const result = await updateBookingDishes(bookingId, payload);
@@ -190,12 +211,12 @@ export function DishesEditor({ bookingId, dishes, hasMenu, catalog, onClose }: D
 
       <div className="flex flex-wrap items-center gap-3 border-t border-sand pt-5">
         <Button type="submit" variant="primary" size="md" disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "Salvataggio…" : "Salva piatti"}
+          {pending ? "Salvataggio…" : submitLabel}
         </Button>
         <Button type="button" variant="outline" size="md" disabled={pending} onClick={() => onClose(false)}>
           Annulla
         </Button>
-        {hasMenu && (
+        {hasMenu && bookingId && (
           <ConfirmAction
             label="Ripristina dal menù"
             variant="outline"

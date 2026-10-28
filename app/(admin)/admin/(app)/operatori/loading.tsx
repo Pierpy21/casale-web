@@ -9,7 +9,7 @@ export default function OperatorsLoading() {
         <Skeleton className="h-10 w-56" />
       </div>
       <Skeleton className="h-32" />
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-3">
           {Array.from({ length: 4 }, (_, i) => (
             <Skeleton key={i} className="h-24" />

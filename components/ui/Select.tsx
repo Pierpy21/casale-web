@@ -494,7 +494,8 @@ export function Select({
               </div>
             </div>
           ),
-          document.body,
+          // Dentro una <dialog> modale il resto della pagina è inerte e sotto il top layer: la lista va nella dialog.
+          buttonRef.current?.closest("dialog") ?? document.body,
         )}
     </div>
   );

@@ -29,7 +29,7 @@ export default async function OperatorsPage() {
 
       <PermissionsInfo />
 
-      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <section aria-labelledby="elenco-operatori" className="flex flex-col gap-5">
           <div className="flex items-end justify-between gap-4 border-b border-sand pb-3">
             <div className="flex flex-col gap-1">

@@ -26,7 +26,9 @@ export function StatsControls({ periodo, tipo, anchor, prevAnchor, nextAnchor, l
   return (
     <section
       aria-label="Periodo"
-      className="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-20 flex min-w-0 flex-col gap-2 rounded-btn border border-sand bg-paper/95 p-2 shadow-sm shadow-ink/5 backdrop-blur supports-[backdrop-filter]:bg-paper/85 lg:top-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:p-2.5"
+      // Sfondo pieno (niente backdrop-blur: su mobile ricalcolarlo durante lo scroll fa tremare la barra) e
+      // 1px sotto l'header mobile, come la ricerca della giacenza: nessuna giunzione con i pixel frazionari.
+      className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 flex min-w-0 flex-col gap-2 rounded-btn border border-sand bg-paper p-2 shadow-sm shadow-ink/5 lg:top-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:p-2.5"
     >
       <nav aria-label="Scegli periodo" className="min-w-0 lg:shrink-0">
         <ul className={SEGMENT_LIST}>

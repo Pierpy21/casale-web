@@ -8,7 +8,7 @@ export default function ClientDetailLoading() {
         <Skeleton className="h-3 w-28" />
         <Skeleton className="h-10 w-72" />
       </div>
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+      <div className="grid gap-10 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
         <Skeleton className="h-[28rem]" />
         <div className="grid gap-4 md:grid-cols-2">
           {Array.from({ length: 2 }, (_, i) => (
