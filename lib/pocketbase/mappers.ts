@@ -50,6 +50,7 @@ export function mapProfile(r: PbRecord): Profile {
     is_chef: Boolean(r.is_chef),
     active: Boolean(r.active),
     created_at: toIsoDateTime(r.created),
+    updated_at: toIsoDateTime(r.updated),
   };
 }
 
@@ -75,6 +76,7 @@ export function mapRoom(r: PbRecord): Room {
     capacity: num(r.capacity),
     sort: num(r.sort),
     active: Boolean(r.active),
+    updated_at: toIsoDateTime(r.updated),
   };
 }
 
@@ -100,6 +102,7 @@ export function mapCatalogDish(r: PbRecord, usedIn: { id: string; name: string }
     active: Boolean(r.active),
     sort: num(r.sort),
     used_in: usedIn,
+    updated_at: toIsoDateTime(r.updated),
   };
 }
 
@@ -120,6 +123,7 @@ export function mapMenu(r: PbRecord, items: MenuItem[], baseUrl: string): Menu {
     sort: num(r.sort),
     items: sortMenuItems(items),
     photos,
+    updated_at: toIsoDateTime(r.updated),
   };
 }
 
@@ -220,6 +224,7 @@ export function mapQuote(r: PbRecord): Quote {
     final_total: num(r.final_total) > 0 ? num(r.final_total) : null,
     notes: nn(r.notes),
     created_at: toIsoDateTime(r.created),
+    updated_at: toIsoDateTime(r.updated),
   };
 }
 
@@ -235,6 +240,7 @@ export function mapPayment(r: PbRecord): Payment {
     receipt_type: nn(r.receipt_type),
     notes: nn(r.notes),
     created_at: toIsoDateTime(r.created),
+    updated_at: toIsoDateTime(r.updated),
   };
 }
 
@@ -247,6 +253,7 @@ export function mapInventoryProduct(r: PbRecord): InventoryProduct {
     supplier: normalizeInventorySupplier(r.supplier),
     sort: num(r.sort),
     active: Boolean(r.active),
+    updated_at: toIsoDateTime(r.updated),
   };
 }
 

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { addPayment, deletePayment, getReceiptUrl } from "@/app/actions/payments";
 import { formatIt, toDate } from "@/components/agenda/agenda-utils";
+import { useOnline } from "@/components/offline/useOnline";
 import { Alert, Button, ButtonLink, Modal, cn } from "@/components/ui";
+import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import { getPaymentSummary } from "@/lib/payment-utils";
 import { formatEUR } from "@/lib/quote-utils";
 import {
@@ -45,6 +47,8 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
   const [draftErrors, setDraftErrors] = useState<DraftErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [showError, setShowError] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
+  const online = useOnline();
 
   const visible = payments.filter((p) => !deletedIds.includes(p.id));
   const summary = getPaymentSummary(booking, visible);
@@ -71,13 +75,22 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
     }
     const formData = buildPaymentFormData(draft);
     startTransition(async () => {
-      const result = await addPayment(booking.id, formData);
+      const result = await submitMutation("payments.addPayment", addPayment, [booking.id, formData], {
+        label: `Nuovo acconto · ${draft.amount.trim()} €`,
+        entity: { type: "booking", id: booking.id },
+        expectedUpdated: updatedAtOf(booking),
+      });
       if (!result.ok) {
         setDraftErrors(serverDraftErrors(result.fieldErrors));
         setFormError(result.error);
         return;
       }
       setDraft(emptyPaymentDraft());
+      if (isQueued(result)) {
+        setNotice("Acconto salvato sul dispositivo: verrà inviato appena torna la rete.");
+        return;
+      }
+      setNotice(null);
       router.refresh();
     });
   };
@@ -89,11 +102,19 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
     setDeleteTarget(null);
     setDeletedIds((ids) => [...ids, target.id]);
     startTransition(async () => {
-      const result = await deletePayment(target.id);
+      const result = await submitMutation("payments.deletePayment", deletePayment, [target.id], {
+        label: `Elimina acconto · ${formatEUR(target.amount)}`,
+        entity: { type: "booking", id: booking.id },
+        expectedUpdated: updatedAtOf(booking),
+      });
       if (!result.ok) {
         // Rollback: l'acconto torna nell'elenco.
         setDeletedIds((ids) => ids.filter((id) => id !== target.id));
         setPanelError(result.error);
+        return;
+      }
+      if (isQueued(result)) {
+        setNotice("Eliminazione salvata sul dispositivo: verrà inviata appena torna la rete.");
         return;
       }
       router.refresh();
@@ -102,6 +123,10 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
 
   const openReceipt = async (payment: Payment) => {
     setPanelError(null);
+    if (!online) {
+      setPanelError("La ricevuta è disponibile solo online.");
+      return;
+    }
     // La scheda va aperta subito (gesto dell'utente) per non farla bloccare dai popup dopo l'attesa.
     const tab = window.open("about:blank", "_blank");
     setOpeningId(payment.id);
@@ -142,6 +167,7 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
       )}
 
       {panelError && <Alert tone="danger">{panelError}</Alert>}
+      {notice && !panelError && <Alert tone="success">{notice}</Alert>}
 
       {/* Riepilogo: previsto, versato, residuo su una riga */}
       <div className="flex min-w-0 flex-col gap-2">
@@ -207,7 +233,7 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
                       size="sm"
                       className="min-h-11"
                       onClick={() => openReceipt(payment)}
-                      disabled={openingId === payment.id}
+                      disabled={!online || openingId === payment.id}
                       aria-busy={openingId === payment.id || undefined}
                       aria-label={`Apri ricevuta ${payment.receipt_name ?? ""}`.trim()}
                     >
@@ -216,7 +242,7 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
                       ) : (
                         <ImageIcon aria-hidden="true" className="size-4" />
                       )}
-                      {openingId === payment.id ? "Apertura…" : "Apri ricevuta"}
+                      {openingId === payment.id ? "Apertura…" : online ? "Apri ricevuta" : "Disponibile solo online"}
                     </Button>
                   )}
                   <Button

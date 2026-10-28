@@ -4,6 +4,7 @@ import { LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { searchClients } from "@/app/actions/clients";
 import { Input, cn } from "@/components/ui";
+import { isBrowserOnline } from "@/lib/offline/network";
 import type { ClientSuggestion } from "@/lib/types";
 import { suggestionFullName } from "./booking-form-model";
 
@@ -35,6 +36,7 @@ export function ClientNameCombobox({ id, value, invalid, describedBy, disabled, 
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
+  const [offlineSearch, setOfflineSearch] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const requestRef = useRef(0);
   const listId = `${id}-list`;
@@ -64,6 +66,14 @@ export function ClientNameCombobox({ id, value, invalid, describedBy, disabled, 
       setHighlight(-1);
       return;
     }
+    // Lettura online-only: offline non si cerca, si scrive il nome e si sceglie a rete tornata.
+    if (!isBrowserOnline()) {
+      setResults([]);
+      setHighlight(-1);
+      setOfflineSearch(true);
+      return;
+    }
+    setOfflineSearch(false);
     const requestId = requestRef.current;
     setLoading(true);
     timerRef.current = setTimeout(async () => {
@@ -149,6 +159,12 @@ export function ClientNameCombobox({ id, value, invalid, describedBy, disabled, 
           aria-hidden="true"
           className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-slate"
         />
+      )}
+
+      {offlineSearch && open && (
+        <p role="status" className="mt-1.5 text-[13px] text-slate-dark">
+          Ricerca non disponibile offline
+        </p>
       )}
 
       {listOpen && (

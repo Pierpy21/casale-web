@@ -6,6 +6,8 @@ import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { createInventoryProduct, updateInventoryProduct } from "@/app/actions/inventory";
 import { useOptimisticActive } from "@/components/catalog/useOptimisticActive";
 import { Alert, Button, Field, Input, Modal, Select, Switch, cn } from "@/components/ui";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import {
   INVENTORY_CATEGORIES,
   INVENTORY_CATEGORY_LABELS,
@@ -63,7 +65,7 @@ export function InventoryProductList({ products }: InventoryProductListProps) {
   const handleSaved = (message: string) => {
     setFormOpen(false);
     setNotice({ tone: "success", text: message });
-    router.refresh();
+    if (isBrowserOnline()) router.refresh();
   };
 
   return (
@@ -147,13 +149,17 @@ function ProductRow({
   const toggle = (next: boolean) => {
     setActive(next);
     startTransition(async () => {
-      const result = await updateInventoryProduct(product.id, { active: next });
+      const result = await submitMutation("inventory.updateInventoryProduct", updateInventoryProduct, [product.id, { active: next }], {
+        label: `${next ? "Attiva" : "Disattiva"} prodotto · ${product.name}`,
+        entity: { type: "inventory_product", id: product.id },
+        expectedUpdated: updatedAtOf(product),
+      });
       if (!result.ok) {
         resetActive();
         onNotice({ tone: "danger", text: `Impossibile ${next ? "attivare" : "disattivare"} «${product.name}»: ${result.error}` });
         return;
       }
-      router.refresh();
+      if (isBrowserOnline() && !isQueued(result)) router.refresh();
     });
   };
 
@@ -208,14 +214,29 @@ function ProductForm({
     setErrors({});
     startTransition(async () => {
       const result = product
-        ? await updateInventoryProduct(product.id, {
-            name,
-            unit,
-            category,
-            supplier,
-            sort: Number(form.get("sort") ?? product.sort),
-          })
-        : await createInventoryProduct({ name, unit, category, supplier });
+        ? await submitMutation(
+            "inventory.updateInventoryProduct",
+            updateInventoryProduct,
+            [
+              product.id,
+              {
+                name,
+                unit,
+                category,
+                supplier,
+                sort: Number(form.get("sort") ?? product.sort),
+              },
+            ],
+            {
+              label: `Modifica prodotto · ${name}`,
+              entity: { type: "inventory_product", id: product.id },
+              expectedUpdated: updatedAtOf(product),
+            },
+          )
+        : await submitMutation("inventory.createInventoryProduct", createInventoryProduct, [{ name, unit, category, supplier }], {
+            label: `Nuovo prodotto · ${name}`,
+            createsTempId: true,
+          });
       if (!result.ok) {
         setFormError(result.error);
         const mapped: Record<string, string> = {};

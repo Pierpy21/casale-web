@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { setMenuActive } from "@/app/actions/catalog";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import { Alert, Badge, Button, cn, Disclosure, EmptyState, Modal, Switch } from "@/components/ui";
 import { formatEUR } from "@/lib/quote-utils";
 import { COURSE_LABELS, COURSE_ORDER, type Dish, type Menu } from "@/lib/types";
@@ -35,9 +37,10 @@ export function MenusPanel({ menus, dishes }: MenusPanelProps) {
   }
 
   function handleSaved(message: string) {
+    // Offline la pagina resta quella di prima: le modifiche partono appena torna la rete.
     setEditorOpen(false);
     setNotice({ tone: "success", text: message });
-    router.refresh();
+    if (isBrowserOnline()) router.refresh();
   }
 
   return (
@@ -140,13 +143,17 @@ function MenuCard({
   function toggle(next: boolean) {
     setActive(next);
     startTransition(async () => {
-      const result = await setMenuActive(menu.id, next);
+      const result = await submitMutation("catalog.setMenuActive", setMenuActive, [menu.id, next], {
+        label: `${next ? "Mostra" : "Nascondi"} menù · ${menu.name}`,
+        entity: { type: "menu", id: menu.id },
+        expectedUpdated: updatedAtOf(menu),
+      });
       if (!result.ok) {
         resetActive();
         onError(`Impossibile ${next ? "rendere visibile" : "nascondere"} il menù "${menu.name}": ${result.error}`);
         return;
       }
-      router.refresh();
+      if (isBrowserOnline() && !isQueued(result)) router.refresh();
     });
   }
 

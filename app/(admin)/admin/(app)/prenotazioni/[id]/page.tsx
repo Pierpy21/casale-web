@@ -26,6 +26,7 @@ import { DetailCard, InfoRow, SummaryItem } from "@/components/booking-detail/De
 import { QuotesList } from "@/components/booking-detail/QuotesList";
 import { MenuBadge } from "@/components/menu/MenuBadge";
 import { PaymentsPanel } from "@/components/payments/PaymentsPanel";
+import { PendingChanges } from "@/components/offline/PendingChanges";
 import { Alert, Badge, ButtonLink, Card, Disclosure, StatusBadge, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
 import { canAddBookingNote, canEditAllergies, canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
@@ -176,6 +177,7 @@ export default async function BookingDetailPage({
           adults={booking.adults}
           childCount={booking.children}
           kidsMenus={booking.kids_menus}
+          expectedUpdated={booking.updated_at}
         />
       ),
     });
@@ -190,6 +192,8 @@ export default async function BookingDetailPage({
           bookingId={booking.id}
           estimate={estimateBookingPrice(booking)}
           finalTotal={finalTotal}
+          // Il server confronta il prezzo finale con l'ultimo preventivo, non con la prenotazione.
+          expectedUpdated={latestQuote?.updated_at}
         />
       ),
     });
@@ -283,6 +287,9 @@ export default async function BookingDetailPage({
         </div>
       </header>
 
+      {/* Modifiche salvate offline su questa prenotazione e non ancora inviate. */}
+      <PendingChanges entity={{ type: "booking", id: booking.id }} />
+
       {/* Numeri: riquadri cliccabili, con un solo pannello aperto sotto (coperti o pagamenti e prezzo). */}
       <BookingNumbers tiles={tiles} panels={panels} initialPanel={initialPanel} />
 
@@ -297,7 +304,7 @@ export default async function BookingDetailPage({
       )}
 
       {/* Allergie: modificabili da admin e sala; per la cucina sono in sola lettura, ben evidenti. */}
-      <AllergiesEditor bookingId={booking.id} allergies={booking.allergies} editable={allergiesEditable} />
+      <AllergiesEditor bookingId={booking.id} allergies={booking.allergies} editable={allergiesEditable} expectedUpdated={booking.updated_at} />
 
       <Disclosure
         defaultOpen={kitchen}
@@ -328,6 +335,7 @@ export default async function BookingDetailPage({
                 hasMenu={booking.menu_id !== null}
                 canEdit={dishesEditable}
                 catalog={catalog}
+                expectedUpdated={booking.updated_at}
               />
 
               {booking.kids_menu && (
@@ -475,9 +483,9 @@ export default async function BookingDetailPage({
           <ButtonLink href={`/admin/prenotazioni/${booking.id}/modifica`} variant="primary" size="md">
             Modifica
           </ButtonLink>
-          <DeleteBookingButton bookingId={booking.id} quotesCount={quotes.length} paymentsCount={payments.length} />
+          <DeleteBookingButton bookingId={booking.id} quotesCount={quotes.length} paymentsCount={payments.length} expectedUpdated={booking.updated_at} />
           <div className="ml-auto">
-            <BookingStatusActions bookingId={booking.id} kind={booking.kind} status={booking.status} paymentsCount={payments.length} />
+            <BookingStatusActions bookingId={booking.id} kind={booking.kind} status={booking.status} paymentsCount={payments.length} expectedUpdated={booking.updated_at} />
           </div>
         </div>
       )}

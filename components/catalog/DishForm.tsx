@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { upsertDish } from "@/app/actions/catalog";
+import { submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import { Alert, Button, Field, Input, Select, Textarea } from "@/components/ui";
 import { COURSE_LABELS, COURSE_ORDER, type Course, type Dish } from "@/lib/types";
 
@@ -39,7 +40,12 @@ export function DishForm({ dish, onSaved, onCancel }: DishFormProps) {
     setFormError(null);
     setErrors({});
     startTransition(async () => {
-      const result = await upsertDish(input);
+      const result = await submitMutation("catalog.upsertDish", upsertDish, [input], {
+        label: dish ? `Modifica piatto · ${input.name}` : `Nuovo piatto · ${input.name}`,
+        entity: dish ? { type: "dish", id: dish.id } : undefined,
+        expectedUpdated: updatedAtOf(dish),
+        createsTempId: !dish,
+      });
       if (!result.ok) {
         setFormError(result.error);
         const mapped: Record<string, string> = {};

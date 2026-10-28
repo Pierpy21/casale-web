@@ -15,7 +15,7 @@ export const isUuid = isRecordId;
 
 export type Authorized =
   | { ok: true; db: PocketBase; profile: Profile }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: "unauthenticated" | "in_progress" };
 
 /**
  * Verifica il profilo attivo (token nel cookie) e il permesso.
@@ -25,8 +25,16 @@ export async function authorize(
   allowed: (p: Profile) => boolean,
   denied = "Operazione non consentita.",
 ): Promise<Authorized> {
-  const profile = await getCurrentProfile();
-  if (!profile) return { ok: false, error: "Sessione non valida o utente non abilitato." };
+  let profile: Profile | null;
+  try {
+    profile = await getCurrentProfile();
+  } catch (err) {
+    // PocketBase irraggiungibile o 5xx (getCurrentProfile ora rilancia): esito strutturato e transitorio, la coda riprova.
+    console.error("[auth] profilo non verificabile:", err);
+    return { ok: false, error: "Servizio momentaneamente non disponibile. Riprova tra poco.", code: "in_progress" };
+  }
+  // Il code permette alla coda offline di fermarsi e chiedere di rientrare (lib/offline/contract.ts).
+  if (!profile) return { ok: false, error: "Sessione non valida o utente non abilitato.", code: "unauthenticated" };
   if (!allowed(profile)) return { ok: false, error: denied };
   return { ok: true, db: await getAdminPb(), profile };
 }

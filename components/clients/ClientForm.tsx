@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { createClient as createClientAction, updateClient } from "@/app/actions/clients";
 import { Alert, Button, ButtonLink, Field, Input, Textarea, fieldIds } from "@/components/ui";
-import type { ActionResult, Client } from "@/lib/types";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
+import type { Client } from "@/lib/types";
 
 export interface ClientFormProps {
   mode: "create" | "edit";
@@ -76,10 +78,18 @@ export function ClientForm({ mode, client }: ClientFormProps) {
 
     startTransition(async () => {
       if (mode === "create") {
-        const result: ActionResult<{ id: string }> = await createClientAction(input);
+        const result = await submitMutation("clients.createClient", createClientAction, [input], {
+          label: `Nuovo cliente · ${input.first_name} ${input.last_name}`.trim(),
+          createsTempId: true,
+        });
         if (!result.ok) {
           setFormError(result.error);
           setFieldErrors(toFieldErrors(result.fieldErrors));
+          return;
+        }
+        // Offline il cliente non ha ancora un id reale: si torna all'elenco (in cache).
+        if (isQueued(result)) {
+          router.push("/admin/clienti");
           return;
         }
         router.push(`/admin/clienti/${result.data.id}`);
@@ -87,14 +97,18 @@ export function ClientForm({ mode, client }: ClientFormProps) {
       }
 
       if (!client) return;
-      const result = await updateClient(client.id, input);
+      const result = await submitMutation("clients.updateClient", updateClient, [client.id, input], {
+        label: `Modifica cliente · ${client.first_name} ${client.last_name}`,
+        entity: { type: "client", id: client.id },
+        expectedUpdated: updatedAtOf(client),
+      });
       if (!result.ok) {
         setFormError(result.error);
         setFieldErrors(toFieldErrors(result.fieldErrors));
         return;
       }
       setSaved(true);
-      router.refresh();
+      if (isBrowserOnline()) router.refresh();
     });
   }
 

@@ -5,6 +5,7 @@ import { isToday } from "date-fns";
 import { addBookingNote, deleteBookingNote } from "@/app/actions/bookings";
 import { formatIt } from "@/components/agenda/agenda-utils";
 import { Alert, Button, Textarea } from "@/components/ui";
+import { submitMutation } from "@/lib/offline/submit";
 import type { BookingNote } from "@/lib/types";
 
 export const BOOKING_NOTE_MAX_LENGTH = 2000;
@@ -81,7 +82,11 @@ export function BookingNotes({ bookingId, notes, canAdd, currentUserId, isAdmin 
     setDraft("");
     setError(null);
 
-    const result = await addBookingNote(bookingId, body);
+    const result = await submitMutation("bookings.addBookingNote", addBookingNote, [bookingId, body], {
+      label: "Nota cucina",
+      entity: { type: "booking", id: bookingId },
+      createsTempId: true,
+    });
     if (result.ok) {
       const realId = result.data.id;
       setItems((current) => current.map((note) => (note.id === pendingId ? { ...note, id: realId } : note)));
@@ -97,7 +102,10 @@ export function BookingNotes({ bookingId, notes, canAdd, currentUserId, isAdmin 
     setError(null);
     setItems((current) => current.filter((item) => item.id !== note.id));
 
-    const result = await deleteBookingNote(note.id);
+    const result = await submitMutation("bookings.deleteBookingNote", deleteBookingNote, [note.id], {
+      label: "Eliminazione nota cucina",
+      entity: { type: "booking", id: bookingId },
+    });
     if (!result.ok) {
       setItems((current) => sortNewestFirst([...current.filter((item) => item.id !== note.id), note]));
       setError(result.error);

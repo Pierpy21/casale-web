@@ -232,6 +232,34 @@ export async function getUpcomingBookings(
   return items.map((i) => hideKitchenPhone(isAdmin(me) ? i : zeroMenuPrices(i), me));
 }
 
+/**
+ * Solo gli id delle prossime prenotazioni (oggi + `days` giorni, esclusi gli annullati), in ordine di data.
+ * Una sola richiesta leggera, senza espansioni: serve al layout per le URL di precaricamento.
+ * Stesse regole di visibilità di getUpcomingBookings: gli appuntamenti non escono per chi non li vede.
+ */
+export async function getUpcomingBookingIds(days: number, limit = 40): Promise<string[]> {
+  const me = await getCurrentProfile();
+  if (!me) return [];
+  const span = Math.floor(Number(days));
+  if (!Number.isFinite(span) || span < 0) return [];
+  const db = await getAdminPb();
+  const today = romeToday();
+  const to = addDaysISO(today, Math.min(span, 366));
+  const max = Math.max(1, Math.min(Math.floor(limit), 100));
+  const filter = `${db.filter("event_date >= {:from} && event_date <= {:to} && status != {:s}", {
+    from: dayStartPb(today),
+    to: dayEndPb(to),
+    s: "annullato",
+  })}${appointmentsClause(db, me)}`;
+  const page = await db.collection("bookings").getList(1, max, {
+    filter,
+    fields: "id",
+    sort: "event_date,id",
+    skipTotal: true,
+  });
+  return page.items.map((r) => r.id);
+}
+
 // ---------------------------------------------------------------------
 // Note interne (cucina), registro attività, statistiche, da confermare
 // ---------------------------------------------------------------------

@@ -4,6 +4,7 @@ import { Badge, SubmitButton } from "@/components/ui";
 import { ROLE_LABELS, type Profile } from "@/lib/types";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { InstallAppButton } from "@/components/pwa/InstallAppButton";
+import { SignOutForm } from "@/components/pwa/SignOutForm";
 import { SidebarNav } from "./NavLinks";
 import type { NavLink } from "./nav";
 
@@ -42,11 +43,11 @@ export function Sidebar({ profile, links }: { profile: Profile; links: NavLink[]
             {ROLE_LABELS[profile.role]}
           </Badge>
         </div>
-        <form action={signOut} className="mt-5">
+        <SignOutForm action={signOut} className="mt-5">
           <SubmitButton variant="light" size="sm" className="w-full" pendingLabel="Uscita…">
             Esci
           </SubmitButton>
-        </form>
+        </SignOutForm>
       </div>
     </aside>
   );
@@ -66,11 +67,11 @@ export function MobileHeader() {
       />
       <div className="flex items-center gap-1">
         <NotificationBell variant="header" />
-        <form action={signOut}>
+        <SignOutForm action={signOut}>
           <SubmitButton variant="light" size="sm" pendingLabel="Uscita…">
             Esci
           </SubmitButton>
-        </form>
+        </SignOutForm>
       </div>
     </header>
   );

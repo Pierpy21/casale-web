@@ -2,17 +2,17 @@ export type Role = "admin" | "sala" | "cucina";
 export type Course = "antipasto" | "primo" | "secondo" | "contorno" | "dolce" | "bevande";
 export type BookingStatus = "opzione" | "confermato" | "saldato" | "annullato";
 
-export interface Profile { id: string; full_name: string; email: string; role: Role; is_chef: boolean; active: boolean; created_at: string; }
+export interface Profile { id: string; full_name: string; email: string; role: Role; is_chef: boolean; active: boolean; created_at: string; updated_at: string; }
 export interface Client { id: string; first_name: string; last_name: string; phone: string; email: string | null; tax_code: string | null; vat_number: string | null; notes: string | null; created_at: string; updated_at: string; }
 export interface ClientWithStats extends Client { bookings_count: number; next_event_date: string | null; }
-export interface Room { id: string; name: string; capacity: number; sort: number; active: boolean; }
+export interface Room { id: string; name: string; capacity: number; sort: number; active: boolean; updated_at: string; }
 /** Voce di un menù. `dish_id` = piatto del catalogo a cui è collegata (sempre valorizzato dopo il salvataggio). */
 export interface MenuItem { id: string; menu_id: string; course: Course; name: string; sort: number; description?: string | null; dish_id: string | null; }
 /** Piatto del catalogo condiviso (Menù & Sale → Piatti). `used_in`: menù che contengono il piatto. */
-export interface Dish { id: string; name: string; course: Course; description: string | null; active: boolean; sort: number; used_in: { id: string; name: string }[]; }
+export interface Dish { id: string; name: string; course: Course; description: string | null; active: boolean; sort: number; used_in: { id: string; name: string }[]; updated_at: string; }
 /** Foto del menu: nome file su PocketBase e URL pubblico assoluto. */
 export interface MenuPhoto { file: string; url: string; }
-export interface Menu { id: string; name: string; season: string | null; price_per_person: number; is_kids: boolean; active: boolean; sort: number; items: MenuItem[]; photos: MenuPhoto[]; }
+export interface Menu { id: string; name: string; season: string | null; price_per_person: number; is_kids: boolean; active: boolean; sort: number; items: MenuItem[]; photos: MenuPhoto[]; updated_at: string; }
 export interface BookingDish { id: string; booking_id: string; course: Course; name: string; sort: number; description?: string | null; }
 export interface BookingAllergy { id: string; booking_id: string; subject_name: string | null; condition: string; notes: string | null; }
 /** Allergia in ingresso per il salvataggio dell'elenco (saveBookingAllergies). `id` presente = riga esistente da aggiornare. */
@@ -49,7 +49,7 @@ export interface BookingDetail extends Booking {
 }
 export interface BookingChange { id: string; booking_id: string | null; booking_label: string | null; changed_by: string | null; changed_by_name: string; table_name: string; field: string; old_value: string | null; new_value: string | null; created_at: string; }
 export interface QuoteLine { description: string; quantity: number; unit_price: number; }
-export interface Quote { id: string; booking_id: string; number: string; issued_at: string; valid_until: string | null; lines: QuoteLine[]; discount: number; vat_rate: number; /** Prezzo finale concordato (IVA inclusa): sostituisce il totale calcolato. Null = calcolo automatico. */ final_total: number | null; notes: string | null; created_at: string; }
+export interface Quote { id: string; booking_id: string; number: string; issued_at: string; valid_until: string | null; lines: QuoteLine[]; discount: number; vat_rate: number; /** Prezzo finale concordato (IVA inclusa): sostituisce il totale calcolato. Null = calcolo automatico. */ final_total: number | null; notes: string | null; created_at: string; updated_at: string; }
 export interface QuoteWithBooking extends Quote { booking: BookingDetail; }
 /** Prezzi IVA inclusa: taxable = total/(1+vat/100). Con prezzo finale (`overridden`) il totale è il prezzo finale e lo sconto è 0; subtotal resta la somma delle righe. */
 export interface QuoteTotals { subtotal: number; discount: number; total: number; taxable: number; vat: number; overridden: boolean; }
@@ -61,10 +61,12 @@ export type ActionResult<T = void> =
       ok: false;
       error: string;
       fieldErrors?: Record<string, string[]>;
-      /** Codice del fallimento quando la UI deve reagire (es. chiedere conferma). */
-      code?: "dish_in_use";
+      /** Codice del fallimento quando la UI deve reagire (es. chiedere conferma). "conflict"/"unauthenticated": coda offline (lib/offline/contract.ts). */
+      code?: "dish_in_use" | "conflict" | "unauthenticated" | "in_progress";
       /** Con code "dish_in_use": menù che contengono ancora il piatto. */
       usedIn?: { id: string; name: string }[];
+      /** Con code "conflict": stato attuale del record sul server. */
+      conflict?: { currentUpdated: string; updatedByName?: string | null };
     };
 
 export const SETUP_COLORS = ["Bianco","Avorio","Champagne","Oro","Argento","Rosa cipria","Pesca","Verde salvia","Verde oliva","Azzurro","Blu notte","Bordeaux","Lilla","Rosso","Nero"] as const;
@@ -94,7 +96,7 @@ export const STATUS_COLORS: Record<BookingStatus, string> = { opzione: "#A9792B"
 export const PAYMENT_METHODS = ["contanti", "bonifico", "carta", "assegno", "altro"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { contanti: "Contanti", bonifico: "Bonifico", carta: "Carta", assegno: "Assegno", altro: "Altro" };
-export interface Payment { id: string; booking_id: string; amount: number; paid_at: string; method: PaymentMethod | null; receipt_path: string | null; receipt_name: string | null; receipt_type: string | null; notes: string | null; created_at: string; }
+export interface Payment { id: string; booking_id: string; amount: number; paid_at: string; method: PaymentMethod | null; receipt_path: string | null; receipt_name: string | null; receipt_type: string | null; notes: string | null; created_at: string; updated_at: string; }
 export interface PaymentSummary { expected_total: number; paid_total: number; balance: number; } // expected = adults*menu.price + kids_menus*kids_menu.price
 
 export type NotificationType = "booking_created" | "booking_updated" | "booking_status" | "booking_cancelled" | "booking_deleted" | "covers_updated" | "dishes_updated" | "event_reminder" | "inventory_report";
@@ -126,7 +128,7 @@ export const INVENTORY_CATEGORY_LABELS: Record<InventoryCategory, string> = {
   altro: "Altro",
 };
 
-export interface InventoryProduct { id: string; name: string; unit: string | null; category: InventoryCategory; supplier: InventorySupplier; sort: number; active: boolean; }
+export interface InventoryProduct { id: string; name: string; unit: string | null; category: InventoryCategory; supplier: InventorySupplier; sort: number; active: boolean; updated_at: string; }
 export interface InventoryReportLine { id: string; report_id: string; product_id: string | null; product_name: string; unit: string | null; state: InventoryState; quantity: number; sort: number; supplier: InventorySupplier; category: InventoryCategory; }
 export interface InventoryReport { id: string; created_by: string | null; created_by_name: string; report_date: string; notes: string | null; status: "inviato" | "visto"; seen_by: string | null; seen_at: string | null; created_at: string; lines: InventoryReportLine[]; }
 

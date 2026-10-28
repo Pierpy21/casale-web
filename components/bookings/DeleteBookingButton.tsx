@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { deleteBooking } from "@/app/actions/bookings";
+import { submitMutation } from "@/lib/offline/submit";
 import { ConfirmAction } from "./ConfirmAction";
 
 function plural(n: number, one: string, many: string): string {
@@ -13,10 +14,13 @@ export function DeleteBookingButton({
   bookingId,
   quotesCount = 0,
   paymentsCount = 0,
+  expectedUpdated,
 }: {
   bookingId: string;
   quotesCount?: number;
   paymentsCount?: number;
+  /** `updated_at` della prenotazione letto con la pagina (controllo di conflitto offline). */
+  expectedUpdated?: string;
 }) {
   const router = useRouter();
   const linked = [
@@ -36,7 +40,13 @@ export function DeleteBookingButton({
       description={description}
       confirmLabel="Elimina definitivamente"
       pendingLabel="Eliminazione…"
-      run={() => deleteBooking(bookingId)}
+      run={() =>
+        submitMutation("bookings.deleteBooking", deleteBooking, [bookingId], {
+          label: "Elimina prenotazione",
+          entity: { type: "booking", id: bookingId },
+          expectedUpdated,
+        })
+      }
       onSuccess={() => router.push("/admin/agenda")}
     />
   );

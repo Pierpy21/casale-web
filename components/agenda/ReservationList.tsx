@@ -6,6 +6,7 @@ import { assignBookingRoom } from "@/app/actions/bookings";
 import { clientFullName, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
 import { Select } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
+import { submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import type { BookingListItem, Room } from "@/lib/types";
 
 /** Sopra questo numero di sale il selettore diventa una tendina: i chip andrebbero su troppe righe. */
@@ -59,7 +60,12 @@ export function ReservationList({ bookings, rooms, canAssign }: ReservationListP
     setOverrides((prev) => ({ ...prev, [id]: { base: booking.room_id, roomId } }));
 
     startTransition(async () => {
-      const result = await assignBookingRoom(id, roomId);
+      // Offline l'assegnazione resta visibile (ottimistica) finché non parte l'invio.
+      const result = await submitMutation("bookings.assignBookingRoom", assignBookingRoom, [id, roomId], {
+        label: `Sala · ${label}`,
+        entity: { type: "booking", id },
+        expectedUpdated: updatedAtOf(booking),
+      });
       inFlight.current.delete(id);
       if (!result.ok) {
         // Rollback: torna la sala salvata prima del tap.
@@ -104,7 +110,7 @@ export function ReservationList({ bookings, rooms, canAssign }: ReservationListP
           return (
             <li
               key={booking.id}
-              className="flex min-w-0 flex-col gap-2.5 px-4 py-3 lg:grid lg:grid-cols-[4rem_minmax(0,1fr)_minmax(0,auto)] lg:items-center lg:gap-4"
+              className="flex min-w-0 flex-col gap-2.5 px-4 py-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-6"
             >
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">

@@ -6,6 +6,8 @@ import { PaymentInput, ReceiptFile, resolveReceiptType } from "@/lib/validation"
 import { authorize, dbFail, fail, invalidInput, isRecordId } from "@/lib/action-utils";
 import { isAdmin } from "@/lib/permissions";
 import { sanitizeReceiptName } from "@/lib/payment-utils";
+import { checkConflict, withMutation } from "@/lib/mutations";
+import type { MutationOptions } from "@/lib/offline/contract";
 import { dayStartPb, nn, type PbRecord } from "@/lib/pocketbase/helpers";
 import { fetchOne } from "@/lib/pocketbase/queries";
 import { syncEventStatusFromPayments } from "@/lib/rpc/bookings";
@@ -35,84 +37,91 @@ function field(formData: FormData, key: string): string {
 }
 
 /** Aggiunge un acconto a una prenotazione, con ricevuta opzionale (foto o PDF). */
-export async function addPayment(bookingId: string, formData: FormData): Promise<ActionResult<{ id: string }>> {
+export async function addPayment(bookingId: string, formData: FormData, opts?: MutationOptions): Promise<ActionResult<{ id: string }>> {
   if (!isRecordId(bookingId)) return fail("Prenotazione non valida.");
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
 
-  const parsed = PaymentInput.safeParse({
-    amount: field(formData, "amount"),
-    paid_at: field(formData, "paid_at"),
-    method: field(formData, "method"),
-    notes: field(formData, "notes"),
-  });
-  if (!parsed.success) return invalidInput(parsed.error);
+  return withMutation(auth.db, opts, "payments.addPayment", auth.profile.id, async (): Promise<ActionResult<{ id: string }>> => {
+    const parsed = PaymentInput.safeParse({
+      amount: field(formData, "amount"),
+      paid_at: field(formData, "paid_at"),
+      method: field(formData, "method"),
+      notes: field(formData, "notes"),
+    });
+    if (!parsed.success) return invalidInput(parsed.error);
 
-  // Un campo file vuoto (nessuna selezione nel browser) equivale ad assenza di ricevuta.
-  const entry = formData.get("receipt");
-  let receipt: File | null = null;
-  if (entry instanceof File && entry.size > 0) {
-    const checked = ReceiptFile.safeParse(entry);
-    if (!checked.success) {
-      const message = checked.error.issues[0]?.message ?? "Ricevuta non valida.";
-      return { ok: false, error: message, fieldErrors: { receipt: [message] } };
+    // Un campo file vuoto (nessuna selezione nel browser) equivale ad assenza di ricevuta.
+    const entry = formData.get("receipt");
+    let receipt: File | null = null;
+    if (entry instanceof File && entry.size > 0) {
+      const checked = ReceiptFile.safeParse(entry);
+      if (!checked.success) {
+        const message = checked.error.issues[0]?.message ?? "Ricevuta non valida.";
+        return { ok: false, error: message, fieldErrors: { receipt: [message] } };
+      }
+      receipt = checked.data;
     }
-    receipt = checked.data;
-  }
 
-  const { db, profile } = auth;
+    const { db, profile } = auth;
 
-  const booking = await fetchOne(db, "bookings", bookingId);
-  if (!booking) return fail("Prenotazione non trovata.");
-  if (String(booking.kind || "evento") !== "evento") return fail("Gli acconti si registrano solo sugli eventi.");
+    const booking = await fetchOne(db, "bookings", bookingId);
+    if (!booking) return fail("Prenotazione non trovata.");
+    if (String(booking.kind || "evento") !== "evento") return fail("Gli acconti si registrano solo sugli eventi.");
 
-  const body = new FormData();
-  body.set("booking", bookingId);
-  body.set("amount", String(parsed.data.amount));
-  body.set("paid_at", dayStartPb(parsed.data.paid_at));
-  body.set("method", parsed.data.method ?? "");
-  body.set("notes", parsed.data.notes ?? "");
-  body.set("created_by", profile.id);
+    const body = new FormData();
+    body.set("booking", bookingId);
+    body.set("amount", String(parsed.data.amount));
+    body.set("paid_at", dayStartPb(parsed.data.paid_at));
+    body.set("method", parsed.data.method ?? "");
+    body.set("notes", parsed.data.notes ?? "");
+    body.set("created_by", profile.id);
 
-  if (receipt) {
-    const mime = resolveReceiptType(receipt);
-    if (!mime) return fail("Formato ricevuta non ammesso.");
-    const named = new File([receipt], sanitizeReceiptName(receipt.name, mime), { type: mime });
-    body.set("receipt", named);
-    body.set("receipt_name", receipt.name.slice(0, 200) || "ricevuta");
-    body.set("receipt_type", mime);
-  }
+    if (receipt) {
+      const mime = resolveReceiptType(receipt);
+      if (!mime) return fail("Formato ricevuta non ammesso.");
+      const named = new File([receipt], sanitizeReceiptName(receipt.name, mime), { type: mime });
+      body.set("receipt", named);
+      body.set("receipt_name", receipt.name.slice(0, 200) || "ricevuta");
+      body.set("receipt_type", mime);
+    }
 
-  try {
-    const record = await db.collection("payments").create(body);
-    await syncStatus(db, bookingId, profile);
-    revalidateBookingViews(bookingId);
-    return { ok: true, data: { id: record.id } };
-  } catch (err) {
-    console.error("[payments] salvataggio acconto fallito:", err);
-    return dbFail(err, "Impossibile salvare l'acconto. Controlla la ricevuta e riprova.");
-  }
+    try {
+      const record = await db.collection("payments").create(body);
+      await syncStatus(db, bookingId, profile);
+      revalidateBookingViews(bookingId);
+      return { ok: true, data: { id: record.id } };
+    } catch (err) {
+      console.error("[payments] salvataggio acconto fallito:", err);
+      return dbFail(err, "Impossibile salvare l'acconto. Controlla la ricevuta e riprova.");
+    }
+  });
 }
 
 /** Elimina un acconto e la sua ricevuta (PocketBase elimina anche il file). */
-export async function deletePayment(id: string): Promise<ActionResult> {
+export async function deletePayment(id: string, opts?: MutationOptions): Promise<ActionResult> {
   if (!isRecordId(id)) return fail("Acconto non valido.");
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
 
-  const row = await fetchOne(auth.db, "payments", id);
-  if (!row) return fail("Acconto non trovato.");
+  return withMutation(auth.db, opts, "payments.deletePayment", auth.profile.id, async (): Promise<ActionResult> => {
+    const row = await fetchOne(auth.db, "payments", id);
+    // Coda offline: acconto già eliminato (solo nel reinvio) = successo. Dal form: "non trovato", come prima.
+    if (!row) return opts?.replay === true ? { ok: true, data: undefined } : fail("Acconto non trovato.");
+    const conflict = await checkConflict(auth.db, opts, row);
+    if (conflict) return conflict;
 
-  try {
-    await auth.db.collection("payments").delete(id);
-  } catch (err) {
-    return dbFail(err);
-  }
+    try {
+      await auth.db.collection("payments").delete(id);
+    } catch (err) {
+      return dbFail(err);
+    }
 
-  const bookingId = String(row.booking);
-  await syncStatus(auth.db, bookingId, auth.profile);
-  revalidateBookingViews(bookingId);
-  return { ok: true, data: undefined };
+    const bookingId = String(row.booking);
+    await syncStatus(auth.db, bookingId, auth.profile);
+    revalidateBookingViews(bookingId);
+    return { ok: true, data: undefined };
+  });
 }
 
 /**

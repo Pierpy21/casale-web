@@ -6,6 +6,7 @@ import { ChevronDown, Download, ExternalLink, FilePlus, FileText } from "lucide-
 import { useEffect, useId, useRef, useState, useTransition, type FocusEvent } from "react";
 import { createQuoteFromBooking } from "@/app/actions/quotes";
 import { Alert, DocumentDownload, buttonClasses, cn } from "@/components/ui";
+import { isQueued, submitMutation } from "@/lib/offline/submit";
 import { DOCX_MIME, quoteFileName } from "@/lib/quote-utils";
 
 export interface PreventivoMenuProps {
@@ -64,9 +65,18 @@ export function PreventivoMenu({ bookingId, latest, quotesCount }: PreventivoMen
   const create = () => {
     setError(null);
     startTransition(async () => {
-      const result = await createQuoteFromBooking(bookingId);
+      const result = await submitMutation("quotes.createQuoteFromBooking", createQuoteFromBooking, [bookingId], {
+        label: "Nuovo preventivo",
+        entity: { type: "booking", id: bookingId },
+        createsTempId: true,
+      });
       if (result.ok) {
         setOpen(false);
+        // Offline il preventivo non ha ancora un id reale: si resta sulla prenotazione (in cache).
+        if (isQueued(result)) {
+          router.push(`/admin/prenotazioni/${bookingId}`);
+          return;
+        }
         router.push(`/admin/preventivi/${result.data.id}`);
       } else {
         setError(result.error);

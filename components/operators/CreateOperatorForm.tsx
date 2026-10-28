@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { createOperator } from "@/app/actions/operators";
+import { useOnline } from "@/components/offline/useOnline";
 import { Alert, Button, Field, Input, Select, fieldIds } from "@/components/ui";
 import type { ActionResult, Role } from "@/lib/types";
 
@@ -31,6 +32,7 @@ export function CreateOperatorForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [created, setCreated] = useState<string | null>(null);
+  const online = useOnline();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,6 +50,7 @@ export function CreateOperatorForm() {
     setCreated(null);
 
     startTransition(async () => {
+      // Con password: solo online (la password non finisce nella coda del dispositivo).
       const result: ActionResult<{ id: string }> = await createOperator(input);
       if (!result.ok) {
         setFormError(result.error);
@@ -134,7 +137,10 @@ export function CreateOperatorForm() {
         </Select>
       </Field>
 
-      <Button type="submit" variant="primary" size="md" disabled={pending} aria-busy={pending || undefined}>
+      {!online && (
+        <Alert tone="warning">La creazione di un operatore richiede la connessione (la password non viene salvata sul dispositivo).</Alert>
+      )}
+      <Button type="submit" variant="primary" size="md" disabled={pending || !online} aria-busy={pending || undefined}>
         {pending ? "Creazione in corso…" : "Crea operatore"}
       </Button>
     </form>

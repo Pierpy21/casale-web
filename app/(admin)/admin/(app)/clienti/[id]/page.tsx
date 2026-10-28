@@ -62,7 +62,7 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
             <p className="text-[13px] text-slate-dark">
               Un cliente con prenotazioni collegate non può essere eliminato.
             </p>
-            <DeleteClientButton clientId={client.id} clientName={name} />
+            <DeleteClientButton clientId={client.id} clientName={name} expectedUpdated={client.updated_at} />
           </div>
         </section>
 

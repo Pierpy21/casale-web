@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type MouseEvent, type ReactNode } from "react";
+import { useOnline } from "@/components/offline/useOnline";
 import { cn } from "./cn";
 
 /** URL del documento da aprire nel visualizzatore del browser invece di scaricarlo (?inline=1). */
@@ -42,6 +43,17 @@ export function DocumentDownload({
   onActivate?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const online = useOnline();
+
+  // Il documento si genera sul server: offline non è disponibile.
+  if (!online) {
+    return (
+      <span aria-disabled="true" className={cn(className, "cursor-not-allowed opacity-50")}>
+        {children}
+        <span className="ml-1 text-[12px] font-normal normal-case tracking-normal text-slate-dark">· Disponibile solo online</span>
+      </span>
+    );
+  }
 
   const onClick = async (event: MouseEvent<HTMLAnchorElement>) => {
     onActivate?.();

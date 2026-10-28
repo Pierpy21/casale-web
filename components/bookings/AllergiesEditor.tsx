@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { saveBookingAllergies } from "@/app/actions/bookings";
+import { isQueued, submitMutation } from "@/lib/offline/submit";
 import { Alert, Button } from "@/components/ui";
 import type { BookingAllergy } from "@/lib/types";
 import {
@@ -19,6 +20,8 @@ export interface AllergiesEditorProps {
   allergies: BookingAllergy[];
   /** Modificabile (admin, sala su eventi e prenotazioni). Altrimenti sola lettura, ben evidente. */
   editable: boolean;
+  /** `updated_at` della prenotazione letto con la pagina (controllo di conflitto offline). */
+  expectedUpdated?: string;
 }
 
 /** Riga modificabile: `id` è presente per le allergie già salvate. */
@@ -60,7 +63,7 @@ const SECTION_CLASS =
  * in blocco (saveBookingAllergies): "Salva" torna alla lettura, "Annulla" scarta la bozza.
  * Il salvataggio è ottimistico: con errore l'elenco torna a quello salvato e il modulo si riapre con la bozza.
  */
-export function AllergiesEditor({ bookingId, allergies, editable }: AllergiesEditorProps) {
+export function AllergiesEditor({ bookingId, allergies, editable, expectedUpdated }: AllergiesEditorProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   // Contenuto delle allergie sul server: se cambia (dopo un salvataggio) si riallinea elenco e bozza.
@@ -154,13 +157,22 @@ export function AllergiesEditor({ bookingId, allergies, editable }: AllergiesEdi
     setEditing(false);
     startTransition(async () => {
       setSaved(optimistic);
-      const result = await saveBookingAllergies(bookingId, payload);
+      const result = await submitMutation("bookings.saveBookingAllergies", saveBookingAllergies, [bookingId, payload], {
+        label: "Allergie e patologie",
+        entity: { type: "booking", id: bookingId },
+        expectedUpdated,
+      });
       if (!result.ok) {
         // Rollback: l'elenco torna a quello salvato e il modulo si riapre con la bozza per riprovare.
         setSaved(previous);
         setEditing(true);
         setErrors(mapServerErrors(result.fieldErrors, rows));
         setError(result.error);
+        return;
+      }
+      if (isQueued(result)) {
+        // Offline: resta l'elenco appena scelto, da inviare appena torna la rete.
+        setMessage("Allergie salvate sul dispositivo: verranno inviate appena torna la rete.");
         return;
       }
       setMessage("Allergie aggiornate.");

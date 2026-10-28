@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { setRoomActive, upsertRoom } from "@/app/actions/catalog";
 import { Alert, Button, cn, EmptyState, Field, Input, Modal, Switch } from "@/components/ui";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import type { Room } from "@/lib/types";
 import { useOptimisticActive } from "./useOptimisticActive";
 
@@ -33,7 +35,7 @@ export function RoomsPanel({ rooms }: RoomsPanelProps) {
   function handleSaved(message: string) {
     setOpen(false);
     setNotice({ tone: "success", text: message });
-    router.refresh();
+    if (isBrowserOnline()) router.refresh();
   }
 
   return (
@@ -102,13 +104,17 @@ function RoomRow({
   function toggle(next: boolean) {
     setActive(next);
     startTransition(async () => {
-      const result = await setRoomActive(room.id, next);
+      const result = await submitMutation("catalog.setRoomActive", setRoomActive, [room.id, next], {
+        label: `${next ? "Attiva" : "Disattiva"} sala · ${room.name}`,
+        entity: { type: "room", id: room.id },
+        expectedUpdated: updatedAtOf(room),
+      });
       if (!result.ok) {
         resetActive();
         onError(`Impossibile ${next ? "attivare" : "disattivare"} la sala "${room.name}": ${result.error}`);
         return;
       }
-      router.refresh();
+      if (isBrowserOnline() && !isQueued(result)) router.refresh();
     });
   }
 
@@ -173,7 +179,12 @@ function RoomForm({
     setFormError(null);
     setErrors({});
     startTransition(async () => {
-      const result = await upsertRoom(input);
+      const result = await submitMutation("catalog.upsertRoom", upsertRoom, [input], {
+        label: room ? `Modifica sala · ${input.name}` : `Nuova sala · ${input.name}`,
+        entity: room ? { type: "room", id: room.id } : undefined,
+        expectedUpdated: updatedAtOf(room),
+        createsTempId: !room,
+      });
       if (!result.ok) {
         setFormError(result.error);
         const mapped: Record<string, string> = {};
