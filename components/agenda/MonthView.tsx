@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import type { BookingListItem } from "@/lib/types";
 import { BOOKING_KIND_LABELS, STATUS_COLORS, STATUS_LABELS } from "@/lib/types";
 import { bookingTitle, formatCovers, formatTime } from "@/components/bookings/format";
+import { MenuBadge } from "@/components/menu/MenuBadge";
 import { StatusDot, cn } from "@/components/ui";
 import { formatIt, toISO } from "./agenda-utils";
 
@@ -46,15 +47,18 @@ function MonthPill({ booking: b }: { booking: BookingListItem }) {
       <span className="flex min-w-0 items-center gap-1.5">
         {b.kind !== "normale" && <StatusDot status={b.status} size="sm" />}
         {time && <span className="shrink-0 text-[11px] font-medium tabular-nums text-ink">{time}</span>}
-        <span
-          className={cn(
-            "min-w-0 truncate font-serif text-[13px] leading-tight",
-            isEvent && menuName ? "text-petrol" : "text-ink",
-            isEvent && !menuName && "italic text-slate-dark",
-          )}
-        >
-          {primary}
-        </span>
+        {isEvent && menuName ? (
+          <MenuBadge menuId={b.menu?.id ?? null} name={menuName} size="sm" className="min-w-0 truncate" />
+        ) : (
+          <span
+            className={cn(
+              "min-w-0 truncate font-serif text-[13px] leading-tight",
+              isEvent ? "italic text-slate-dark" : "text-ink",
+            )}
+          >
+            {primary}
+          </span>
+        )}
       </span>
       <span className="truncate text-[11px] text-slate-dark">{secondary}</span>
     </Link>

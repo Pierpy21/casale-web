@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { formatIt, toDate, toISO, todayISO, capitalize } from "@/components/agenda/agenda-utils";
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { formatChangeTimestamp } from "@/components/bookings/change-labels";
@@ -37,35 +38,42 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         ? today
         : weekDays[0];
 
-  const [stats, upcoming, rooms, weekBookings, deletions] = await Promise.all([
+  const [stats, upcoming, rooms, weekBookings, todayBookings, deletions] = await Promise.all([
     getDashboardStats(),
     getUpcomingBookings(8, { kinds: ["evento"] }),
     getRooms(),
     getBookingsInRange(week.startIso, week.endIso),
+    getBookingsInRange(today, today),
     getDeletionLog(5),
   ]);
+  const todayNormalBookings = todayBookings.filter((b) => b.kind === "normale");
 
-  const tiles: StatProps[] = [
+  // Ogni indicatore è un link alla vista che lo spiega.
+  const tiles: (StatProps & { href: string })[] = [
     {
       label: "Eventi oggi",
       value: stats.eventsToday,
       hint: capitalize(formatIt(todayDate, "EEEE d MMMM")),
+      href: `/admin/agenda?date=${today}&view=day`,
     },
     {
       label: "Eventi nel mese",
       value: stats.eventsThisMonth,
       hint: capitalize(formatIt(todayDate, "LLLL yyyy")),
+      href: "/admin/statistiche?periodo=mese&tipo=evento",
     },
     {
       label: "Coperti · 7 giorni",
       value: stats.coversNext7Days,
       hint: "Adulti e bambini nei prossimi sette giorni",
+      href: "/admin/statistiche?periodo=mese",
     },
     {
       label: "Eventi senza acconto",
       value: stats.pendingOptions,
       hint: stats.pendingOptions > 0 ? "In attesa del primo acconto" : "Tutti gli eventi hanno un acconto",
       highlight: stats.pendingOptions > 0,
+      href: "/admin/da-confermare",
     },
   ];
 
@@ -81,8 +89,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
       />
 
       <section aria-label="Indicatori principali" className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
-        {tiles.map((tile) => (
-          <Stat key={tile.label} {...tile} />
+        {tiles.map(({ href, ...tile }) => (
+          <Link
+            key={tile.label}
+            href={href}
+            aria-label={`${tile.label}: ${tile.value}`}
+            className="block min-w-0 rounded-btn transition-shadow duration-200 hover:shadow-md hover:shadow-ink/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+          >
+            <Stat {...tile} className="h-full" />
+          </Link>
         ))}
       </section>
 
@@ -121,6 +136,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         initialDays={weekDays}
         initialBookings={weekBookings}
         initialSelectedDay={selectedDay}
+        todayNormalBookings={todayNormalBookings}
       />
 
       <section aria-labelledby="eliminazioni-recenti" className="flex min-w-0 flex-col gap-4">

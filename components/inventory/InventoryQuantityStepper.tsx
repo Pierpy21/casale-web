@@ -49,8 +49,10 @@ export function InventoryQuantityStepper({ id, label, itemName, value, onChange,
         role="group"
         aria-labelledby={labelId}
         className={cn(
-          "flex h-11 min-w-0 items-stretch overflow-hidden rounded-btn border border-slate/70 bg-paper transition-colors duration-200 hover:border-slate focus-within:ring-2 focus-within:ring-petrol/40",
-          disabled && "opacity-60",
+          "flex h-11 min-w-0 items-stretch overflow-hidden rounded-lg border shadow-[inset_0_1px_2px_rgb(28_43_45/0.04)] transition-[border-color,box-shadow,background-color] duration-200",
+          disabled
+            ? "border-ink/10 bg-cream/50 shadow-none"
+            : "border-field-edge bg-field hover:border-field-edge-hover focus-within:border-petrol focus-within:ring-[3px] focus-within:ring-petrol/25",
         )}
       >
         <button
@@ -61,7 +63,7 @@ export function InventoryQuantityStepper({ id, label, itemName, value, onChange,
             setDraft(null);
             onChange(Math.max(0, value - 1));
           }}
-          className={cn(STEP_BUTTON, "border-r border-sand")}
+          className={cn(STEP_BUTTON, "border-r border-ink/10")}
         >
           <Minus aria-hidden="true" className="size-5" />
         </button>
@@ -89,7 +91,7 @@ export function InventoryQuantityStepper({ id, label, itemName, value, onChange,
               e.currentTarget.blur();
             }
           }}
-          className="min-w-0 flex-1 bg-transparent px-1 text-center text-[18px] font-medium tabular-nums text-ink focus:outline-none disabled:cursor-not-allowed"
+          className="min-w-0 flex-1 bg-transparent px-1 text-center text-[18px] font-medium tabular-nums text-ink placeholder:text-slate focus:outline-none disabled:cursor-not-allowed disabled:text-disabled"
         />
 
         <button
@@ -100,7 +102,7 @@ export function InventoryQuantityStepper({ id, label, itemName, value, onChange,
             setDraft(null);
             onChange(value + 1);
           }}
-          className={cn(STEP_BUTTON, "border-l border-sand")}
+          className={cn(STEP_BUTTON, "border-l border-ink/10")}
         >
           <Plus aria-hidden="true" className="size-5" />
         </button>

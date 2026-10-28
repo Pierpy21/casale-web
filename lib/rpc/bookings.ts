@@ -14,7 +14,7 @@ import {
   nullIfEmpty,
   type AuditEntry,
 } from "@/lib/booking-audit";
-import type { BookingStatus, Course } from "@/lib/types";
+import type { BookingAllergyDraft, BookingStatus, Course } from "@/lib/types";
 import type { BookingInputType } from "@/lib/validation";
 
 // Sostituisce le RPC SQL legacy (upsert_booking, save_booking_dishes, reset_booking_dishes,
@@ -383,6 +383,72 @@ export async function updateBookingCovers(
   });
   queueAuditEntries(batch, actor, id, diffs);
   await batch.send();
+}
+
+/**
+ * Allergie della prenotazione in una sola batch: le righe con `id` esistente si aggiornano (solo se cambiano),
+ * le altre si creano, quelle non più presenti si eliminano. Audit: una riga "allergie" se il riepilogo cambia.
+ * Ritorna false se non c'è nulla da salvare (nessuna scrittura).
+ */
+export async function saveBookingAllergies(
+  db: PocketBase,
+  bookingId: string,
+  drafts: BookingAllergyDraft[],
+  actor: Actor,
+): Promise<boolean> {
+  await loadBooking(db, bookingId);
+  const oldRows = await bookingAllergyRows(db, bookingId);
+  const oldById = new Map(oldRows.map((r) => [r.id, r]));
+  const kept = new Set<string>();
+  const batch = db.createBatch();
+  let writes = 0;
+
+  for (const d of drafts) {
+    const subject = d.subject_name ?? "";
+    const notes = d.notes ?? "";
+    const existing = d.id ? oldById.get(d.id) : undefined;
+    if (existing && !kept.has(existing.id)) {
+      kept.add(existing.id);
+      const same =
+        (nn(existing.subject_name) ?? "") === subject &&
+        String(existing.condition ?? "") === d.condition &&
+        (nn(existing.notes) ?? "") === notes;
+      if (!same) {
+        batch.collection("booking_allergies").update(existing.id, { subject_name: subject, condition: d.condition, notes });
+        writes++;
+      }
+    } else {
+      batch.collection("booking_allergies").create({
+        id: generateRecordId(),
+        booking: bookingId,
+        subject_name: subject,
+        condition: d.condition,
+        notes,
+      });
+      writes++;
+    }
+  }
+  for (const r of oldRows) {
+    if (kept.has(r.id)) continue;
+    batch.collection("booking_allergies").delete(r.id);
+    writes++;
+  }
+  if (writes === 0) return false;
+
+  const oldSummary = allergiesSummary(oldRows.map((r) => ({ subject_name: nn(r.subject_name), condition: String(r.condition ?? "") })));
+  const newSummary = allergiesSummary(drafts.map((d) => ({ subject_name: d.subject_name ?? null, condition: d.condition })));
+  if (oldSummary !== newSummary) {
+    queueAudit(batch, actor, {
+      bookingId,
+      table: "booking_allergies",
+      field: "allergie",
+      old: nullIfEmpty(oldSummary),
+      new: nullIfEmpty(newSummary),
+    });
+  }
+  batch.collection("bookings").update(bookingId, { updated_by: actor.id });
+  await batch.send();
+  return true;
 }
 
 /** Sostituisce i piatti della prenotazione (admin o chef) con audit. */

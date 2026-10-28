@@ -6,6 +6,21 @@ import type { BookingKind, Profile } from "./types";
 // - sala: vede tutte le prenotazioni; modifica solo i coperti; crea solo prenotazioni normali (cliente via nuovo cliente).
 // - cucina: sola lettura delle prenotazioni; usa la giacenza. Il flag is_chef non dà più permessi.
 
+/**
+ * Allergie e intolleranze di una prenotazione: admin sempre; sala attiva solo su eventi e prenotazioni normali
+ * (mai sugli appuntamenti). La cucina è in sola lettura.
+ */
+export function canEditAllergies(p: Profile, kind: BookingKind): boolean {
+  if (!p.active) return false;
+  if (p.role === "admin") return true;
+  return p.role === "sala" && kind !== "appuntamento";
+}
+
+/** Gli appuntamenti sono visibili solo all'admin: mai a sala e cucina (letture, notifiche, modifiche). */
+export function canSeeAppointments(p: Profile): boolean {
+  return p.role === "admin";
+}
+
 /** Attivo e admin. */
 export function isAdmin(p: Profile): boolean {
   return p.active && p.role === "admin";
@@ -64,5 +79,15 @@ export function canUseInventory(p: Profile): boolean {
 
 /** Gestione del catalogo giacenza (disattivare prodotti) e segnatura dei report come visti: solo admin. */
 export function canManageInventory(p: Profile): boolean {
+  return isAdmin(p);
+}
+
+/** Note interne sulle prenotazioni: admin e cucina attiva. */
+export function canAddBookingNote(p: Profile): boolean {
+  return isAdmin(p) || (p.active && p.role === "cucina");
+}
+
+/** Registro delle modifiche alle prenotazioni: solo admin (la sala non lo vede). */
+export function canViewActivityLog(p: Profile): boolean {
   return isAdmin(p);
 }

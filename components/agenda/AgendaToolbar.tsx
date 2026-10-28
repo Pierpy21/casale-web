@@ -1,7 +1,7 @@
 import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 import { ButtonLink, buttonClasses, cn } from "@/components/ui";
 import { AgendaNavLink } from "./AgendaNavLink";
-import { shiftPeriod, type AgendaView } from "./agenda-utils";
+import { shiftPeriod, type AgendaKindFilter, type AgendaView } from "./agenda-utils";
 
 const VIEWS: Array<{ value: AgendaView; label: string }> = [
   { value: "month", label: "Mese" },
@@ -15,11 +15,13 @@ export interface AgendaToolbarProps {
   today: string;
   title: string;
   isAdmin: boolean;
+  /** Filtro corrente, mantenuto nei link di navigazione. */
+  kind: AgendaKindFilter;
   onNavigate: (iso: string, view: AgendaView) => void;
 }
 
-/** Toolbar desktop: ‹ Oggi › + titolo del periodo, switch vista segmentato, nuova prenotazione. */
-export function AgendaToolbar({ view, selected, today, title, isAdmin, onNavigate }: AgendaToolbarProps) {
+/** Toolbar desktop: ‹ Oggi › + titolo del periodo, switch vista segmentato, nuova prenotazione. Il filtro tipo sta sotto il calendario. */
+export function AgendaToolbar({ view, selected, today, title, isAdmin, kind, onNavigate }: AgendaToolbarProps) {
   const prev = shiftPeriod(selected, view, -1);
   const next = shiftPeriod(selected, view, 1);
   const navButton =
@@ -36,10 +38,10 @@ export function AgendaToolbar({ view, selected, today, title, isAdmin, onNavigat
           Oggi
         </button>
         <div className="flex items-center">
-          <AgendaNavLink iso={prev} view={view} label="Periodo precedente" className={navButton} onNavigate={onNavigate}>
+          <AgendaNavLink iso={prev} view={view} kind={kind} label="Periodo precedente" className={navButton} onNavigate={onNavigate}>
             <ChevronLeft aria-hidden="true" className="size-5" />
           </AgendaNavLink>
-          <AgendaNavLink iso={next} view={view} label="Periodo successivo" className={navButton} onNavigate={onNavigate}>
+          <AgendaNavLink iso={next} view={view} kind={kind} label="Periodo successivo" className={navButton} onNavigate={onNavigate}>
             <ChevronRight aria-hidden="true" className="size-5" />
           </AgendaNavLink>
         </div>

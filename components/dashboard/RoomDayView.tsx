@@ -2,6 +2,8 @@ import { addDays } from "date-fns";
 import Link from "next/link";
 import { capitalize, formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
 import { bookingTitle, clientFullName, formatCovers, totalCovers } from "@/components/bookings/format";
+import { MenuBadge } from "@/components/menu/MenuBadge";
+import { useMenuColor } from "@/components/menu/MenuColorsProvider";
 import { Badge, EmptyState, StatusDot } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { STATUS_LABELS, type BookingListItem, type Room } from "@/lib/types";
@@ -140,9 +142,11 @@ export function RoomDayView({ rooms, days, selectedDay, todayIso, bookings, onSe
                 >
                   <span className="flex items-start gap-2">
                     {booking.kind !== "normale" && <StatusDot status={booking.status} size="sm" className="mt-2" />}
-                    <span className="min-w-0 font-serif text-lg leading-tight break-words">
-                      {booking.menu?.name ?? "Menù da definire"}
-                    </span>
+                    <MenuBadge
+                      menuId={booking.menu?.id ?? null}
+                      name={booking.menu?.name ?? "Menù da definire"}
+                      size="md"
+                    />
                   </span>
                   <span className="break-words text-[13px] text-slate-dark">
                     {bookingTitle(booking)} · {formatCovers(booking)}
@@ -161,24 +165,27 @@ function BookingBlock({ booking, capacity }: { booking: BookingListItem; capacit
   const covers = totalCovers(booking);
   const menuName = booking.menu?.name ?? null;
   const title = bookingTitle(booking);
+  // Il blocco prende il colore del menù (stesso colore di card e calendario).
+  const color = useMenuColor(booking.menu?.id ?? null);
   return (
     <Link
       href={`/admin/prenotazioni/${booking.id}`}
       aria-label={`${menuName ?? "Menù da definire"}, ${title}, ${covers} coperti su capienza ${capacity}, stato ${STATUS_LABELS[booking.status]}`}
-      className="flex flex-col gap-2 bg-petrol px-4 py-4 text-paper transition-colors duration-200 hover:bg-petrol-hover"
+      style={{ backgroundColor: color.solid, color: color.onSolid }}
+      className="flex flex-col gap-2 px-4 py-4 transition-[filter] duration-200 hover:brightness-95"
     >
       <span className="flex items-start gap-2.5">
         {booking.kind !== "normale" && <StatusDot status={booking.status} onDark className="mt-2" />}
         {menuName ? (
           <span className="min-w-0 font-serif text-xl leading-tight break-words">{menuName}</span>
         ) : (
-          <span className="min-w-0 font-serif text-xl italic leading-tight text-paper/85">Menù da definire</span>
+          <span className="min-w-0 font-serif text-xl italic leading-tight">Menù da definire</span>
         )}
       </span>
-      <span className="text-[13px] tabular-nums text-paper/90">
+      <span className="text-[13px] font-semibold tabular-nums">
         {covers}/{capacity} coperti · {formatCovers(booking)}
       </span>
-      <span className="break-words text-[13px] text-paper/85">
+      <span className="break-words text-[13px]">
         {clientFullName(booking)}
         {booking.event_name ? ` · ${booking.event_name}` : ""}
       </span>

@@ -146,7 +146,9 @@ function MenuBlock({ title, menu }: { title: string; menu: QuoteDocumentMenu }) 
   return (
     <View style={styles.section}>
       <Text style={styles.eyebrow}>{title}</Text>
-      {menu.name ? <Text style={styles.sectionTitle}>{menu.name}</Text> : null}
+      {menu.name && menu.name.trim().toLowerCase() !== title.trim().toLowerCase() ? (
+        <Text style={styles.sectionTitle}>{menu.name}</Text>
+      ) : null}
       {menu.courses.map((course) => (
         <View key={course.course} style={styles.courseRow} wrap={false}>
           <Text style={styles.courseLabel}>{course.label}</Text>

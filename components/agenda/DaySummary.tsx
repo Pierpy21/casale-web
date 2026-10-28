@@ -1,4 +1,6 @@
+import { MenuBadge } from "@/components/menu/MenuBadge";
 import { Stat, cn } from "@/components/ui";
+import { kidsMenuRowLabel } from "@/lib/quote-utils";
 import type { BookingListItem } from "@/lib/types";
 
 /** Quantità di un menù (adulti) o di un menù bambini nella giornata. */
@@ -7,6 +9,15 @@ export interface MenuQuantity {
   label: string;
   quantity: number;
   kind: "menu" | "kids";
+  /** Id del menù (per il colore). Se manca, si ricava dalla chiave "menu:<id>" / "kids:<id>". */
+  menuId?: string | null;
+}
+
+/** Id del menù di una voce: dichiarato, oppure dalla chiave "menu:<id>" / "kids:<id>". */
+function menuIdOf(menu: MenuQuantity): string | null {
+  if (menu.menuId) return menu.menuId;
+  const separator = menu.key.indexOf(":");
+  return separator >= 0 ? menu.key.slice(separator + 1) : null;
 }
 
 export interface DaySummaryData {
@@ -39,11 +50,11 @@ export function summarizeDay(bookings: BookingListItem[]): DaySummaryData {
     menus: [],
   };
   const menus = new Map<string, MenuQuantity>();
-  const addMenu = (key: string, label: string, kind: MenuQuantity["kind"], quantity: number) => {
+  const addMenu = (key: string, label: string, kind: MenuQuantity["kind"], quantity: number, menuId: string) => {
     if (quantity <= 0) return;
     const current = menus.get(key);
     if (current) current.quantity += quantity;
-    else menus.set(key, { key, label, quantity, kind });
+    else menus.set(key, { key, label, quantity, kind, menuId });
   };
 
   for (const b of bookings) {
@@ -61,9 +72,9 @@ export function summarizeDay(bookings: BookingListItem[]): DaySummaryData {
 
     // Evento: coperti e menù.
     data.eventCovers += covers;
-    if (b.menu) addMenu(`menu:${b.menu.id}`, b.menu.name, "menu", b.adults);
+    if (b.menu) addMenu(`menu:${b.menu.id}`, b.menu.name, "menu", b.adults, b.menu.id);
     if (b.kids_menu) {
-      addMenu(`kids:${b.kids_menu.id}`, `Menù bambini — ${b.kids_menu.name}`, "kids", b.kids_menus);
+      addMenu(`kids:${b.kids_menu.id}`, kidsMenuRowLabel(b.kids_menu.name), "kids", b.kids_menus, b.kids_menu.id);
     }
   }
 
@@ -82,25 +93,18 @@ export interface MenuChipsProps {
   className?: string;
 }
 
-/** Menù del giorno come chip compatti: "Menù Autunno ×42". */
+/** Menù del giorno come chip nel colore del menù: "Menù Autunno ×42". */
 export function MenuChips({ menus, size = "md", title = "Menù del giorno", className }: MenuChipsProps) {
   if (menus.length === 0) return null;
   const lg = size === "lg";
   return (
-    <div role="group" aria-label={title} className={cn("flex flex-wrap items-center gap-1.5", className)}>
-      <span className={cn("mr-1 font-medium uppercase tracking-[0.12em] text-bronze", lg ? "text-[13px]" : "text-[10px]")}>
+    <div role="group" aria-label={title} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2", className)}>
+      <span className={cn("font-medium uppercase tracking-[0.12em] text-bronze", lg ? "text-[13px]" : "text-[10px]")}>
         {title}
       </span>
       {menus.map((menu) => (
-        <span
-          key={menu.key}
-          className={cn(
-            "inline-flex min-w-0 items-baseline gap-1.5 rounded-[2px] border bg-paper text-ink",
-            menu.kind === "kids" ? "border-bronze/40" : "border-petrol/25",
-            lg ? "px-3 py-1.5 text-[17px]" : "px-2 py-1 text-[12px] leading-snug",
-          )}
-        >
-          <span className="break-words">{menu.label}</span>
+        <span key={menu.key} className="inline-flex max-w-full items-baseline gap-1.5">
+          <MenuBadge menuId={menuIdOf(menu)} name={menu.label} size={lg ? "lg" : "sm"} />
           <span
             className={cn(
               "shrink-0 font-serif tabular-nums",

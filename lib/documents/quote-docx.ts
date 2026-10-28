@@ -101,7 +101,7 @@ function kv(label: string, value: string): Paragraph {
 
 function menuBlock(title: string, menu: QuoteDocumentMenu): Paragraph[] {
   const out: Paragraph[] = [eyebrow(title)];
-  if (menu.name) {
+  if (menu.name && menu.name.trim().toLowerCase() !== title.trim().toLowerCase()) {
     out.push(para([text(menu.name, { size: 13, font: FONT.serif })], { after: 100, keepNext: true }));
   }
   for (const course of menu.courses) {

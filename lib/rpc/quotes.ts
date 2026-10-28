@@ -5,7 +5,7 @@ import { UserFacingError } from "@/lib/action-utils";
 import { addDaysISO, romeToday } from "@/lib/dates";
 import { dayStartPb, nn, num, type PbRecord } from "@/lib/pocketbase/helpers";
 import { fetchOne } from "@/lib/pocketbase/queries";
-import { buildDefaultQuoteLines } from "@/lib/quote-utils";
+import { buildDefaultQuoteLines, formatEUR } from "@/lib/quote-utils";
 import type { QuoteLine } from "@/lib/types";
 import type { QuoteDraftInputType, QuoteInputType } from "@/lib/validation";
 
@@ -92,8 +92,9 @@ export async function createQuote(
       kids_menu: kids ? { name: String(kids.name), price_per_person: num(kids.price_per_person) } : null,
     });
   }
-  if (lines.length === 0) {
-    throw new UserFacingError("Nessuna riga da preventivare: associa un menù alla prenotazione e indica i coperti.");
+  // Preventivo automatico senza menù (evento senza menù): 0 righe automatiche, il preventivo si crea comunque.
+  if (draft && lines.length === 0) {
+    throw new UserFacingError("Nessuna riga da preventivare: aggiungi almeno una riga.");
   }
 
   const issued = romeToday();
@@ -152,4 +153,52 @@ export async function deleteQuoteRecord(db: PocketBase, id: string): Promise<str
   if (!quote) throw new UserFacingError("Preventivo non trovato.");
   await db.collection("quotes").delete(id);
   return String(quote.booking);
+}
+
+/**
+ * Prezzo finale di un evento (IVA inclusa) sul preventivo più recente della prenotazione.
+ * Se il preventivo non esiste lo crea come la creazione automatica. `finalTotal` null = calcolo automatico (0 in DB).
+ * Registra l'audit "Prezzo finale" nella stessa batch. Ritorna l'id del preventivo.
+ */
+export async function setEventFinalTotal(
+  db: PocketBase,
+  bookingId: string,
+  finalTotal: number | null,
+  actor: QuoteActor & { full_name: string },
+): Promise<string> {
+  const booking = await fetchOne(db, "bookings", bookingId);
+  if (!booking) throw new UserFacingError("Prenotazione non trovata");
+  if (String(booking.kind || "evento") !== "evento") {
+    throw new UserFacingError("Il prezzo finale si imposta solo sugli eventi.");
+  }
+
+  const latest = (
+    await db.collection("quotes").getList(1, 1, {
+      filter: db.filter("booking = {:id}", { id: bookingId }),
+      sort: "-created,-id",
+      skipTotal: true,
+    })
+  ).items[0] as PbRecord | undefined;
+
+  // Nessun preventivo e nessun prezzo da impostare (ripristino al calcolo automatico): non creare nulla.
+  if (!latest && finalTotal === null) throw new UserFacingError("Nessun preventivo da ripristinare");
+
+  const quoteId = latest ? latest.id : await createQuote(db, bookingId, { id: actor.id }, null);
+  const oldTotal = latest && num(latest.final_total) > 0 ? num(latest.final_total) : null;
+  if (oldTotal === finalTotal) return quoteId;
+
+  const batch = db.createBatch();
+  batch.collection("quotes").update(quoteId, { final_total: finalTotal ?? 0 });
+  batch.collection("booking_changes").create({
+    booking: bookingId,
+    booking_label: "",
+    changed_by: actor.id,
+    changed_by_name: actor.full_name || "sistema",
+    table_name: "quotes",
+    field: "Prezzo finale",
+    old_value: oldTotal === null ? "" : formatEUR(oldTotal),
+    new_value: finalTotal === null ? "" : formatEUR(finalTotal),
+  });
+  await batch.send();
+  return quoteId;
 }

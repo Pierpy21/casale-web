@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  BarChart3,
   Boxes,
   CalendarDays,
   Ellipsis,
+  History,
   LayoutDashboard,
   PartyPopper,
   UserCog,
@@ -29,6 +31,8 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   operators: UserCog,
   catalog: UtensilsCrossed,
   inventory: Boxes,
+  activity: History,
+  stats: BarChart3,
 };
 
 /** Numero di voci dirette nella barra mobile; le altre finiscono nel menù "Altro". */

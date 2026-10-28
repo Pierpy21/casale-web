@@ -33,7 +33,7 @@ export function PaymentDraftFields({ idPrefix, draft, errors, onChange, disabled
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-x-3 gap-y-3 sm:grid-cols-2">
       <Field label="Importo" htmlFor={id("amount")} required error={errors.amount}>
         <div className="relative">
           <span aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[15px] text-slate-dark">
@@ -94,7 +94,7 @@ export function PaymentDraftFields({ idPrefix, draft, errors, onChange, disabled
         />
       </Field>
 
-      <div className="flex flex-col gap-1.5 sm:col-span-2">
+      <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2">
         <span className="text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark">Ricevuta</span>
         <input
           ref={fileRef}
@@ -115,7 +115,7 @@ export function PaymentDraftFields({ idPrefix, draft, errors, onChange, disabled
         {draft.receipt ? (
           <div
             className={cn(
-              "flex flex-wrap items-center justify-between gap-3 rounded-btn border bg-paper px-3.5 py-2.5",
+              "flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-btn border bg-paper px-3 py-2",
               errors.receipt ? "border-danger" : "border-sand",
             )}
           >
@@ -137,6 +137,7 @@ export function PaymentDraftFields({ idPrefix, draft, errors, onChange, disabled
                 variant="ghost"
                 size="sm"
                 disabled={disabled}
+                className="min-h-11"
                 onClick={() => fileRef.current?.click()}
               >
                 Cambia
@@ -145,6 +146,7 @@ export function PaymentDraftFields({ idPrefix, draft, errors, onChange, disabled
                 variant="ghost"
                 size="sm"
                 disabled={disabled}
+                className="min-h-11"
                 aria-label="Rimuovi ricevuta"
                 onClick={() => onChange({ receipt: null })}
               >
@@ -159,12 +161,12 @@ export function PaymentDraftFields({ idPrefix, draft, errors, onChange, disabled
               type="button"
               disabled={disabled}
               onClick={() => fileRef.current?.click()}
-              className={buttonClasses("outline", "sm", "disabled:opacity-50")}
+              className={buttonClasses("outline", "sm", "min-h-11 disabled:opacity-50")}
             >
               <Paperclip aria-hidden="true" className="size-4" />
               Carica ricevuta
             </button>
-            <p className="mt-1.5 text-[13px] text-slate">Foto o PDF, fino a 10 MB.</p>
+            <p className="mt-1 text-[12px] text-slate">Foto o PDF, fino a 10 MB.</p>
           </div>
         )}
         {errors.receipt && (

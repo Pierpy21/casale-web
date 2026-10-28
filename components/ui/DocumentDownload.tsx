@@ -31,16 +31,20 @@ export function DocumentDownload({
   mimeType,
   className,
   children,
+  onActivate,
 }: {
   href: string;
   fileName: string;
   mimeType: string;
   className?: string;
   children: ReactNode;
+  /** Chiamato al clic, prima del download (es. per chiudere un menu che lo contiene). */
+  onActivate?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
 
   const onClick = async (event: MouseEvent<HTMLAnchorElement>) => {
+    onActivate?.();
     const touch = window.matchMedia("(pointer: coarse)").matches;
     if (!touch) return; // computer: download normale
     event.preventDefault();

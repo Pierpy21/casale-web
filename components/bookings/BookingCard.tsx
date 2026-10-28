@@ -1,7 +1,9 @@
-import { ChevronDown, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { formatIt, toDate } from "@/components/agenda/agenda-utils";
-import { Badge, StatusDot } from "@/components/ui";
+import { KitchenAllergyBanner } from "@/components/agenda/kitchen/KitchenAllergyBanner";
+import { MenuBadge } from "@/components/menu/MenuBadge";
+import { Badge, Disclosure, StatusDot } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import {
   BOOKING_KIND_LABELS,
@@ -10,7 +12,9 @@ import {
   STATUS_COLORS,
   STATUS_LABELS,
   type BookingListItem,
+  type BookingNote,
 } from "@/lib/types";
+import { BookingNotes } from "./BookingNotes";
 import { KindBadge } from "./KindBadge";
 import {
   bookingTitle,
@@ -22,6 +26,13 @@ import {
   type DishGroup,
 } from "./format";
 
+/** Variante cucina: sola lettura, con note cucina. */
+export interface BookingCardKitchen {
+  notes: BookingNote[];
+  canAddNote: boolean;
+  currentUserId: string;
+}
+
 export interface BookingCardProps {
   booking: BookingListItem;
   /** compact: cella del calendario mese / lista dashboard. full: card ricca. */
@@ -31,13 +42,18 @@ export interface BookingCardProps {
   showDate?: boolean;
   /** Variante full: tutta la card apre la prenotazione (stretched link); l'area piatti resta indipendente. */
   wholeCardLink?: boolean;
+  /**
+   * Scheda cucina (sola lettura): nome prima dell'orario, allergie in cima, piatti sempre visibili,
+   * tendina "Dettagli e note cucina". Implica la variante full.
+   */
+  kitchen?: BookingCardKitchen;
   className?: string;
 }
 
 const SETUP_FALLBACK = "#B0B0B0";
 
-/** Menù scelto: etichetta serif in pill petrol, la prima informazione della card. */
-function MenuLabel({ name }: { name: string | null }) {
+/** Menù scelto: nome nel colore del menù, la prima informazione della card. */
+function MenuLabel({ menuId, name }: { menuId: string | null; name: string | null }) {
   if (!name) {
     return (
       <span className="inline-flex max-w-full items-center rounded-[2px] border border-dashed border-slate/60 px-3 py-1.5 font-serif text-[15px] italic text-slate-dark">
@@ -45,11 +61,7 @@ function MenuLabel({ name }: { name: string | null }) {
       </span>
     );
   }
-  return (
-    <span className="inline-flex max-w-full items-center rounded-[2px] bg-petrol px-3 py-1.5 font-serif text-[15px] leading-tight text-paper break-words">
-      {name}
-    </span>
-  );
+  return <MenuBadge menuId={menuId} name={name} size="md" />;
 }
 
 /** Colori di allestimento: pallini distanziati e nomi che vanno a capo, senza troncamenti. */
@@ -78,6 +90,7 @@ export function BookingCard({
   dishes = "inline",
   showDate = false,
   wholeCardLink = false,
+  kitchen,
   className,
 }: BookingCardProps) {
   const href = `/admin/prenotazioni/${b.id}`;
@@ -88,24 +101,23 @@ export function BookingCard({
   const menuName = b.menu?.name ?? null;
   const isEvent = b.kind === "evento";
   const covers = totalCovers(b);
-  // Senza menù (prenotazioni, appuntamenti) la testata è il titolo; il cliente va sotto, se diverso.
-  const headline = isEvent ? (menuName ?? "Menù da definire") : title;
-  const subline = isEvent ? title : b.event_name?.trim() ? clientFullName(b) : null;
   const roomLine = [b.room?.name ?? "Sala da assegnare", covers > 0 ? formatCovers(b) : null].filter(Boolean).join(" · ");
 
-  if (variant === "compact") {
+  if (variant === "compact" && !kitchen) {
+    // Senza menù (prenotazioni, appuntamenti) la testata è il titolo; il cliente va sotto, se diverso.
+    const subline = isEvent ? title : b.event_name?.trim() ? clientFullName(b) : null;
     return (
       <Link
         href={href}
-        aria-label={`${BOOKING_KIND_LABELS[b.kind]}, ${headline}${time ? `, ore ${time}` : ""}${b.room ? `, ${b.room.name}` : ""}${covers > 0 ? `, ${formatCovers(b)} coperti` : ""}${allergyCount > 0 ? `, ${allergyCount} allergie` : ""}, stato ${STATUS_LABELS[b.status]}`}
+        aria-label={`${BOOKING_KIND_LABELS[b.kind]}, ${isEvent ? (menuName ?? "Menù da definire") : title}${time ? `, ore ${time}` : ""}${b.room ? `, ${b.room.name}` : ""}${covers > 0 ? `, ${formatCovers(b)} coperti` : ""}${allergyCount > 0 ? `, ${allergyCount} allergie` : ""}, stato ${STATUS_LABELS[b.status]}`}
         style={{ borderLeftColor: STATUS_COLORS[b.status] }}
         className={cn(
-          "flex flex-col gap-1.5 border-l-[3px] bg-cream/70 px-3 py-3 text-ink transition-colors duration-200 hover:bg-sand/60",
+          "flex min-w-0 flex-col gap-1.5 border-l-[3px] bg-cream/70 px-3 py-3 text-ink transition-colors duration-200 hover:bg-sand/60",
           b.status === "annullato" && "line-through opacity-70",
           className,
         )}
       >
-        <span className="flex items-center gap-2 text-[12px] text-slate-dark">
+        <span className="flex min-w-0 items-center gap-2 text-[12px] text-slate-dark">
           {b.kind !== "normale" && <StatusDot status={b.status} size="sm" />}
           <KindBadge kind={b.kind} compact />
           {dateLabel && <span className="font-medium">{dateLabel}</span>}
@@ -121,22 +133,52 @@ export function BookingCard({
             </span>
           )}
         </span>
-        <span
-          className={cn(
-            "break-words font-serif text-[16px] font-semibold leading-snug",
-            isEvent && !menuName ? "italic text-slate-dark" : "text-petrol",
-          )}
-        >
-          {headline}
-        </span>
+        {isEvent ? (
+          menuName ? (
+            <MenuBadge menuId={b.menu?.id ?? null} name={menuName} size="sm" className="self-start" />
+          ) : (
+            <span className="font-serif text-[16px] font-semibold italic leading-snug text-slate-dark">Menù da definire</span>
+          )
+        ) : (
+          <span className="break-words font-serif text-[16px] font-semibold leading-snug text-petrol">{title}</span>
+        )}
         {subline && <span className="line-clamp-2 break-words text-[13px] leading-snug">{subline}</span>}
         <span className="truncate text-[12px] text-slate-dark">{roomLine}</span>
       </Link>
     );
   }
 
+  const isKitchen = kitchen !== undefined;
   const groups = groupDishes(b.dishes);
-  const hasDishes = dishes !== "hidden" && groups.length > 0;
+  const hasDishes = (isKitchen || dishes !== "hidden") && groups.length > 0;
+  const dishesMode = isKitchen ? "inline" : dishes;
+
+  // Intestazione del nome: in cucina il nome viene prima dell'orario e non è un link (sola lettura).
+  const nameLine = isKitchen ? (
+    <h3 className="break-words font-serif text-2xl leading-tight wrap-anywhere">{title}</h3>
+  ) : (
+    <h3 className="break-words font-serif text-xl leading-tight wrap-anywhere">
+      <Link
+        href={href}
+        className={cn(
+          "rounded-[2px] underline-offset-4 hover:text-petrol hover:underline",
+          wholeCardLink
+            ? "after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+            : "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol",
+        )}
+      >
+        {title}
+      </Link>
+    </h3>
+  );
+
+  const timeLine = (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+      {dateLabel && <span>{dateLabel}</span>}
+      {time && <span>ore {time}</span>}
+      {b.room && <span>{b.room.name}</span>}
+    </p>
+  );
 
   return (
     <article
@@ -150,37 +192,33 @@ export function BookingCard({
         className,
       )}
     >
+      {isKitchen && <KitchenAllergyBanner allergies={b.allergies} />}
+
       <header className="flex min-w-0 flex-col gap-4">
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             <KindBadge kind={b.kind} />
-            {isEvent && <MenuLabel name={menuName} />}
+            {isEvent && <MenuLabel menuId={b.menu?.id ?? null} name={menuName} />}
           </div>
           {b.kind !== "normale" && <StatusDot status={b.status} />}
         </div>
 
         <div className="flex min-w-0 flex-col gap-2">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
-            {dateLabel && <span>{dateLabel}</span>}
-            {time && <span>ore {time}</span>}
-            {b.room && <span>{b.room.name}</span>}
-          </p>
-          <h3 className="break-words font-serif text-xl leading-tight wrap-anywhere">
-            <Link
-              href={href}
-              className={cn(
-                "rounded-[2px] underline-offset-4 hover:text-petrol hover:underline",
-                wholeCardLink
-                  ? "after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
-                  : "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol",
-              )}
-            >
-              {title}
-            </Link>
-          </h3>
+          {isKitchen ? (
+            <>
+              {nameLine}
+              {timeLine}
+            </>
+          ) : (
+            <>
+              {timeLine}
+              {nameLine}
+            </>
+          )}
           {b.event_name && (
             <p className="break-words wrap-anywhere text-[14px] text-slate-dark">
-              {clientFullName(b)} · {b.client.phone}
+              {clientFullName(b)}
+              {!isKitchen && b.client.phone ? ` · ${b.client.phone}` : null}
             </p>
           )}
         </div>
@@ -195,7 +233,7 @@ export function BookingCard({
             </p>
           )}
           {b.kids_menus > 0 && <Badge tone="petrol">Menù bambini ×{b.kids_menus}</Badge>}
-          {allergyCount > 0 && (
+          {allergyCount > 0 && !isKitchen && (
             <Badge tone="danger">
               <TriangleAlert aria-hidden="true" className="size-3" />
               {allergyCount} {allergyCount === 1 ? "allergia" : "allergie"}
@@ -207,23 +245,23 @@ export function BookingCard({
       <SetupColors colors={b.setup_colors} />
 
       {hasDishes &&
-        (dishes === "collapsible" ? (
-          <details className={cn("group border-t border-sand pt-4", wholeCardLink && "relative z-10")}>
-            <summary className="flex cursor-pointer list-none items-center justify-between rounded-[2px] text-[13px] font-medium text-petrol transition-colors hover:text-petrol-hover">
-              Piatti del menù ({b.dishes.length})
-              <ChevronDown aria-hidden="true" className="size-4 transition-transform duration-300 group-open:rotate-180" />
-            </summary>
+        (dishesMode === "collapsible" ? (
+          <Disclosure
+            className={cn("border-t border-sand pt-4", wholeCardLink && "relative z-10")}
+            summaryClassName="min-h-11 text-[13px] font-medium normal-case tracking-normal text-petrol hover:text-petrol-hover"
+            summary={`Piatti del menù (${b.dishes.length})`}
+          >
             <div className="mt-4">
               <DishList groups={groups} />
             </div>
-          </details>
+          </Disclosure>
         ) : (
           <div className={cn("border-t border-sand pt-4", wholeCardLink && "relative z-10")}>
             <DishList groups={groups} />
           </div>
         ))}
 
-      {allergyCount > 0 && (
+      {allergyCount > 0 && !isKitchen && (
         <div className="border-l-[3px] border-danger bg-danger/5 px-4 py-3">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-danger">
             Allergie e patologie
@@ -240,7 +278,63 @@ export function BookingCard({
           </ul>
         </div>
       )}
+
+      {kitchen && (
+        <Disclosure
+          className="border-t border-sand pt-4"
+          summaryClassName="min-h-11 text-[13px] font-medium normal-case tracking-normal text-petrol hover:text-petrol-hover"
+          summary={kitchen.notes.length > 0 ? `Dettagli e note cucina · ${kitchen.notes.length}` : "Dettagli e note cucina"}
+        >
+          <div className="mt-4 flex min-w-0 flex-col gap-5">
+            {b.allergies.some((allergy) => allergy.notes) && (
+              <ul className="flex flex-col gap-2 text-[14px] leading-snug text-ink">
+                {b.allergies
+                  .filter((allergy) => allergy.notes)
+                  .map((allergy) => (
+                    <li key={allergy.id} className="break-words">
+                      <span className="font-semibold">{allergy.subject_name?.trim() || "Persona non indicata"}</span>
+                      <span> · {allergy.condition}: </span>
+                      <span className="text-slate-dark">{allergy.notes}</span>
+                    </li>
+                  ))}
+              </ul>
+            )}
+
+            <dl className="flex flex-col gap-4 text-[14px] text-ink">
+              <KitchenField label="Cliente">{clientFullName(b)}</KitchenField>
+              {b.event_name && <KitchenField label="Evento">{b.event_name}</KitchenField>}
+              <KitchenField label="Sala">{b.room?.name ?? "Da assegnare"}</KitchenField>
+              {isEvent && (b.setup_colors.length > 0 || b.setup_notes) && (
+                <KitchenField label="Allestimento">
+                  {b.setup_colors.length > 0 && <span className="block">Colori: {b.setup_colors.join(", ")}</span>}
+                  {b.setup_notes && <span className="block whitespace-pre-line">{b.setup_notes}</span>}
+                </KitchenField>
+              )}
+              {b.notes && <KitchenField label="Note prenotazione">{b.notes}</KitchenField>}
+            </dl>
+
+            <div className="border-t border-sand pt-4">
+              <BookingNotes
+                bookingId={b.id}
+                notes={kitchen.notes}
+                canAdd={kitchen.canAddNote}
+                currentUserId={kitchen.currentUserId}
+                isAdmin={false}
+              />
+            </div>
+          </div>
+        </Disclosure>
+      )}
     </article>
+  );
+}
+
+function KitchenField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">{label}</dt>
+      <dd className="break-words wrap-anywhere">{children}</dd>
+    </div>
   );
 }
 

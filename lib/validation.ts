@@ -148,6 +148,18 @@ export const AllergyInput = z.object({
 });
 export type AllergyInputType = z.infer<typeof AllergyInput>;
 
+/** Elenco allergie di una prenotazione (saveBookingAllergies). `id` non valido o sconosciuto = riga nuova. */
+export const BookingAllergiesInput = z
+  .array(
+    AllergyInput.extend({
+      id: z.preprocess(
+        (v) => (typeof v === "string" && /^[a-z0-9]{15}$/.test(v) ? v : undefined),
+        z.string().optional(),
+      ),
+    }),
+  )
+  .max(MAX_ITEMS, "Troppe allergie (massimo 60)");
+
 export const DishInput = z.object({
   course: courseSchema,
   name: z.string().trim().min(1, "Nome piatto obbligatorio").max(MAX_TEXT, "Nome piatto troppo lungo"),
@@ -276,7 +288,7 @@ export const BookingInput = z
     if (v.kind === "evento") {
       if (!v.event_name) issue("event_name", "Nome evento obbligatorio");
       if (!v.event_type) issue("event_type", "Tipo evento obbligatorio");
-      if (!v.menu_id) issue("menu_id", "Scegli il menù");
+      // Il menù è facoltativo: senza menù l'evento non ha copia piatti e il preventivo automatico ha 0 righe.
       checkCovers(v, ctx);
     } else if (v.kind === "normale") {
       if (!v.event_time) issue("event_time", "Ora obbligatoria");
@@ -298,6 +310,16 @@ export const BookingInput = z
     status: v.kind === "normale" ? normalBookingStatus(v.status ?? "confermato") : (v.status ?? "opzione"),
   }));
 export type BookingInputType = z.infer<typeof BookingInput>;
+
+/** Testo di una nota interna sulla prenotazione (cucina e admin). */
+export const BookingNoteBody = z
+  .string({ message: "Scrivi il testo della nota" })
+  .trim()
+  .min(1, "Scrivi il testo della nota")
+  .max(MAX_NOTES, "Nota troppo lunga (massimo 2000 caratteri)");
+
+/** Prezzo finale di un evento (IVA inclusa); null = torna al calcolo automatico. */
+export const EventFinalTotalInput = finalTotalSchema;
 
 // ---------------------------------------------------------------------
 // Giacenza

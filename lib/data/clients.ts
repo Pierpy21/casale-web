@@ -5,6 +5,7 @@ import { isRecordId, toDateOnly } from "@/lib/pocketbase/helpers";
 import { mapClient } from "@/lib/pocketbase/mappers";
 import { fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { romeToday } from "@/lib/dates";
+import { canSeeAppointments } from "@/lib/permissions";
 import type { Client, ClientOption, ClientWithStats, BookingListItem } from "@/lib/types";
 import { BOOKING_LIST_EXPAND, bookingListItems, sortBookingRecords } from "./shared";
 
@@ -18,7 +19,8 @@ function byName(a: { last_name: string; first_name: string }, b: { last_name: st
 }
 
 export async function getClients(search?: string): Promise<ClientWithStats[]> {
-  if (!(await getCurrentProfile())) return [];
+  const me = await getCurrentProfile();
+  if (!me) return [];
   const db = await getAdminPb();
 
   const term = sanitizeSearch(search);
@@ -30,7 +32,12 @@ export async function getClients(search?: string): Promise<ClientWithStats[]> {
 
   // Prenotazioni non annullate dei clienti in elenco (una sola query, filtrata in memoria).
   const ids = new Set(clients.map((c) => c.id));
-  const bookings = await listAll(db, "bookings", db.filter("status != {:s}", { s: "annullato" }), {
+  // La sala non vede gli appuntamenti: esclusi anche dal conteggio e dalla prossima data.
+  const seeAppointments = canSeeAppointments(me);
+  const bookingFilter = seeAppointments
+    ? db.filter("status != {:s}", { s: "annullato" })
+    : db.filter("status != {:s} && kind != {:ka}", { s: "annullato", ka: "appuntamento" });
+  const bookings = await listAll(db, "bookings", bookingFilter, {
     fields: "id,client,event_date",
   });
 
@@ -74,9 +81,13 @@ export async function getClient(id: string): Promise<Client | null> {
 
 export async function getClientBookings(clientId: string): Promise<BookingListItem[]> {
   if (!isRecordId(clientId)) return [];
-  if (!(await getCurrentProfile())) return [];
+  const me = await getCurrentProfile();
+  if (!me) return [];
   const db = await getAdminPb();
-  const records = await listAll(db, "bookings", db.filter("client = {:id}", { id: clientId }), {
+  const filter = canSeeAppointments(me)
+    ? db.filter("client = {:id}", { id: clientId })
+    : db.filter("client = {:id} && kind != {:ka}", { id: clientId, ka: "appuntamento" });
+  const records = await listAll(db, "bookings", filter, {
     expand: BOOKING_LIST_EXPAND,
   });
   // Data piu' recente per prima; a parita' di data, l'ora in ordine crescente.

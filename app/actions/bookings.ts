@@ -2,10 +2,10 @@
 
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
-import { BookingInput, coversInputFor, DishesInput } from "@/lib/validation";
+import { BookingAllergiesInput, BookingInput, BookingNoteBody, coversInputFor, DishesInput } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } from "@/lib/action-utils";
 import { createQuote } from "@/lib/rpc/quotes";
-import { canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditBookingFully, canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
+import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canSeeAppointments, isAdmin } from "@/lib/permissions";
 import { fetchOne } from "@/lib/pocketbase/queries";
 import { loadBookingBrief, notifyBookingDeleted, notifyBookingEvent } from "@/lib/notify";
 import {
@@ -14,12 +14,13 @@ import {
   setBookingStatusRecord,
   deleteBookingRecord,
   resetBookingDishesFromMenu,
+  saveBookingAllergies as writeAllergies,
   saveBookingDishes,
   updateBookingCovers as writeCovers,
   upsertBooking,
 } from "@/lib/rpc/bookings";
 import { eventStatusFor } from "@/lib/booking-status";
-import type { ActionResult, BookingKind, BookingStatus } from "@/lib/types";
+import type { ActionResult, BookingAllergyDraft, BookingKind, BookingStatus } from "@/lib/types";
 
 function revalidateBooking(id?: string, clientId?: string): void {
   revalidatePath("/admin/agenda");
@@ -148,7 +149,9 @@ export async function updateBookingCovers(id: string, input: unknown): Promise<A
   if (!auth.ok) return auth;
 
   const booking = await fetchOne(auth.db, "bookings", id);
-  if (!booking) return fail("Prenotazione non trovata.");
+  if (!booking || (!canSeeAppointments(auth.profile) && kindOf(booking) === "appuntamento")) {
+    return fail("Prenotazione non trovata.");
+  }
   const parsed = coversInputFor(kindOf(booking)).safeParse(input);
   if (!parsed.success) return invalidInput(parsed.error);
 
@@ -257,7 +260,9 @@ export async function assignBookingRoom(bookingId: string, roomId: string | null
   if (!auth.ok) return auth;
 
   const booking = await fetchOne(auth.db, "bookings", bookingId);
-  if (!booking) return fail("Prenotazione non trovata.");
+  if (!booking || (!canSeeAppointments(auth.profile) && kindOf(booking) === "appuntamento")) {
+    return fail("Prenotazione non trovata.");
+  }
   if (!canAssignRoom(auth.profile, kindOf(booking))) {
     return fail("Solo le prenotazioni normali hanno la sala assegnabile.");
   }
@@ -296,5 +301,96 @@ export async function resetDishesFromMenu(id: string): Promise<ActionResult> {
   revalidateBooking(id);
   const actor = auth.profile;
   after(() => notifyBookingEvent({ type: "dishes_updated", bookingId: id, actor }));
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Allergie e patologie: sostituzione dell'elenco. Admin sempre; sala attiva su eventi e prenotazioni normali
+ * (canEditAllergies). Audit e notifica (booking_updated) solo se qualcosa cambia.
+ */
+export async function saveBookingAllergies(bookingId: string, allergies: BookingAllergyDraft[]): Promise<ActionResult> {
+  if (!isRecordId(bookingId)) return fail("Prenotazione non valida.");
+  const auth = await authorize((p) => p.active, "Non sei autorizzato a modificare le allergie.");
+  if (!auth.ok) return auth;
+
+  const booking = await fetchOne(auth.db, "bookings", bookingId);
+  if (!booking) return fail("Prenotazione non trovata.");
+  if (!canEditAllergies(auth.profile, kindOf(booking))) {
+    return fail("Non sei autorizzato a modificare le allergie di questa prenotazione.");
+  }
+
+  const parsed = BookingAllergiesInput.safeParse(allergies);
+  if (!parsed.success) return invalidInput(parsed.error);
+
+  const actor = auth.profile;
+  let changed: boolean;
+  try {
+    changed = await writeAllergies(auth.db, bookingId, parsed.data, { id: actor.id, full_name: actor.full_name });
+  } catch (err) {
+    return dbFail(err);
+  }
+  if (!changed) return { ok: true, data: undefined };
+
+  revalidateBooking(bookingId, String(booking.client ?? "") || undefined);
+  after(() => notifyBookingEvent({ type: "booking_updated", bookingId, actor }));
+  return { ok: true, data: undefined };
+}
+
+function revalidateNotes(bookingId: string): void {
+  revalidatePath("/admin/agenda");
+  revalidatePath(`/admin/prenotazioni/${bookingId}`);
+}
+
+/** Aggiunge una nota interna alla prenotazione (admin e cucina). Autore e nome dal profilo. */
+export async function addBookingNote(bookingId: string, body: string): Promise<ActionResult<{ id: string }>> {
+  if (!isRecordId(bookingId)) return fail("Prenotazione non valida.");
+  const auth = await authorize(canAddBookingNote, "Non sei autorizzato ad aggiungere note.");
+  if (!auth.ok) return auth;
+
+  const parsed = BookingNoteBody.safeParse(body);
+  if (!parsed.success) return invalidInput(parsed.error);
+
+  const booking = await fetchOne(auth.db, "bookings", bookingId);
+  if (!booking || (!canSeeAppointments(auth.profile) && kindOf(booking) === "appuntamento")) {
+    return fail("Prenotazione non trovata.");
+  }
+
+  const profile = auth.profile;
+  try {
+    const record = await auth.db.collection("booking_notes").create({
+      booking: bookingId,
+      author: profile.id,
+      author_name: profile.full_name || "Utente",
+      body: parsed.data,
+    });
+    revalidateNotes(bookingId);
+    return { ok: true, data: { id: record.id } };
+  } catch (err) {
+    return dbFail(err);
+  }
+}
+
+/** Elimina una nota: l'autore o l'amministratore. */
+export async function deleteBookingNote(noteId: string): Promise<ActionResult> {
+  if (!isRecordId(noteId)) return fail("Nota non valida.");
+  const auth = await authorize((p) => p.active, "Non sei autorizzato a eliminare la nota.");
+  if (!auth.ok) return auth;
+
+  const note = await fetchOne(auth.db, "booking_notes", noteId);
+  if (!note) return fail("Nota non trovata.");
+  if (!isAdmin(auth.profile) && String(note.author ?? "") !== auth.profile.id) {
+    return fail("Puoi eliminare solo le note che hai scritto.");
+  }
+  const parentBooking = await fetchOne(auth.db, "bookings", String(note.booking ?? ""));
+  if (!parentBooking || (!canSeeAppointments(auth.profile) && kindOf(parentBooking) === "appuntamento")) {
+    return fail("Nota non trovata.");
+  }
+
+  try {
+    await auth.db.collection("booking_notes").delete(noteId);
+  } catch (err) {
+    return dbFail(err);
+  }
+  revalidateNotes(String(note.booking ?? ""));
   return { ok: true, data: undefined };
 }

@@ -1,9 +1,20 @@
-import type { Quote, QuoteLine, QuoteTotals } from "./types";
+import type { BookingDetail, Menu, Quote, QuoteLine, QuoteTotals } from "./types";
 
 /** Menu del catalogo usati per le righe automatiche (solo nome e prezzo a persona). */
 export interface QuoteMenuRef {
   name: string;
   price_per_person: number;
+}
+
+/**
+ * Etichetta della riga/chip menù bambini: "Menù bambini" se il nome è generico, altrimenti
+ * "Menù bambini — <nome>". Non duplica il prefisso se il nome lo contiene già.
+ */
+export function kidsMenuRowLabel(name: string | null | undefined): string {
+  const trimmed = (name ?? "").trim();
+  if (!trimmed || /^men[uù]\s+bambini$/i.test(trimmed)) return "Menù bambini";
+  if (/^men[uù]\s+bambini\b/i.test(trimmed)) return trimmed;
+  return `Menù bambini — ${trimmed}`;
 }
 
 /**
@@ -23,7 +34,7 @@ export function buildDefaultQuoteLines(input: {
   }
   if (input.kids_menu && input.kids_menus > 0) {
     lines.push({
-      description: `Menù bambini — ${input.kids_menu.name}`,
+      description: kidsMenuRowLabel(input.kids_menu.name),
       quantity: input.kids_menus,
       unit_price: round2(input.kids_menu.price_per_person),
     });
@@ -50,6 +61,22 @@ export function computeQuoteTotals(
   const taxable = round2(total / (1 + q.vat_rate / 100));
   const vat = round2(total - taxable);
   return { subtotal, discount, total, taxable, vat, overridden: hasFinal };
+}
+
+/**
+ * Prezzo stimato di un evento (IVA inclusa, prima di un eventuale prezzo finale):
+ * menu adulti × adulti + menu bambini × menù bambini. Senza menù la voce vale 0.
+ * Accetta il dettaglio prenotazione (BookingDetail) e le liste (solo il prezzo a persona dei menù).
+ */
+export function estimateBookingPrice(
+  b: Pick<BookingDetail, "adults" | "kids_menus"> & {
+    menu: Pick<Menu, "price_per_person"> | null;
+    kids_menu: Pick<Menu, "price_per_person"> | null;
+  },
+): number {
+  const adults = b.menu ? b.menu.price_per_person * b.adults : 0;
+  const kids = b.kids_menu ? b.kids_menu.price_per_person * b.kids_menus : 0;
+  return round2(adults + kids);
 }
 
 const eurFormatter = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });

@@ -7,6 +7,7 @@ export interface CourseItem {
   course: Course;
   name: string;
   sort: number;
+  description?: string | null;
 }
 
 export interface CourseGroup {
@@ -24,21 +25,33 @@ export function groupByCourse(items: CourseItem[]): CourseGroup[] {
   })).filter((group) => group.items.length > 0);
 }
 
-/** Elenco piatti per portata (sola lettura). */
-export function CourseList({ items, className }: { items: CourseItem[]; className?: string }) {
+/**
+ * Elenco piatti per portata (sola lettura): nome completo e descrizione, senza troncamenti.
+ * `comfortable` per la scheda prenotazione: testo più grande e più spazio tra i piatti.
+ */
+export function CourseList({ items, className, comfortable = false }: { items: CourseItem[]; className?: string; comfortable?: boolean }) {
   const groups = groupByCourse(items);
   if (groups.length === 0) {
     return <p className="text-[14px] text-slate">Nessun piatto indicato.</p>;
   }
   return (
-    <dl className={cn("flex flex-col gap-3", className)}>
+    <dl className={cn(comfortable ? "flex flex-col gap-7" : "flex flex-col gap-3", className)}>
       {groups.map((group) => (
-        <div key={group.course}>
+        <div key={group.course} className="flex min-w-0 flex-col gap-2">
           <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">{group.label}</dt>
-          <dd>
-            <ul className="mt-0.5 text-[14px] leading-snug text-ink">
+          <dd className="min-w-0">
+            <ul className={cn("flex min-w-0 flex-col", comfortable ? "gap-4" : "gap-2")}>
               {group.items.map((item) => (
-                <li key={item.id}>{item.name}</li>
+                <li key={item.id} className="min-w-0 wrap-anywhere">
+                  <span className={cn("block text-ink", comfortable ? "text-[17px] leading-snug" : "text-[14px] leading-snug")}>
+                    {item.name}
+                  </span>
+                  {item.description && (
+                    <span className={cn("mt-0.5 block whitespace-pre-line text-slate-dark", comfortable ? "text-[15px] leading-relaxed" : "text-[13px] leading-snug")}>
+                      {item.description}
+                    </span>
+                  )}
+                </li>
               ))}
             </ul>
           </dd>

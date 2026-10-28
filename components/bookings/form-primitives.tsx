@@ -553,8 +553,10 @@ export function BookingFormHeader({
             aria-invalid={dateError ? true : undefined}
             aria-describedby={dateError ? `${BOOKING_DATE_ID}-error` : undefined}
             className={cn(
-              "min-w-0 rounded-btn border-0 bg-transparent p-0 font-serif text-2xl leading-tight transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-petrol/40 sm:text-3xl",
-              dateError ? "text-danger" : "text-ink",
+              "min-h-11 min-w-0 rounded-btn border border-transparent bg-transparent px-1 font-serif text-2xl leading-tight transition-[border-color,box-shadow] duration-200 focus:outline-none focus:ring-[3px] sm:text-3xl",
+              dateError
+                ? "text-danger focus:border-danger focus:ring-danger/25"
+                : "text-ink focus:border-petrol focus:ring-petrol/25",
             )}
           />
           {dateError && (

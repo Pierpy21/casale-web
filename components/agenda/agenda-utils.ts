@@ -19,6 +19,31 @@ import type { BookingListItem } from "@/lib/types";
 
 export type AgendaView = "month" | "week" | "day";
 
+/** Filtro per tipo nelle agende (query `tipo`). "Prenotazioni" = tutto ciò che non è evento. */
+export type AgendaKindFilter = "tutti" | "eventi" | "prenotazioni";
+
+export const AGENDA_KIND_OPTIONS: Array<{ value: AgendaKindFilter; label: string }> = [
+  { value: "tutti", label: "Tutti" },
+  { value: "eventi", label: "Eventi" },
+  { value: "prenotazioni", label: "Prenotazioni" },
+];
+
+export function parseKindFilter(value: string | undefined): AgendaKindFilter {
+  return value === "eventi" || value === "prenotazioni" ? value : "tutti";
+}
+
+export function filterBookings(bookings: BookingListItem[], filter: AgendaKindFilter): BookingListItem[] {
+  if (filter === "tutti") return bookings;
+  if (filter === "eventi") return bookings.filter((b) => b.kind === "evento");
+  return bookings.filter((b) => b.kind !== "evento");
+}
+
+/** Conteggio di un giorno: solo gli eventi (banchetti), con singolare/plurale. Le prenotazioni non si contano. */
+export function dayCountLabel(items: BookingListItem[]): string {
+  const events = items.filter((b) => b.kind === "evento").length;
+  return events > 0 ? `${events} ${events === 1 ? "banchetto" : "banchetti"}` : "Nessun banchetto";
+}
+
 /** Intervallo di date in formato ISO (YYYY-MM-DD), estremi inclusi. */
 export interface IsoRange {
   from: string;
@@ -65,8 +90,17 @@ export function capitalize(text: string): string {
 }
 
 /** Link alla vista agenda con searchParams. */
-export function agendaHref({ date, view = "month" }: { date: string; view?: AgendaView }): string {
+export function agendaHref({
+  date,
+  view = "month",
+  kind = "tutti",
+}: {
+  date: string;
+  view?: AgendaView;
+  kind?: AgendaKindFilter;
+}): string {
   const params = new URLSearchParams({ date, view });
+  if (kind !== "tutti") params.set("tipo", kind);
   return `/admin/agenda?${params.toString()}`;
 }
 

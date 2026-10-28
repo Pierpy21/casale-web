@@ -1,8 +1,10 @@
 import "server-only";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAdminPb } from "@/lib/pocketbase/admin";
+import { num, type PbRecord } from "@/lib/pocketbase/helpers";
 import { listAll, listByParents } from "@/lib/pocketbase/queries";
 import { mapCatalogDish, mapRoom, sortDishes } from "@/lib/pocketbase/mappers";
+import { buildMenuColors, type MenuColor } from "@/lib/menu-colors";
 import type { Dish, Menu, Room } from "@/lib/types";
 import { menusWithItems } from "./shared";
 
@@ -59,4 +61,23 @@ export async function getDishes(opts?: { includeInactive?: boolean }): Promise<D
     ),
   );
   return sortDishes(dishes);
+}
+
+/**
+ * Colore di ogni menù (adulti per prezzo crescente, bambini fissi). Letto con l'account di servizio per
+ * qualunque ruolo attivo: i prezzi servono solo a ordinare, non escono dal server. Include anche i menù
+ * inattivi, così le prenotazioni passate mantengono il loro colore.
+ */
+export async function getMenuColors(): Promise<Record<string, MenuColor>> {
+  if (!(await getCurrentProfile())) return {};
+  const db = await getAdminPb();
+  const records = await listAll(db, "menus", "", { fields: "id,name,price_per_person,is_kids" });
+  return buildMenuColors(
+    records.map((r: PbRecord) => ({
+      id: r.id,
+      name: String(r.name ?? ""),
+      price_per_person: num(r.price_per_person),
+      is_kids: Boolean(r.is_kids),
+    })),
+  );
 }

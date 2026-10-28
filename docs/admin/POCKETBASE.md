@@ -26,6 +26,8 @@ Le migrazioni sono in `pocketbase/pb_migrations/` del repository:
 
 - `1793000008_quote_final_total.js`: prezzo finale del preventivo (`quotes.final_total`, facoltativo, 0 = nessun prezzo finale). Idempotente, con down (rimuove il campo).
 - `1793000009_booking_status_rules.js`: stato delle prenotazioni. Prenotazioni normali in "opzione" → "confermato"; eventi in "opzione" con almeno un acconto → "confermato" (gli eventi senza acconti restano in "opzione"). Idempotente, down no-op.
+- `1793000010_booking_notes.js`: note interne sulle prenotazioni (`booking_notes`: prenotazione, autore, nome autore, testo max 2000 caratteri), cancellate a cascata con la prenotazione. Riservata all'account di servizio. Idempotente, con down (elimina la collezione).
+- `1793000011_hide_appointment_notifications.js`: le notifiche delle prenotazioni di tipo appuntamento (`kind` = appuntamento) restano solo agli admin: elimina quelle destinate ad altri utenti. Idempotente, down no-op.
 
 Le migrazioni già applicate non si modificano: `1793000000` può essere già in produzione, quindi le modifiche vanno in file nuovi.
 

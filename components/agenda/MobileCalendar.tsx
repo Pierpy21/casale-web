@@ -18,11 +18,12 @@ const MAX_DOTS = 3;
 export interface MobileCalendarProps {
   selected: string;
   today: string;
+  /** Tutti i banchetti per giorno: i pallini contano solo gli eventi (kind "evento"). */
   byDate: Map<string, BookingListItem[]>;
   onNavigate: (iso: string) => void;
 }
 
-/** Calendario mensile compatto (mobile): swipe orizzontale o frecce cambiano mese. */
+/** Calendario mensile compatto (mobile): swipe orizzontale o frecce cambiano mese. Pallini = eventi del giorno. */
 export function MobileCalendar({ selected, today, byDate, onNavigate }: MobileCalendarProps) {
   const selectedDate = toDate(selected);
   const days = monthGridDates(selected);
@@ -30,15 +31,15 @@ export function MobileCalendar({ selected, today, byDate, onNavigate }: MobileCa
   const prevMonth = shiftPeriod(selected, "month", -1);
   const nextMonth = shiftPeriod(selected, "month", 1);
   const navButton =
-    "grid size-10 place-items-center rounded-btn text-petrol transition-colors hover:bg-cream";
+    "grid size-11 place-items-center rounded-btn text-petrol transition-colors hover:bg-cream";
 
   return (
     <SwipeDay onPrev={() => onNavigate(prevMonth)} onNext={() => onNavigate(nextMonth)}>
       <section aria-label="Calendario mensile" className="flex flex-col gap-3">
-        <header className="flex items-center justify-between gap-2">
-          <h1 className="font-serif text-3xl leading-tight">{title}</h1>
+        <header className="flex flex-wrap items-center justify-between gap-x-2 gap-y-3">
+          <h1 className="min-w-0 break-words font-serif text-3xl leading-tight">{title}</h1>
           <div className="flex items-center gap-1">
-            <button type="button" onClick={() => onNavigate(today)} className={buttonClasses("outline", "sm")}>
+            <button type="button" onClick={() => onNavigate(today)} className={cn(buttonClasses("outline", "sm"), "min-h-11")}>
               Oggi
             </button>
             <AgendaNavLink iso={prevMonth} view="month" label="Mese precedente" className={navButton} onNavigate={(iso) => onNavigate(iso)}>
@@ -61,7 +62,7 @@ export function MobileCalendar({ selected, today, byDate, onNavigate }: MobileCa
         <div className="grid grid-cols-7">
           {days.map((day) => {
             const iso = toISO(day);
-            const count = byDate.get(iso)?.length ?? 0;
+            const count = (byDate.get(iso) ?? []).filter((b) => b.kind === "evento").length;
             const dots = Math.min(count, MAX_DOTS);
             const inMonth = isSameMonth(day, selectedDate);
             const isSelected = iso === selected;

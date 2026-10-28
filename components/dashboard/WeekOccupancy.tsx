@@ -4,7 +4,8 @@ import { addDays, endOfWeek } from "date-fns";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { getWeekOccupancy } from "@/app/actions/dashboard";
-import { formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
+import { capitalize, formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
+import { DayBookingsDisclosure } from "@/components/dashboard/DayBookingsDisclosure";
 import { RoomDayView } from "@/components/dashboard/RoomDayView";
 import { RoomOccupancyMatrix } from "@/components/dashboard/RoomOccupancyMatrix";
 import { WeekNav } from "@/components/dashboard/WeekNav";
@@ -28,6 +29,8 @@ export interface WeekOccupancyProps {
   initialDays: string[];
   initialBookings: BookingListItem[];
   initialSelectedDay: string;
+  /** Prenotazioni normali di oggi (per la tendina su desktop, indipendente dalla settimana mostrata). */
+  todayNormalBookings: BookingListItem[];
 }
 
 /** Sostituisce il solo parametro di query senza navigazione Next, senza scroll. */
@@ -52,6 +55,7 @@ export function WeekOccupancy({
   initialDays,
   initialBookings,
   initialSelectedDay,
+  todayNormalBookings,
 }: WeekOccupancyProps) {
   const [data, setData] = useState<WeekData>({
     weekStart: initialWeekStart,
@@ -135,6 +139,12 @@ export function WeekOccupancy({
   const requestedEnd = endOfWeek(requestedStart, { weekStartsOn: 1 });
   const isCurrentWeek = requestedWeek === currentWeekIso;
 
+  // La matrice e la vista giorno mostrano solo gli eventi; le prenotazioni normali stanno nella tendina.
+  const eventBookings = data.bookings.filter((b) => b.kind === "evento");
+  const selectedNormalBookings = data.bookings.filter((b) => b.kind === "normale" && b.event_date === selectedDay);
+  const selectedDayLabel = capitalize(formatIt(toDate(selectedDay), "EEEE d MMMM"));
+  const todayLabel = `Oggi · ${formatIt(toDate(todayIso), "d MMMM")}`;
+
   return (
     <section aria-labelledby="sale-settimana" className="flex min-w-0 flex-col gap-5">
       <div className="flex flex-col gap-4 border-b border-sand pb-3 sm:flex-row sm:items-end sm:justify-between">
@@ -176,7 +186,7 @@ export function WeekOccupancy({
 
       <div className={cn("flex min-w-0 flex-col transition-opacity duration-200", isPending && "opacity-60")}>
         <div className="hidden min-w-0 lg:block">
-          <RoomOccupancyMatrix rooms={rooms} days={data.days} bookings={data.bookings} />
+          <RoomOccupancyMatrix rooms={rooms} days={data.days} bookings={eventBookings} />
         </div>
 
         <div className="min-w-0 lg:hidden">
@@ -185,10 +195,17 @@ export function WeekOccupancy({
             days={data.days}
             selectedDay={selectedDay}
             todayIso={todayIso}
-            bookings={data.bookings}
+            bookings={eventBookings}
             onSelectDay={selectDay}
           />
         </div>
+      </div>
+
+      <div className="min-w-0 lg:hidden">
+        <DayBookingsDisclosure dayLabel={selectedDayLabel} bookings={selectedNormalBookings} />
+      </div>
+      <div className="hidden min-w-0 lg:block">
+        <DayBookingsDisclosure dayLabel={todayLabel} bookings={todayNormalBookings} />
       </div>
 
       <p className="text-[13px] text-slate-dark">

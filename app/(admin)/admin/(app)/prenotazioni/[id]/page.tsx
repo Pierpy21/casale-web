@@ -1,31 +1,41 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
 import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
+import { AllergiesEditor } from "@/components/bookings/AllergiesEditor";
 import { BookingChangesTimeline } from "@/components/bookings/BookingChangesTimeline";
-import { BookingSummary } from "@/components/bookings/BookingSummary";
+import { BookingNotes } from "@/components/bookings/BookingNotes";
 import { CoversEditor } from "@/components/bookings/CoversEditor";
 import { DeleteBookingButton } from "@/components/bookings/DeleteBookingButton";
 import { BookingStatusActions } from "@/components/bookings/BookingStatusActions";
-import { DishesEditor } from "@/components/bookings/DishesEditor";
+import { BookingDishes } from "@/components/bookings/BookingDishes";
+import { EventPriceCard } from "@/components/bookings/EventPriceCard";
 import { KindBadge } from "@/components/bookings/KindBadge";
 import { decodeWarnings } from "@/components/bookings/booking-form-model";
-import { PaymentsPanel } from "@/components/payments/PaymentsPanel";
-import { CreateQuoteButton } from "@/components/bookings/QuoteActions";
+import { PreventivoMenu } from "@/components/bookings/QuoteActions";
 import { CourseList } from "@/components/bookings/MenuPreview";
-import { bookingTitle, formatTime } from "@/components/bookings/format";
+import { bookingTitle, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
 import type { NameLookup } from "@/components/bookings/change-labels";
-import { Alert, Badge, ButtonLink, Card, DocumentDownload, StatusBadge, buttonClasses, cn } from "@/components/ui";
+import {
+  BookingNumbers,
+  type BookingPanel,
+  type BookingPanelKey,
+  type NumberTile,
+} from "@/components/booking-detail/BookingNumbers";
+import { DetailCard, InfoRow, SummaryItem } from "@/components/booking-detail/DetailCard";
+import { QuotesList } from "@/components/booking-detail/QuotesList";
+import { MenuBadge } from "@/components/menu/MenuBadge";
+import { PaymentsPanel } from "@/components/payments/PaymentsPanel";
+import { Alert, Badge, ButtonLink, Card, Disclosure, StatusBadge, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
-import { canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
+import { canAddBookingNote, canEditAllergies, canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
 import { requireProfile } from "@/lib/auth";
-import { getBooking, getBookingChanges } from "@/lib/data/bookings";
+import { getBooking, getBookingChanges, getBookingNotes } from "@/lib/data/bookings";
 import { getPayments } from "@/lib/data/payments";
 import { getDishes, getMenus, getRooms } from "@/lib/data/catalog";
 import { getQuotesForBooking } from "@/lib/data/quotes";
 import { getPaymentSummary } from "@/lib/payment-utils";
-import { DOCX_MIME, computeQuoteTotals, formatEUR, quoteFileName } from "@/lib/quote-utils";
+import { estimateBookingPrice, formatEUR } from "@/lib/quote-utils";
 import { SETUP_COLOR_HEX } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -44,44 +54,14 @@ function telHref(phone: string): string {
   return `tel:${phone.replace(/[^+0-9]/g, "")}`;
 }
 
-function DetailCard({
-  eyebrow,
-  title,
-  children,
-  className,
-}: {
-  eyebrow: string;
-  title: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <Card className={cn("flex min-w-0 flex-col gap-5 p-5 sm:p-6", className)}>
-      <header className="flex flex-col gap-2 border-b border-sand pb-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">{eyebrow}</p>
-        <h2 className="text-2xl wrap-anywhere">{title}</h2>
-      </header>
-      {children}
-    </Card>
-  );
-}
-
-/** Riga etichetta + valore: etichette su una colonna fissa, allineate. */
-function InfoRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:gap-4">
-      <dt className="text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark sm:pt-0.5">{label}</dt>
-      <dd className="min-w-0 wrap-anywhere text-[15px] text-ink">{children}</dd>
-    </div>
-  );
-}
+const CALL_BUTTON = buttonClasses("outline", "sm", "min-h-11");
 
 export default async function BookingDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ payments_error?: string; warnings?: string }>;
+  searchParams: Promise<{ payments_error?: string; warnings?: string; pannello?: string }>;
 }) {
   const { id } = await params;
   const query = await searchParams;
@@ -94,12 +74,15 @@ export default async function BookingDetailPage({
   const admin = isAdmin(profile);
   const covers = canEditCovers(profile);
   const dishesEditable = canEditDishes(profile);
+  const allergiesEditable = canEditAllergies(profile, booking.kind);
+  const kitchen = profile.role === "cucina";
   // Preventivi, acconti e prezzi esistono solo per gli eventi, e si gestiscono solo dall'admin.
   const isEvent = booking.kind === "evento";
   const financeVisible = admin && isEvent;
 
-  const [changes, rooms, menus, quotes, payments, catalog] = await Promise.all([
+  const [changes, notes, rooms, menus, quotes, payments, catalog] = await Promise.all([
     getBookingChanges(id),
+    getBookingNotes(id),
     getRooms({ includeInactive: true }),
     getMenus({ includeInactive: true }),
     financeVisible ? getQuotesForBooking(id) : Promise.resolve([]),
@@ -115,9 +98,11 @@ export default async function BookingDetailPage({
   const eventDate = toDate(booking.event_date);
   const time = formatTime(booking.event_time);
   const finance = financeVisible ? getPaymentSummary(booking, payments) : null;
-  const dishesVersion = `${booking.menu_id ?? ""}|${booking.dishes
-    .map((d) => `${d.id}:${d.course}:${d.name}:${d.sort}:${d.description ?? ""}`)
-    .join("|")}`;
+  // Prezzo finale: quello del preventivo più recente (null = calcolo automatico).
+  const latestQuote = [...quotes].sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
+  const finalTotal = latestQuote?.final_total ?? null;
+  const totals = totalCovers(booking);
+  const coversPanel = covers ? ("coperti" as const) : undefined;
 
   const lookup: NameLookup = {
     rooms: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
@@ -125,12 +110,147 @@ export default async function BookingDetailPage({
     clients: { [booking.client_id]: clientName },
   };
 
+  // Numeri in alto: i riquadri economici compaiono solo per l'admin.
+  const tiles: NumberTile[] = [];
+  if (isEvent) {
+    tiles.push({
+      key: "covers",
+      label: "Coperti totali",
+      value: totals,
+      hint: `Adulti ${booking.adults} · Bambini ${booking.children}`,
+      panel: coversPanel,
+      cta: "Modifica coperti",
+    });
+    tiles.push({
+      key: "kids",
+      label: "Menù bambini",
+      value: booking.kids_menus,
+      hint: booking.kids_menu?.name ?? "Nessun menù bambini",
+      panel: coversPanel,
+      cta: "Modifica coperti",
+    });
+    if (finance) {
+      tiles.push({
+        key: "expected",
+        label: "Totale previsto",
+        value: formatEUR(finance.expected_total),
+        hint: booking.menu ? `${formatEUR(booking.menu.price_per_person)} a persona` : "Menù non scelto",
+        panel: "prezzo",
+        cta: "Vedi prezzo",
+      });
+      tiles.push({
+        key: "balance",
+        label: "Residuo",
+        value: formatEUR(Math.max(0, finance.balance)),
+        hint: `Versato ${formatEUR(finance.paid_total)}`,
+        highlight: finance.balance > 0,
+        panel: "pagamenti",
+        cta: "Pagamenti e acconti",
+      });
+    }
+  } else if (booking.kind === "normale") {
+    tiles.push({
+      key: "covers",
+      label: "Coperti",
+      value: totals,
+      hint: formatCovers(booking),
+      panel: coversPanel,
+      cta: "Modifica coperti",
+    });
+    tiles.push({ key: "time", label: "Ora", value: time ?? "—" });
+  } else {
+    tiles.push({ key: "time", label: "Ora", value: time ?? "—" });
+    tiles.push({ key: "type", label: "Tipo evento", value: booking.event_type?.trim() || "—" });
+  }
+
+  // Pannelli apribili, uno alla volta: solo quelli che il ruolo può usare.
+  const panels: BookingPanel[] = [];
+  if (covers) {
+    panels.push({
+      key: "coperti",
+      title: "Modifica coperti",
+      content: (
+        <CoversEditor
+          key={`${booking.adults}-${booking.children}-${booking.kids_menus}`}
+          bookingId={booking.id}
+          adults={booking.adults}
+          childCount={booking.children}
+          kidsMenus={booking.kids_menus}
+        />
+      ),
+    });
+  }
+  if (financeVisible) {
+    panels.push({
+      key: "prezzo",
+      title: "Prezzo dell’evento",
+      content: (
+        <EventPriceCard
+          key={finalTotal ?? "auto"}
+          bookingId={booking.id}
+          estimate={estimateBookingPrice(booking)}
+          finalTotal={finalTotal}
+        />
+      ),
+    });
+    panels.push({
+      key: "pagamenti",
+      title: "Pagamenti e acconti",
+      content: (
+        <div className="flex min-w-0 flex-col gap-5">
+          <PaymentsPanel booking={booking} payments={payments} paymentsError={paymentsError} />
+          <div className="flex min-w-0 flex-col gap-3 border-t border-sand pt-4">
+            <h3 className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-dark">Preventivi</h3>
+            <QuotesList quotes={quotes} />
+          </div>
+        </div>
+      ),
+    });
+  }
+  // ?pannello=coperti | prezzo | pagamenti (pagamenti resta valido anche per gli acconti non salvati).
+  const requestedPanel = query.pannello;
+  const initialPanel: BookingPanelKey | null =
+    requestedPanel === "coperti" && covers
+      ? "coperti"
+      : requestedPanel === "prezzo" && financeVisible
+        ? "prezzo"
+        : (requestedPanel === "pagamenti" || paymentsError !== undefined) && financeVisible
+          ? "pagamenti"
+          : null;
+
+  const menuPrice = admin && booking.menu ? formatEUR(booking.menu.price_per_person) : null;
+
+  // Riepilogo sempre visibile della tendina "Dettagli e menù".
+  const detailsSummary = (
+    <span className="flex min-w-0 flex-col gap-4">
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+          {isEvent ? "Evento" : "Prenotazione"}
+        </span>
+        <span className="font-serif text-2xl leading-tight wrap-anywhere sm:text-3xl">
+          {isEvent ? "Dettagli e menù" : "Dettagli"}
+        </span>
+      </span>
+      <span className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+        <SummaryItem label="Data">{capitalize(formatIt(eventDate, "EEE d MMM yyyy"))}</SummaryItem>
+        <SummaryItem label="Ora">{time ?? "Non indicata"}</SummaryItem>
+        <SummaryItem label="Sala">{booking.room?.name ?? "Da assegnare"}</SummaryItem>
+        {isEvent && (
+          <SummaryItem label="Menù">
+            {booking.menu ? <MenuBadge menuId={booking.menu.id} name={booking.menu.name} /> : "Non scelto"}
+          </SummaryItem>
+        )}
+        {menuPrice && <SummaryItem label="Costo">{`${menuPrice} a persona`}</SummaryItem>}
+      </span>
+    </span>
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex min-w-0 flex-col gap-5 border-b border-sand pb-6">
         <Link
           href={`/admin/agenda?date=${booking.event_date}&view=day`}
-          className="w-fit rounded-[2px] text-[13px] font-medium text-petrol underline-offset-4 hover:underline"
+          className="inline-flex min-h-11 w-fit items-center rounded-btn px-1 text-[13px] font-medium text-petrol underline-offset-4 hover:underline"
         >
           ← Torna all’agenda
         </Link>
@@ -140,7 +260,16 @@ export default async function BookingDetailPage({
             {capitalize(formatIt(eventDate, "EEEE d MMMM yyyy"))}
             {time ? ` · ore ${time}` : ""}
           </p>
-          <h1 className="text-3xl leading-tight wrap-anywhere sm:text-4xl lg:text-5xl">{bookingTitle(booking)}</h1>
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <h1 className="min-w-0 flex-1 text-3xl leading-tight wrap-anywhere sm:text-4xl lg:text-5xl">{bookingTitle(booking)}</h1>
+            {financeVisible && (
+              <PreventivoMenu
+                bookingId={booking.id}
+                latest={latestQuote ? { id: latestQuote.id, number: latestQuote.number } : null}
+                quotesCount={quotes.length}
+              />
+            )}
+          </div>
           {booking.event_name && <p className="wrap-anywhere text-[15px] text-slate-dark">{clientName}</p>}
           <div className="flex flex-wrap items-center gap-3">
             <KindBadge kind={booking.kind} />
@@ -152,19 +281,10 @@ export default async function BookingDetailPage({
             )}
           </div>
         </div>
-
-        {admin && (
-          <div className="no-print flex flex-wrap gap-3">
-            <ButtonLink href={`/admin/prenotazioni/${booking.id}/modifica`} variant="outline" size="md">
-              Modifica
-            </ButtonLink>
-            <BookingStatusActions bookingId={booking.id} kind={booking.kind} status={booking.status} paymentsCount={payments.length} />
-            <DeleteBookingButton bookingId={booking.id} quotesCount={quotes.length} paymentsCount={payments.length} />
-          </div>
-        )}
       </header>
 
-      <BookingSummary booking={booking} time={time} finance={finance} />
+      {/* Numeri: riquadri cliccabili, con un solo pannello aperto sotto (coperti o pagamenti e prezzo). */}
+      <BookingNumbers tiles={tiles} panels={panels} initialPanel={initialPanel} />
 
       {warnings.length > 0 && (
         <div className="flex flex-col gap-3">
@@ -176,39 +296,73 @@ export default async function BookingDetailPage({
         </div>
       )}
 
-      {booking.allergies.length > 0 && (
-        <section
-          aria-labelledby="allergie-title"
-          className="flex min-w-0 flex-col gap-4 rounded-[2px] border-l-[3px] border-danger bg-danger/5 p-5 sm:p-6"
-        >
-          <div className="flex flex-col gap-2">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-danger">Attenzione</p>
-            <h2 id="allergie-title" className="text-2xl">
-              Allergie e patologie
-            </h2>
-          </div>
-          <ul className="flex flex-col gap-3">
-            {booking.allergies.map((allergy) => (
-              <li key={allergy.id} className="flex flex-col gap-1 text-[15px] leading-snug text-ink break-words">
-                <span className="font-medium">{allergy.condition}</span>
-                {allergy.subject_name && <span className="text-slate-dark">Per: {allergy.subject_name}</span>}
-                {allergy.notes && <span className="text-[14px] text-slate-dark">{allergy.notes}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* Allergie: modificabili da admin e sala; per la cucina sono in sola lettura, ben evidenti. */}
+      <AllergiesEditor bookingId={booking.id} allergies={booking.allergies} editable={allergiesEditable} />
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-        <div className="flex min-w-0 flex-col gap-6">
-          <DetailCard eyebrow="Cliente" title={clientName}>
+      <Disclosure
+        defaultOpen={kitchen}
+        className="min-w-0 rounded-[2px] border border-sand border-t-[3px] border-t-petrol bg-paper shadow-sm shadow-ink/5"
+        summaryClassName="min-h-11 w-full gap-4 p-5 text-left text-ink hover:bg-cream/40 sm:p-6"
+        summary={detailsSummary}
+      >
+        <div className="flex min-w-0 flex-col gap-10 border-t border-sand p-5 sm:p-6">
+          {isEvent && (
+            <section aria-labelledby="menu-title" className="flex min-w-0 flex-col gap-6">
+              <header className="flex min-w-0 flex-col gap-3 border-b border-sand pb-6">
+                <h3 id="menu-title" className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+                  Menù e piatti
+                </h3>
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
+                  {booking.menu ? (
+                    <MenuBadge menuId={booking.menu.id} name={booking.menu.name} size="lg" />
+                  ) : (
+                    <p className="font-serif text-2xl text-slate-dark">Menù non selezionato</p>
+                  )}
+                  {menuPrice && <p className="text-[15px] tabular-nums text-slate-dark">{menuPrice} a persona</p>}
+                </div>
+              </header>
+
+              <BookingDishes
+                bookingId={booking.id}
+                dishes={booking.dishes}
+                hasMenu={booking.menu_id !== null}
+                canEdit={dishesEditable}
+                catalog={catalog}
+              />
+
+              {booking.kids_menu && (
+                <div className="flex flex-col gap-5 border-t border-sand pt-6">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">Menù bambini</p>
+                    <div className="flex min-w-0 flex-wrap items-center gap-3">
+                      <MenuBadge menuId={booking.kids_menu.id} name={booking.kids_menu.name} />
+                      {admin && (
+                        <span className="text-[15px] text-slate-dark">{formatEUR(booking.kids_menu.price_per_person)} a bambino</span>
+                      )}
+                    </div>
+                  </div>
+                  <CourseList items={booking.kids_menu.items} />
+                </div>
+              )}
+            </section>
+          )}
+
+          <section aria-labelledby="cliente-title" className="flex min-w-0 flex-col gap-5 border-t border-sand pt-8 first:border-t-0 first:pt-0">
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">Cliente</p>
+              <h3 id="cliente-title" className="text-2xl wrap-anywhere">
+                {clientName}
+              </h3>
+            </div>
             <dl className="flex min-w-0 flex-col gap-4">
-              <InfoRow label="Telefono">
-                <a href={telHref(client.phone)} className="wrap-anywhere font-medium text-petrol underline-offset-4 hover:underline">
-                  {client.phone}
-                </a>
-              </InfoRow>
-              {client.email && (
+              {!kitchen && client.phone && (
+                <InfoRow label="Telefono">
+                  <a href={telHref(client.phone)} className="wrap-anywhere font-medium text-petrol underline-offset-4 hover:underline">
+                    {client.phone}
+                  </a>
+                </InfoRow>
+              )}
+              {!kitchen && client.email && (
                 <InfoRow label="Email">
                   <a href={`mailto:${client.email}`} className="wrap-anywhere text-petrol underline-offset-4 hover:underline">
                     {client.email}
@@ -232,26 +386,36 @@ export default async function BookingDetailPage({
               )}
             </dl>
             <div className="no-print flex flex-wrap gap-3">
-              <a href={telHref(client.phone)} className={buttonClasses("outline", "sm")}>
-                Chiama
-              </a>
-              <a
-                href={whatsappHref(client.phone)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonClasses("outline", "sm", "rounded-none")}
-              >
-                WhatsApp
-              </a>
+              {!kitchen && client.phone && (
+                <>
+                  <a href={telHref(client.phone)} className={CALL_BUTTON}>
+                    Chiama
+                  </a>
+                  <a
+                    href={whatsappHref(client.phone)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonClasses("outline", "sm", "min-h-11 rounded-none")}
+                  >
+                    WhatsApp
+                  </a>
+                </>
+              )}
               {admin && (
-                <ButtonLink href={`/admin/clienti/${client.id}`} variant="ghost" size="sm">
+                <ButtonLink href={`/admin/clienti/${client.id}`} variant="ghost" size="sm" className="min-h-11">
                   Scheda cliente
                 </ButtonLink>
               )}
             </div>
-          </DetailCard>
+          </section>
 
-          <DetailCard eyebrow={isEvent ? "Evento" : "Prenotazione"} title={isEvent ? "Dettagli dell’evento" : "Dettagli"}>
+          <section aria-labelledby="evento-title" className="flex min-w-0 flex-col gap-5 border-t border-sand pt-8">
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">{isEvent ? "Evento" : "Prenotazione"}</p>
+              <h3 id="evento-title" className="text-2xl">
+                {isEvent ? "Dettagli dell’evento" : "Dettagli"}
+              </h3>
+            </div>
             <dl className="flex min-w-0 flex-col gap-4">
               <InfoRow label="Data">{capitalize(formatIt(eventDate, "EEEE d MMMM yyyy"))}</InfoRow>
               <InfoRow label="Ora">{time ?? "Non indicata"}</InfoRow>
@@ -291,122 +455,38 @@ export default async function BookingDetailPage({
                 </InfoRow>
               )}
             </dl>
-          </DetailCard>
-
-          {covers && (
-            <DetailCard eyebrow="Coperti" title="Modifica coperti">
-              <CoversEditor
-                key={`${booking.adults}-${booking.children}-${booking.kids_menus}`}
-                bookingId={booking.id}
-                adults={booking.adults}
-                childCount={booking.children}
-                kidsMenus={booking.kids_menus}
-              />
-            </DetailCard>
-          )}
+          </section>
         </div>
+      </Disclosure>
 
-        <div className="flex min-w-0 flex-col gap-6">
-          {financeVisible && <PaymentsPanel booking={booking} payments={payments} paymentsError={paymentsError} />}
+      {/* Note cucina: sempre visibili, aggiunta a chi può. */}
+      <Card className="min-w-0 p-5 sm:p-6">
+        <BookingNotes
+          bookingId={booking.id}
+          notes={notes}
+          canAdd={canAddBookingNote(profile)}
+          currentUserId={profile.id}
+          isAdmin={admin}
+        />
+      </Card>
 
-          {financeVisible && (
-            <DetailCard eyebrow="Preventivi" title="Preventivi">
-              {quotes.length === 0 ? (
-                <p className="text-[14px] text-slate">Nessun preventivo emesso per questa prenotazione.</p>
-              ) : (
-                <ul className="flex flex-col divide-y divide-sand">
-                  {quotes.map((quote) => {
-                    const totals = computeQuoteTotals(quote);
-                    return (
-                      <li key={quote.id} className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <p className="wrap-anywhere font-medium text-ink">n. {quote.number}</p>
-                          <p className="text-[13px] text-slate-dark">
-                            Emesso il {formatIt(toDate(quote.issued_at), "d MMM yyyy")} · {formatEUR(totals.total)} IVA inclusa
-                          </p>
-                        </div>
-                        <div className="no-print flex min-w-0 flex-wrap gap-2">
-                          <ButtonLink href={`/admin/preventivi/${quote.id}`} variant="ghost" size="sm">
-                            Apri
-                          </ButtonLink>
-                          <DocumentDownload
-                            href={`/api/quotes/${quote.id}/pdf`}
-                            fileName={quoteFileName(quote.number, "pdf")}
-                            mimeType="application/pdf"
-                            className={buttonClasses("outline", "sm")}
-                          >
-                            PDF
-                          </DocumentDownload>
-                          <DocumentDownload
-                            href={`/api/quotes/${quote.id}/docx`}
-                            fileName={quoteFileName(quote.number, "docx")}
-                            mimeType={DOCX_MIME}
-                            className={buttonClasses("outline", "sm")}
-                          >
-                            DOCX
-                          </DocumentDownload>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              <div className="no-print min-w-0 border-t border-sand pt-6">
-                <CreateQuoteButton bookingId={booking.id} />
-              </div>
-            </DetailCard>
-          )}
-
-          <DetailCard eyebrow="Registro" title="Modifiche">
-            <BookingChangesTimeline changes={changes} lookup={lookup} />
-          </DetailCard>
+      {admin && (
+        <div className="no-print flex flex-wrap items-center gap-3">
+          <ButtonLink href={`/admin/prenotazioni/${booking.id}/modifica`} variant="primary" size="md">
+            Modifica
+          </ButtonLink>
+          <DeleteBookingButton bookingId={booking.id} quotesCount={quotes.length} paymentsCount={payments.length} />
+          <div className="ml-auto">
+            <BookingStatusActions bookingId={booking.id} kind={booking.kind} status={booking.status} paymentsCount={payments.length} />
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Menù e piatti: in fondo alla pagina. L'editor è solo per l'admin; gli altri vedono l'elenco. */}
-      {isEvent && (
-        <section
-          aria-labelledby="menu-title"
-          className="flex min-w-0 flex-col gap-6 rounded-[2px] border border-sand border-t-[3px] border-t-petrol bg-paper p-5 shadow-sm shadow-ink/5 sm:p-8"
-        >
-          <header className="flex flex-col gap-3 border-b border-sand pb-6">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">Menù e piatti</p>
-            <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-6 gap-y-3">
-              <h2 id="menu-title" className="min-w-0 text-3xl leading-tight wrap-anywhere sm:text-4xl">
-                {booking.menu?.name ?? "Menù non selezionato"}
-              </h2>
-              {booking.menu && (
-                <p className="text-[15px] tabular-nums text-slate-dark">{formatEUR(booking.menu.price_per_person)} a persona</p>
-              )}
-            </div>
-          </header>
-
-          {dishesEditable ? (
-            <DishesEditor
-              key={dishesVersion}
-              bookingId={booking.id}
-              dishes={booking.dishes}
-              hasMenu={booking.menu_id !== null}
-              catalog={catalog}
-            />
-          ) : (
-            <CourseList items={booking.dishes} />
-          )}
-
-          {booking.kids_menu && (
-            <div className="flex flex-col gap-5 border-t border-sand pt-6">
-              <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">Menù bambini</p>
-                <p className="min-w-0 wrap-anywhere text-[15px] text-slate-dark">
-                  <span className="font-medium text-ink">{booking.kids_menu.name}</span>
-                  {" · "}
-                  {formatEUR(booking.kids_menu.price_per_person)} a bambino
-                </p>
-              </div>
-              <CourseList items={booking.kids_menu.items} />
-            </div>
-          )}
-        </section>
+      {/* Registro delle modifiche: solo admin, in fondo alla pagina, a tutta larghezza. */}
+      {admin && (
+        <DetailCard eyebrow="Registro" title="Modifiche" className="w-full">
+          <BookingChangesTimeline changes={changes} lookup={lookup} />
+        </DetailCard>
       )}
     </div>
   );

@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { EmptyState, cn } from "@/components/ui";
 import type { BookingListItem, Room } from "@/lib/types";
-import { formatIt, toISO } from "./agenda-utils";
+import { dayCountLabel, formatIt, toISO } from "./agenda-utils";
 import { DaySummary } from "./DaySummary";
 import { ReservationList } from "./ReservationList";
 
@@ -26,7 +26,7 @@ export function WeekView({
           return (
             <section
               key={iso}
-              aria-label={`${formatIt(day, "EEEE d MMMM")}, ${items.length} banchetti`}
+              aria-label={`${formatIt(day, "EEEE d MMMM")}, ${dayCountLabel(items)}`}
               className={cn(
                 "flex min-h-[20rem] flex-col gap-3 rounded-[2px] bg-cream/40 p-2.5",
                 isToday && "ring-1 ring-petrol/60",
@@ -62,7 +62,7 @@ export function WeekView({
 }
 
 /**
- * Vista giorno desktop: eventi e appuntamenti come card ricche in griglia a due colonne;
+ * Vista giorno desktop: eventi e appuntamenti come card ricche, in un unico elenco verticale;
  * le prenotazioni normali sotto, come lista compatta con la sala assegnabile.
  */
 export function DayView({ items, rooms, canAssignRooms }: { items: BookingListItem[]; rooms: Room[]; canAssignRooms: boolean }) {
@@ -80,7 +80,7 @@ export function DayView({ items, rooms, canAssignRooms }: { items: BookingListIt
     <div className="flex min-w-0 flex-col gap-5">
       <DaySummary bookings={items} />
       {cards.length > 0 && (
-        <section aria-label="Banchetti della giornata" className="grid gap-5 xl:grid-cols-2">
+        <section aria-label="Banchetti della giornata" className="flex min-w-0 flex-col gap-4">
           {cards.map((booking) => (
             <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" />
           ))}

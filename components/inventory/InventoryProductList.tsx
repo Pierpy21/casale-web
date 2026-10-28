@@ -82,7 +82,7 @@ export function InventoryProductList({ products }: InventoryProductListProps) {
               if (e.key === "Enter") e.preventDefault();
             }}
             placeholder="Cerca per nome, unità o categoria…"
-            className="h-12 text-[16px]"
+            className="h-12"
           />
         </div>
         <Button variant="primary" size="md" onClick={openNew} className="min-h-12 w-full sm:w-auto">
@@ -242,7 +242,6 @@ function ProductForm({
           required
           invalid={!!errors.name}
           disabled={pending}
-          className="text-[16px]"
         />
       </Field>
 

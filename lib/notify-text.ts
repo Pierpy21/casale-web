@@ -100,6 +100,14 @@ export function buildBookingNotice(
 
 /** Promemoria del giorno dopo: "Domani · Menù 2" / "Sala Grande · 44 coperti (A 40 + B 4) · 2 allergie". */
 export function buildReminderNotice(b: BookingBrief): { title: string; body: string } {
+  if (b.kind === "appuntamento") {
+    // Appuntamento: ora e cliente, senza coperti ne' sala.
+    const time = b.event_time ? b.event_time.slice(0, 5) : "orario da definire";
+    return {
+      title: clip("Domani · Appuntamento", TITLE_MAX),
+      body: clip([time, b.client_name].filter(Boolean).join(" · "), BODY_MAX),
+    };
+  }
   const title = `Domani · ${b.menu_name ?? "Evento"}`;
   const parts = [
     b.room_name ?? "sala da definire",

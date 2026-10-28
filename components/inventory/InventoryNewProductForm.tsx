@@ -68,7 +68,7 @@ export function InventoryNewProductForm({ idPrefix, category, defaultName = "", 
           onKeyDown={onNameKeyDown}
           onChange={(e) => setName(e.target.value)}
           placeholder="Es. Pomodori San Marzano"
-          className="text-[17px]"
+          large
         />
       </Field>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
