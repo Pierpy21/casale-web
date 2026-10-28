@@ -249,8 +249,9 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
         </Field>
       </div>
 
-      {/* top = altezza dell'header mobile (0.75rem + campanella 2.5rem + 0.75rem): senza spazio in mezzo, la lista non scorre sopra la ricerca. */}
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-10 -mx-4 flex flex-col gap-2 bg-paper px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-10 lg:top-0 lg:px-10">
+      {/* top = altezza dell'header mobile (0.75rem + campanella 2.5rem + 0.75rem) meno 1px: la barra passa appena sotto
+          l'header (z-30), così con pixel frazionari non resta una giunzione che sfarfalla durante lo scroll. */}
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-10 transform-gpu -mx-4 flex flex-col gap-2 bg-paper px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-10 lg:top-0 lg:px-10">
         <div className="relative">
           <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-dark" />
           <Input
