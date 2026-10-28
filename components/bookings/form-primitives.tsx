@@ -595,54 +595,58 @@ export function BookingFormHeader({
 }) {
   return (
     // Griglia a posizioni fisse (niente flex-wrap: a larghezze intermedie andava a capo a caso).
-    // Mobile: una colonna. Da sm: titolo | indietro, poi data | invio. Da xl: tutto su una riga.
-    <header className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 border-b border-sand pb-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end xl:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-      <h1 className="min-w-0 text-3xl leading-tight wrap-anywhere lg:text-4xl">{title}</h1>
-      <ButtonLink
-        href={backHref}
-        variant="ghost"
-        size="sm"
-        className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end sm:self-center xl:col-start-3 xl:self-end"
-      >
-        ← {backLabel}
-      </ButtonLink>
-      <div className="flex min-w-0 flex-col gap-1.5 xl:col-start-2 xl:row-start-1">
-        <label htmlFor={BOOKING_DATE_ID} className="text-[12px] font-medium uppercase tracking-[0.14em] text-bronze">
-          Data
-        </label>
-        <input
-          id={BOOKING_DATE_ID}
-          type="date"
-          value={date}
-          onChange={(e) => onDateChange(e.target.value)}
-          aria-invalid={dateError ? true : undefined}
-          aria-describedby={dateError ? `${BOOKING_DATE_ID}-error` : undefined}
-          className={cn(
-            // appearance-none: Safari iOS/iPad altrimenti ignora la larghezza dei campi data.
-            "block min-h-11 w-full min-w-0 max-w-[16rem] appearance-none rounded-btn border border-transparent bg-transparent px-1 text-left font-serif text-2xl leading-tight transition-[border-color,box-shadow] duration-200 focus:outline-none focus:ring-[3px] sm:text-3xl",
-            dateError
-              ? "text-danger focus:border-danger focus:ring-danger/25"
-              : "text-ink focus:border-petrol focus:ring-petrol/25",
+    // Le colonne dipendono dalla larghezza del form (container query), non dello schermo: il form di
+    // prenotazioni e appuntamenti è largo al massimo 48rem e su una riga sola il titolo restava senza spazio.
+    // Stretto: una colonna. Da @lg: titolo | indietro, poi data | invio. Da @5xl: tutto su una riga.
+    <header className="@container min-w-0 border-b border-sand pb-5">
+      <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 @lg:grid-cols-[minmax(0,1fr)_auto] @lg:items-end @5xl:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+        <h1 className="min-w-0 text-3xl leading-tight wrap-anywhere lg:text-4xl">{title}</h1>
+        <ButtonLink
+          href={backHref}
+          variant="ghost"
+          size="sm"
+          className="justify-self-start @lg:col-start-2 @lg:row-start-1 @lg:justify-self-end @lg:self-center @5xl:col-start-3 @5xl:self-end"
+        >
+          ← {backLabel}
+        </ButtonLink>
+        <div className="flex min-w-0 flex-col gap-1.5 @5xl:col-start-2 @5xl:row-start-1">
+          <label htmlFor={BOOKING_DATE_ID} className="text-[12px] font-medium uppercase tracking-[0.14em] text-bronze">
+            Data
+          </label>
+          <input
+            id={BOOKING_DATE_ID}
+            type="date"
+            value={date}
+            onChange={(e) => onDateChange(e.target.value)}
+            aria-invalid={dateError ? true : undefined}
+            aria-describedby={dateError ? `${BOOKING_DATE_ID}-error` : undefined}
+            className={cn(
+              // appearance-none: Safari iOS/iPad altrimenti ignora la larghezza dei campi data.
+              "block min-h-11 w-full min-w-0 max-w-[16rem] appearance-none rounded-btn border border-transparent bg-transparent px-1 text-left font-serif text-2xl leading-tight transition-[border-color,box-shadow] duration-200 focus:outline-none focus:ring-[3px] sm:text-3xl",
+              dateError
+                ? "text-danger focus:border-danger focus:ring-danger/25"
+                : "text-ink focus:border-petrol focus:ring-petrol/25",
+            )}
+          />
+          {dateError && (
+            <p id={`${BOOKING_DATE_ID}-error`} className="text-[13px] text-danger">
+              {dateError}
+            </p>
           )}
-        />
-        {dateError && (
-          <p id={`${BOOKING_DATE_ID}-error`} className="text-[13px] text-danger">
-            {dateError}
-          </p>
+        </div>
+        {submit && (
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            disabled={submit.pending}
+            aria-busy={submit.pending || undefined}
+            className="w-full @lg:w-auto @lg:self-end @5xl:col-start-4 @5xl:row-start-1"
+          >
+            {submit.pending ? submit.pendingLabel : submit.label}
+          </Button>
         )}
       </div>
-      {submit && (
-        <Button
-          type="submit"
-          variant="primary"
-          size="md"
-          disabled={submit.pending}
-          aria-busy={submit.pending || undefined}
-          className="w-full sm:w-auto sm:self-end xl:col-start-4 xl:row-start-1"
-        >
-          {submit.pending ? submit.pendingLabel : submit.label}
-        </Button>
-      )}
     </header>
   );
 }
