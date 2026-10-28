@@ -32,7 +32,7 @@ export interface PaymentsPanelProps {
   paymentsError?: number;
 }
 
-/** Pannello Pagamenti (solo admin): riepilogo previsto/versato/residuo, elenco acconti, aggiunta rapida. */
+/** Contenuto del pannello "Pagamenti e acconti" (solo admin): riepilogo, elenco acconti, aggiunta rapida. */
 export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -120,18 +120,7 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
   };
 
   return (
-    <section
-      id="pagamenti"
-      aria-labelledby="pagamenti-title"
-      className="flex scroll-mt-6 flex-col gap-6 rounded-[2px] border border-sand border-t-[3px] border-t-bronze bg-paper p-5 shadow-sm shadow-ink/5 sm:p-6"
-    >
-      <header className="flex flex-col gap-2 border-b border-sand pb-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">Solo amministrazione</p>
-        <h2 id="pagamenti-title" className="text-2xl">
-          Pagamenti
-        </h2>
-      </header>
-
+    <section aria-label="Pagamenti e acconti" className="flex min-w-0 flex-col gap-4">
       {paymentsError && showError && (
         <Alert tone="danger">
           <span className="flex flex-wrap items-start justify-between gap-3">
@@ -144,7 +133,7 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
             <button
               type="button"
               onClick={() => setShowError(false)}
-              className="text-[13px] font-medium text-petrol underline-offset-2 hover:underline"
+              className="min-h-11 text-[13px] font-medium text-petrol underline-offset-2 hover:underline"
             >
               Chiudi
             </button>
@@ -154,9 +143,9 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
 
       {panelError && <Alert tone="danger">{panelError}</Alert>}
 
-      {/* Riepilogo */}
-      <div className="flex flex-col gap-4">
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* Riepilogo: previsto, versato, residuo su una riga */}
+      <div className="flex min-w-0 flex-col gap-2">
+        <dl className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-3">
           <SummaryCell label="Previsto" value={formatEUR(summary.expected_total)} />
           <SummaryCell label="Versato" value={formatEUR(summary.paid_total)} />
           <SummaryCell
@@ -171,7 +160,7 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(progress)}
-          className="h-1.5 w-full overflow-hidden rounded-full bg-cream"
+          className="h-1 w-full overflow-hidden rounded-full bg-cream"
         >
           <div
             className="h-full rounded-full bg-petrol transition-[width] duration-500 ease-out"
@@ -179,46 +168,44 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
           />
         </div>
         {summary.expected_total === 0 && (
-          <p className="text-[13px] text-slate-dark">Il previsto si calcola dal menù scelto: al momento è zero.</p>
+          <p className="text-[12px] text-slate-dark">Il previsto si calcola dal menù scelto: al momento è zero.</p>
         )}
         {summary.balance < 0 && (
-          <p className="text-[13px] text-slate-dark">Versato {formatEUR(-summary.balance)} in più del previsto.</p>
+          <p className="text-[12px] text-slate-dark">Versato {formatEUR(-summary.balance)} in più del previsto.</p>
         )}
         {showSettledHint && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-btn bg-success/10 px-4 py-3">
-            <p className="text-[14px] text-ink">Il saldo è completo: segna come Saldato.</p>
-            <ButtonLink href={`/admin/prenotazioni/${booking.id}/modifica`} variant="outline" size="sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-btn bg-success/10 px-3 py-2">
+            <p className="text-[13px] text-ink">Il saldo è completo: segna come Saldato.</p>
+            <ButtonLink href={`/admin/prenotazioni/${booking.id}/modifica`} variant="outline" size="sm" className="min-h-11">
               Modifica stato
             </ButtonLink>
           </div>
         )}
       </div>
 
-      {/* Elenco */}
+      {/* Elenco acconti: una riga per acconto */}
       {visible.length === 0 ? (
-        <p className="text-[14px] text-slate">Nessun acconto registrato.</p>
+        <p className="text-[13px] text-slate">Nessun acconto registrato.</p>
       ) : (
         <ul className="flex flex-col divide-y divide-sand border-y border-sand">
           {visible.map((payment) => {
             const pdf = isPdfReceipt({ type: payment.receipt_type ?? "", name: payment.receipt_name ?? "" });
             const dateLabel = formatIt(toDate(payment.paid_at), "d MMM yyyy");
             return (
-              <li key={payment.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="font-serif text-xl tabular-nums text-ink">{formatEUR(payment.amount)}</span>
-                    <span className="text-[13px] text-slate-dark">{dateLabel}</span>
-                  </p>
-                  <p className="break-words text-[13px] text-slate-dark">
-                    {payment.method ? PAYMENT_METHOD_LABELS[payment.method] : "Metodo non specificato"}
+              <li key={payment.id} className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 py-2">
+                <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="font-serif text-lg tabular-nums text-ink">{formatEUR(payment.amount)}</span>
+                  <span className="break-words text-[12px] text-slate-dark">
+                    {dateLabel} · {payment.method ? PAYMENT_METHOD_LABELS[payment.method] : "Metodo non specificato"}
                     {payment.notes ? ` · ${payment.notes}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
+                  </span>
+                </p>
+                <div className="flex flex-wrap items-center gap-1">
                   {payment.receipt_path && (
                     <Button
                       variant="outline"
                       size="sm"
+                      className="min-h-11"
                       onClick={() => openReceipt(payment)}
                       disabled={openingId === payment.id}
                       aria-busy={openingId === payment.id || undefined}
@@ -235,6 +222,7 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="min-h-11"
                     aria-label={`Elimina acconto di ${formatEUR(payment.amount)} del ${dateLabel}`}
                     onClick={() => setDeleteTarget(payment)}
                     disabled={isPending}
@@ -249,9 +237,9 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
         </ul>
       )}
 
-      {/* Aggiunta rapida */}
-      <form onSubmit={onSubmit} noValidate aria-label="Aggiungi acconto" className="flex flex-col gap-5">
-        <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark">Aggiungi acconto</p>
+      {/* Aggiunta rapida: campi su due colonne da sm */}
+      <form onSubmit={onSubmit} noValidate aria-label="Aggiungi acconto" className="flex min-w-0 flex-col gap-3 border-t border-sand pt-4">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-dark">Aggiungi acconto</p>
         {formError && <Alert tone="danger">{formError}</Alert>}
         <PaymentDraftFields
           idPrefix="payment-new"
@@ -261,7 +249,14 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
           disabled={isPending}
         />
         <div className="flex justify-end">
-          <Button type="submit" variant="primary" size="md" disabled={isPending} aria-busy={isPending || undefined}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            disabled={isPending}
+            aria-busy={isPending || undefined}
+            className="min-h-11 w-full sm:w-auto"
+          >
             {isPending ? "Salvataggio…" : "Registra acconto"}
           </Button>
         </div>
@@ -302,12 +297,12 @@ function SummaryCell({ label, value, emphasis = false }: { label: string; value:
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col gap-1.5 rounded-[2px] border p-3 sm:p-4",
+        "flex min-w-0 flex-col gap-0.5 rounded-[2px] border p-2 sm:p-3",
         emphasis ? "border-petrol/40 bg-petrol/5" : "border-sand bg-cream/40",
       )}
     >
-      <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-bronze">{label}</dt>
-      <dd className="font-serif text-xl tabular-nums text-ink break-words sm:text-2xl">{value}</dd>
+      <dt className="text-[10px] font-medium uppercase tracking-[0.12em] text-bronze sm:text-[11px]">{label}</dt>
+      <dd className="font-serif text-base tabular-nums text-ink break-words sm:text-xl">{value}</dd>
     </div>
   );
 }

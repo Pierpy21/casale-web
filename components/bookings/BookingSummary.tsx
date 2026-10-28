@@ -1,7 +1,7 @@
 import { MenuChips, type MenuQuantity } from "@/components/agenda/DaySummary";
 import { Stat } from "@/components/ui";
 import type { BookingDetail, PaymentSummary } from "@/lib/types";
-import { formatEUR } from "@/lib/quote-utils";
+import { formatEUR, kidsMenuRowLabel } from "@/lib/quote-utils";
 
 export interface BookingSummaryProps {
   booking: Pick<BookingDetail, "kind" | "adults" | "children" | "kids_menus" | "event_type" | "menu" | "kids_menu">;
@@ -73,7 +73,7 @@ export function BookingSummary({ booking, time, finance }: BookingSummaryProps) 
     if (booking.kids_menu && booking.kids_menus > 0) {
       menus.push({
         key: `kids:${booking.kids_menu.id}`,
-        label: `Menù bambini — ${booking.kids_menu.name}`,
+        label: kidsMenuRowLabel(booking.kids_menu.name),
         quantity: booking.kids_menus,
         kind: "kids",
       });

@@ -156,7 +156,7 @@ export function ClientNameCombobox({ id, value, invalid, describedBy, disabled, 
           id={listId}
           role="listbox"
           aria-label="Clienti suggeriti"
-          className="absolute inset-x-0 top-full z-20 mt-1 max-h-80 overflow-y-auto border border-sand bg-paper shadow-lg shadow-ink/10"
+          className="absolute inset-x-0 top-full z-20 mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-ink/10 bg-field p-1.5 shadow-xl shadow-ink/15"
         >
           {results.map((client, index) => {
             const email = client.email;
@@ -173,7 +173,7 @@ export function ClientNameCombobox({ id, value, invalid, describedBy, disabled, 
                 }}
                 onMouseEnter={() => setHighlight(index)}
                 className={cn(
-                  "flex min-h-11 cursor-pointer flex-col justify-center gap-0.5 px-3.5 py-2.5",
+                  "flex min-h-11 cursor-pointer flex-col justify-center gap-0.5 rounded-lg px-3 py-2 transition-colors duration-150",
                   index === highlight ? "bg-cream" : "hover:bg-cream/60",
                 )}
               >

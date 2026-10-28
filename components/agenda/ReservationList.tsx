@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import { assignBookingRoom } from "@/app/actions/bookings";
 import { clientFullName, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
+import { Select } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import type { BookingListItem, Room } from "@/lib/types";
 
-/** Sopra questo numero di sale il selettore diventa un <select> nativo: i chip andrebbero su troppe righe. */
+/** Sopra questo numero di sale il selettore diventa una tendina: i chip andrebbero su troppe righe. */
 const CHIP_LIMIT = 4;
 
 export interface ReservationListProps {
@@ -135,13 +136,13 @@ export function ReservationList({ bookings, rooms, canAssign }: ReservationListP
                     </p>
                   )}
                   {options.length > CHIP_LIMIT ? (
-                    <label className="flex min-w-0 items-center gap-2 text-[13px] text-slate-dark">
+                    <div className="flex min-w-0 items-center gap-2 text-[13px] text-slate-dark">
                       <span className="shrink-0">Sala</span>
-                      <select
+                      <Select
                         aria-label={`Sala per ${title}`}
                         value={currentId ?? ""}
                         onChange={(e) => assign(booking, e.target.value === "" ? null : e.target.value)}
-                        className="min-h-11 min-w-0 flex-1 rounded-btn border border-sand bg-white px-3 py-2 text-[14px] text-ink lg:min-h-9"
+                        wrapperClassName="min-w-0 flex-1"
                       >
                         <option value="">Nessuna</option>
                         {inactiveCurrent && (
@@ -154,18 +155,23 @@ export function ReservationList({ bookings, rooms, canAssign }: ReservationListP
                             {room.name}
                           </option>
                         ))}
-                      </select>
-                    </label>
+                      </Select>
+                    </div>
                   ) : (
-                    <div role="group" aria-label={`Sala per ${title}`} className="flex min-w-0 flex-wrap gap-1.5">
-                      <RoomChip selected={currentId === null} onSelect={() => assign(booking, null)}>
-                        Nessuna
-                      </RoomChip>
-                      {options.map((room) => (
-                        <RoomChip key={room.id} selected={currentId === room.id} onSelect={() => assign(booking, room.id)}>
-                          {room.name}
+                    <div role="group" aria-label={`Sala per ${title}`} className="flex min-w-0 flex-col gap-1.5">
+                      <span aria-hidden="true" className="text-[10px] font-medium uppercase tracking-[0.12em] text-bronze">
+                        Sala
+                      </span>
+                      <div className="flex min-w-0 flex-wrap gap-1.5">
+                        <RoomChip selected={currentId === null} onSelect={() => assign(booking, null)}>
+                          Nessuna
                         </RoomChip>
-                      ))}
+                        {options.map((room) => (
+                          <RoomChip key={room.id} selected={currentId === room.id} onSelect={() => assign(booking, room.id)}>
+                            {room.name}
+                          </RoomChip>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -189,8 +195,8 @@ function RoomChip({ selected, onSelect, children }: { selected: boolean; onSelec
       aria-pressed={selected}
       onClick={onSelect}
       className={cn(
-        "min-h-11 rounded-btn lg:min-h-9 border px-3 py-1.5 text-[13px] leading-snug transition-colors duration-150",
-        selected ? "border-petrol bg-petrol text-paper" : "border-sand bg-white text-ink hover:border-petrol/50 hover:bg-cream",
+        "min-h-11 rounded-lg lg:min-h-9 border px-3 py-1.5 text-[13px] leading-snug transition-colors duration-150",
+        selected ? "border-petrol bg-petrol text-paper" : "border-field-edge bg-field text-ink hover:border-field-edge-hover hover:bg-cream/60",
       )}
     >
       {children}

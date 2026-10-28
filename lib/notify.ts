@@ -4,7 +4,7 @@ import { getAdminPb } from "@/lib/pocketbase/admin";
 import { chunk, dayEndPb, dayStartPb, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
 import { fetchOne, listAll, listByParents } from "@/lib/pocketbase/queries";
 import { buildBookingNotice, buildReminderNotice, type BookingBrief } from "@/lib/notify-text";
-import type { BookingStatus, NotificationType, Role } from "@/lib/types";
+import type { BookingKind, BookingStatus, NotificationType, Role } from "@/lib/types";
 
 // Notifiche in-app (collezione notifications) + push (web-push).
 // Non deve mai far fallire l'azione chiamante: tutti gli errori vengono catturati e loggati.
@@ -20,6 +20,8 @@ export interface NotifyEvent {
   recipients?: "all-except-actor" | "all";
   /** Restringe i destinatari a questi ruoli (es. solo admin per la giacenza). */
   roles?: Role[];
+  /** Esclude questi ruoli dai destinatari (la sala non riceve notifiche sugli appuntamenti). */
+  excludeRoles?: Role[];
   /** Pagina da aprire al tocco (default: prenotazione o agenda). */
   url?: string;
 }
@@ -61,6 +63,12 @@ function buildPushPayload(payload: { title: string; body: string; url: string; t
   return json;
 }
 
+/** Ruoli esclusi dalle notifiche di una prenotazione: gli appuntamenti non arrivano alla sala. */
+export function excludedRolesFor(kind: BookingKind): Role[] | undefined {
+  // Gli appuntamenti riguardano solo l'admin (vedi canSeeAppointments).
+  return kind === "appuntamento" ? ["sala", "cucina"] : undefined;
+}
+
 /** Crea le notifiche in-app per i destinatari e invia il push alle loro sottoscrizioni. Ritorna i destinatari. */
 export async function notify(event: NotifyEvent): Promise<number> {
   try {
@@ -71,8 +79,10 @@ export async function notify(event: NotifyEvent): Promise<number> {
     const actorId = event.actor?.id ?? null;
     const exceptActor = (event.recipients ?? "all-except-actor") === "all-except-actor";
     const roles = event.roles;
+    const excluded = event.excludeRoles;
     const recipientIds: string[] = activeUsers
       .filter((p) => !roles || roles.includes(String(p.role) as Role))
+      .filter((p) => !excluded || !excluded.includes(String(p.role) as Role))
       .map((p) => p.id)
       .filter((id) => !(exceptActor && id === actorId));
     if (recipientIds.length === 0) return 0;
@@ -195,7 +205,14 @@ export async function notifyBookingEvent(input: {
     const brief = await loadBookingBrief(input.bookingId);
     if (!brief) return;
     const { title, body } = buildBookingNotice(input.type, brief, input.actor?.full_name ?? null);
-    await notify({ type: input.type, bookingId: brief.id, title, body, actor: input.actor });
+    await notify({
+      type: input.type,
+      bookingId: brief.id,
+      title,
+      body,
+      actor: input.actor,
+      excludeRoles: excludedRolesFor(brief.kind),
+    });
   } catch (err) {
     console.error("[notify] evento prenotazione fallito:", err);
   }
@@ -208,7 +225,15 @@ export async function notifyBookingDeleted(
 ): Promise<void> {
   try {
     const { title, body } = buildBookingNotice("booking_deleted", brief, actor?.full_name ?? null);
-    await notify({ type: "booking_deleted", bookingId: null, title, body, actor, recipients: "all-except-actor" });
+    await notify({
+      type: "booking_deleted",
+      bookingId: null,
+      title,
+      body,
+      actor,
+      recipients: "all-except-actor",
+      excludeRoles: excludedRolesFor(brief.kind),
+    });
   } catch (err) {
     console.error("[notify] notifica eliminazione fallita:", err);
   }
@@ -234,7 +259,15 @@ export async function sendEventReminders(date: string): Promise<number> {
   for (const row of records) {
     const brief = toBrief(row, counts.get(row.id) ?? 0);
     const { title, body } = buildReminderNotice(brief);
-    await notify({ type: "event_reminder", bookingId: brief.id, title, body, actor: null, recipients: "all" });
+    await notify({
+      type: "event_reminder",
+      bookingId: brief.id,
+      title,
+      body,
+      actor: null,
+      recipients: "all",
+      excludeRoles: excludedRolesFor(brief.kind),
+    });
     sent++;
   }
   return sent;

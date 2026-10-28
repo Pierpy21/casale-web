@@ -62,8 +62,10 @@ export function CountStepper({ id, label, value, onChange, min = 0, max, hint, e
         role="group"
         aria-labelledby={labelId}
         className={cn(
-          "flex h-11 w-full min-w-0 items-stretch overflow-hidden rounded-[2px] border bg-paper transition-colors duration-200 focus-within:ring-2 focus-within:ring-petrol/40",
-          error ? "border-danger" : "border-slate/70 hover:border-slate",
+          "flex h-11 w-full min-w-0 items-stretch overflow-hidden rounded-lg border bg-field shadow-[inset_0_1px_2px_rgb(28_43_45/0.04)] transition-[border-color,box-shadow] duration-200",
+          error
+            ? "border-danger/70 bg-danger/[0.03] ring-[3px] ring-danger/15 hover:border-danger focus-within:border-danger focus-within:ring-danger/25"
+            : "border-field-edge hover:border-field-edge-hover focus-within:border-petrol focus-within:ring-[3px] focus-within:ring-petrol/25",
         )}
       >
         <button
@@ -74,7 +76,7 @@ export function CountStepper({ id, label, value, onChange, min = 0, max, hint, e
             onChange(clamp(value - 1));
           }}
           disabled={value <= min}
-          className={cn(STEP_BUTTON, "border-r border-sand")}
+          className={cn(STEP_BUTTON, "border-r border-ink/10")}
         >
           <Minus aria-hidden="true" className="size-5" />
         </button>
@@ -109,7 +111,7 @@ export function CountStepper({ id, label, value, onChange, min = 0, max, hint, e
             onChange(clamp(value + 1));
           }}
           disabled={max !== undefined && value >= max}
-          className={cn(STEP_BUTTON, "border-l border-sand")}
+          className={cn(STEP_BUTTON, "border-l border-ink/10")}
         >
           <Plus aria-hidden="true" className="size-5" />
         </button>

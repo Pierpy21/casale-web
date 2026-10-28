@@ -228,10 +228,10 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
           <Input
             id="report-date"
             type="date"
+            large
             disabled={pending}
             value={reportDate}
             onChange={(e) => setReportDate(e.target.value)}
-            className="text-[17px]"
           />
         </Field>
         <Field label="Note" htmlFor="report-notes" hint="Facoltative: visibili nel PDF">
@@ -244,7 +244,7 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
             onKeyDown={blockEnter}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Es. consegna Amadori rimandata"
-            className="text-[17px]"
+            large
           />
         </Field>
       </div>
@@ -263,7 +263,8 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
             onKeyDown={blockEnter}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Cerca un prodotto…"
-            className="h-12 pl-12 text-[17px]"
+            large
+            className="h-12 pl-12"
           />
         </div>
       </div>

@@ -269,7 +269,6 @@ export function EventForm({
     if (!values.event_date) add("event_date", "Data obbligatoria");
     if (!values.event_name.trim()) add("event_name", "Inserisci il nome dell’evento");
     if (!eventType) add("event_type", "Scegli il tipo di evento");
-    if (!values.menu_id) add("menu_id", "Scegli il menù");
     if (covers < 1) add("adults", "Indicare almeno un coperto");
     if (values.kids_menus > values.children) add("kids_menus", "I menù bambini non possono superare i bambini");
     Object.assign(local, validateAllergies(values.allergies));
@@ -494,10 +493,13 @@ export function EventForm({
             ))}
           </FormCard>
 
-          <FormCard label="Menù">
+          <FormCard label="Menù (facoltativo)">
             <div data-invalid={errors.menu_id ? "true" : undefined} className="flex flex-col gap-3">
               <GroupLabel>Menù adulti</GroupLabel>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <ChoiceCard name="menu_id" title="Nessun menù" checked={values.menu_id === null} onSelect={() => change({ menu_id: null })}>
+                  <span className="text-[14px] text-slate-dark">Il menù si può scegliere anche più avanti</span>
+                </ChoiceCard>
                 {adultMenus.map((menu) => (
                   <MenuChoice
                     key={menu.id}
@@ -510,7 +512,7 @@ export function EventForm({
                   />
                 ))}
               </div>
-              {!hasActiveAdultMenus && <CatalogHint>Nessun menù adulti attivo: crea o attiva un menù per salvare l’evento.</CatalogHint>}
+              {!hasActiveAdultMenus && <CatalogHint>Nessun menù adulti attivo: l’evento si può salvare anche senza menù.</CatalogHint>}
               {first(errors.menu_id) && <p className="text-[13px] text-danger">{first(errors.menu_id)}</p>}
             </div>
 

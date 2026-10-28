@@ -42,6 +42,15 @@ export function sortBookingRecords(records: PbRecord[]): PbRecord[] {
   });
 }
 
+/** Id (tra quelli dati) delle prenotazioni che sono appuntamenti. Una sola query per gruppo di id. */
+export async function appointmentIdsAmong(db: PocketBase, ids: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (ids.length === 0) return out;
+  const rows = await listByParents(db, "bookings", "id", ids, { fields: "id,kind" });
+  for (const r of rows) if (String(r.kind || "evento") === "appuntamento") out.add(r.id);
+  return out;
+}
+
 function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
   const map = new Map<string, T[]>();
   for (const item of items) {

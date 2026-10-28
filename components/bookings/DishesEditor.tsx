@@ -27,6 +27,8 @@ export interface DishesEditorProps {
   hasMenu: boolean;
   /** Catalogo piatti attivi (admin): serve solo per la scelta, il testo resta libero. */
   catalog: Dish[];
+  /** Chiude l'editor: `saved` è true dopo un salvataggio riuscito, false con "Annulla". */
+  onClose: (saved: boolean) => void;
 }
 
 /**
@@ -35,7 +37,7 @@ export interface DishesEditorProps {
  * Il componente va montato con `key` legata alla versione dei piatti salvati: dopo un salvataggio
  * o un ripristino si riparte dai dati del server.
  */
-export function DishesEditor({ bookingId, dishes, hasMenu, catalog }: DishesEditorProps) {
+export function DishesEditor({ bookingId, dishes, hasMenu, catalog, onClose }: DishesEditorProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const nextKey = useRef(0);
@@ -55,7 +57,6 @@ export function DishesEditor({ bookingId, dishes, hasMenu, catalog }: DishesEdit
     })),
   );
   const [formError, setFormError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   const pickableByCourse = useMemo(
     () =>
@@ -94,24 +95,20 @@ export function DishesEditor({ bookingId, dishes, hasMenu, catalog }: DishesEdit
 
   function updateItem(key: number, patch: Partial<DishDraft>) {
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)));
-    setSaved(false);
   }
 
   function addItem(course: Course) {
     const key = newKey();
     requestFocus(key);
     setItems((prev) => [...prev, { key, course, name: "", description: "", showDescription: false }]);
-    setSaved(false);
   }
 
   function removeItem(key: number) {
     setItems((prev) => prev.filter((item) => item.key !== key));
-    setSaved(false);
   }
 
   function moveItem(key: number, delta: -1 | 1) {
     setItems((prev) => moveWithinCourse(prev, key, delta));
-    setSaved(false);
   }
 
   /** Sceglie un piatto del catalogo: nome, portata e descrizione vengono copiati nella riga. */
@@ -132,7 +129,6 @@ export function DishesEditor({ bookingId, dishes, hasMenu, catalog }: DishesEdit
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
-    setSaved(false);
     if (duplicateKeys.size > 0) {
       setFormError("Alcuni piatti compaiono più di una volta nell’elenco: rimuovi i duplicati prima di salvare.");
       return;
@@ -154,8 +150,8 @@ export function DishesEditor({ bookingId, dishes, hasMenu, catalog }: DishesEdit
         setFormError(result.error);
         return;
       }
-      setSaved(true);
       router.refresh();
+      onClose(true);
     });
   }
 
@@ -196,6 +192,9 @@ export function DishesEditor({ bookingId, dishes, hasMenu, catalog }: DishesEdit
         <Button type="submit" variant="primary" size="md" disabled={pending} aria-busy={pending || undefined}>
           {pending ? "Salvataggio…" : "Salva piatti"}
         </Button>
+        <Button type="button" variant="outline" size="md" disabled={pending} onClick={() => onClose(false)}>
+          Annulla
+        </Button>
         {hasMenu && (
           <ConfirmAction
             label="Ripristina dal menù"
@@ -207,11 +206,6 @@ export function DishesEditor({ bookingId, dishes, hasMenu, catalog }: DishesEdit
             run={() => resetDishesFromMenu(bookingId)}
             onSuccess={() => router.refresh()}
           />
-        )}
-        {saved && (
-          <span role="status" className="min-w-0 text-[13px] text-success">
-            Piatti salvati.
-          </span>
         )}
       </div>
     </form>
@@ -259,37 +253,28 @@ function DishRow({
   const label = item.name.trim() || "piatto senza nome";
 
   return (
-    <li className="flex flex-col gap-2 border-l-[3px] border-sand bg-paper py-1 pl-3 sm:pl-4">
-      <div className="flex min-w-0 items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <label htmlFor={nameId} className="sr-only">
-            Piatto
-          </label>
-          <DishPicker
-            id={nameId}
-            value={item.name}
-            options={options}
-            unavailableIds={unavailableIds}
-            invalid={!!nameError}
-            describedBy={nameError ? nameErrorId : undefined}
-            showNewHint={false}
-            onChangeText={(text) => onNameChange(item.key, text)}
-            onSelect={(dish) => onSelect(item.key, dish)}
-          />
-          {nameError && (
-            <p id={nameErrorId} className="mt-1.5 text-[13px] text-danger">
-              {nameError}
-            </p>
-          )}
-        </div>
-        <ReorderButtons
-          label={label}
-          isFirst={isFirst}
-          isLast={isLast}
-          disabled={disabled}
-          onMove={(delta) => onMove(item.key, delta)}
-          onRemove={() => onRemove(item.key)}
+    <li className="flex min-w-0 flex-col gap-2 border-l-[3px] border-sand bg-paper py-1 pl-3 sm:pl-4">
+      {/* Il campo nome occupa sempre tutta la riga: il testo del piatto non viene troncato dai pulsanti. */}
+      <div className="w-full min-w-0">
+        <label htmlFor={nameId} className="sr-only">
+          Piatto
+        </label>
+        <DishPicker
+          id={nameId}
+          value={item.name}
+          options={options}
+          unavailableIds={unavailableIds}
+          invalid={!!nameError}
+          describedBy={nameError ? nameErrorId : undefined}
+          showNewHint={false}
+          onChangeText={(text) => onNameChange(item.key, text)}
+          onSelect={(dish) => onSelect(item.key, dish)}
         />
+        {nameError && (
+          <p id={nameErrorId} className="mt-1.5 text-[13px] text-danger">
+            {nameError}
+          </p>
+        )}
       </div>
 
       {item.showDescription ? (
@@ -303,7 +288,8 @@ function DishRow({
           />
         </Field>
       ) : null}
-      <div>
+
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <Button
           variant="ghost"
           size="sm"
@@ -313,6 +299,14 @@ function DishRow({
         >
           {item.showDescription ? "Rimuovi descrizione" : "Aggiungi descrizione"}
         </Button>
+        <ReorderButtons
+          label={label}
+          isFirst={isFirst}
+          isLast={isLast}
+          disabled={disabled}
+          onMove={(delta) => onMove(item.key, delta)}
+          onRemove={() => onRemove(item.key)}
+        />
       </div>
     </li>
   );

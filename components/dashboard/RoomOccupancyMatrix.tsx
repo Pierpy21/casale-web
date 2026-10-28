@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { bookingTitle, totalCovers } from "@/components/bookings/format";
+import { useMenuColor } from "@/components/menu/MenuColorsProvider";
 import { EmptyState, StatusDot } from "@/components/ui";
 import { STATUS_LABELS, type BookingListItem, type Room } from "@/lib/types";
 
@@ -10,7 +11,7 @@ export interface RoomOccupancyMatrixProps {
   bookings: BookingListItem[];
 }
 
-/** Matrice sale x giorni della settimana. Cella piena = sala occupata (coperti / capienza). */
+/** Matrice sale x giorni della settimana. Cella piena = sala occupata (coperti / capienza), nel colore del menù. */
 export function RoomOccupancyMatrix({ rooms, days, bookings }: RoomOccupancyMatrixProps) {
   if (rooms.length === 0) {
     return (
@@ -61,28 +62,9 @@ export function RoomOccupancyMatrix({ rooms, days, bookings }: RoomOccupancyMatr
                     </td>
                   );
                 }
-                const covers = totalCovers(booking);
-                const menuName = booking.menu?.name ?? "Menù da definire";
                 return (
                   <td key={iso} className="p-1.5 align-middle">
-                    <Link
-                      href={`/admin/prenotazioni/${booking.id}`}
-                      title={`${menuName} · ${bookingTitle(booking)}: ${covers} coperti su capienza ${room.capacity} · ${STATUS_LABELS[booking.status]}`}
-                      className="flex min-h-20 flex-col justify-center gap-1.5 rounded-[2px] bg-petrol px-3 py-2.5 text-paper transition-colors duration-200 hover:bg-petrol-hover"
-                    >
-                      <span className="flex min-w-0 items-start gap-2">
-                        {booking.kind !== "normale" && <StatusDot status={booking.status} size="sm" onDark className="mt-1.5" />}
-                        <span className="line-clamp-2 min-w-0 font-serif text-[15px] font-semibold leading-snug break-words">
-                          {menuName}
-                        </span>
-                      </span>
-                      <span className="text-[12px] tabular-nums text-paper/90">
-                        {covers}/{room.capacity} coperti
-                      </span>
-                      <span className="line-clamp-1 break-words text-[12px] text-paper/75">
-                        {bookingTitle(booking)}
-                      </span>
-                    </Link>
+                    <OccupancyCell booking={booking} capacity={room.capacity} />
                   </td>
                 );
               })}
@@ -91,5 +73,28 @@ export function RoomOccupancyMatrix({ rooms, days, bookings }: RoomOccupancyMatr
         </tbody>
       </table>
     </div>
+  );
+}
+
+function OccupancyCell({ booking, capacity }: { booking: BookingListItem; capacity: number }) {
+  const color = useMenuColor(booking.menu?.id ?? null);
+  const covers = totalCovers(booking);
+  const menuName = booking.menu?.name ?? "Menù da definire";
+  return (
+    <Link
+      href={`/admin/prenotazioni/${booking.id}`}
+      title={`${menuName} · ${bookingTitle(booking)}: ${covers} coperti su capienza ${capacity} · ${STATUS_LABELS[booking.status]}`}
+      style={{ backgroundColor: color.solid, color: color.onSolid }}
+      className="flex min-h-20 flex-col justify-center gap-1.5 rounded-[2px] px-3 py-2.5 transition-[filter] duration-200 hover:brightness-95"
+    >
+      <span className="flex min-w-0 items-start gap-2">
+        {booking.kind !== "normale" && <StatusDot status={booking.status} size="sm" onDark className="mt-1.5" />}
+        <span className="line-clamp-2 min-w-0 font-serif text-[15px] font-semibold leading-snug break-words">{menuName}</span>
+      </span>
+      <span className="text-[12px] font-semibold tabular-nums">
+        {covers}/{capacity} coperti
+      </span>
+      <span className="line-clamp-1 break-words text-[12px]">{bookingTitle(booking)}</span>
+    </Link>
   );
 }

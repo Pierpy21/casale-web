@@ -15,6 +15,8 @@ export interface MenuPhoto { file: string; url: string; }
 export interface Menu { id: string; name: string; season: string | null; price_per_person: number; is_kids: boolean; active: boolean; sort: number; items: MenuItem[]; photos: MenuPhoto[]; }
 export interface BookingDish { id: string; booking_id: string; course: Course; name: string; sort: number; description?: string | null; }
 export interface BookingAllergy { id: string; booking_id: string; subject_name: string | null; condition: string; notes: string | null; }
+/** Allergia in ingresso per il salvataggio dell'elenco (saveBookingAllergies). `id` presente = riga esistente da aggiornare. */
+export interface BookingAllergyDraft { id?: string; subject_name: string | null; condition: string; notes: string | null; }
 /** Tipo di prenotazione: evento (banchetto con menù e preventivo), normale (tavolo), appuntamento (incontro). */
 export const BOOKING_KINDS = ["evento", "normale", "appuntamento"] as const;
 export type BookingKind = (typeof BOOKING_KINDS)[number];
@@ -127,3 +129,20 @@ export const INVENTORY_CATEGORY_LABELS: Record<InventoryCategory, string> = {
 export interface InventoryProduct { id: string; name: string; unit: string | null; category: InventoryCategory; supplier: InventorySupplier; sort: number; active: boolean; }
 export interface InventoryReportLine { id: string; report_id: string; product_id: string | null; product_name: string; unit: string | null; state: InventoryState; quantity: number; sort: number; supplier: InventorySupplier; category: InventoryCategory; }
 export interface InventoryReport { id: string; created_by: string | null; created_by_name: string; report_date: string; notes: string | null; status: "inviato" | "visto"; seen_by: string | null; seen_at: string | null; created_at: string; lines: InventoryReportLine[]; }
+
+// ---------------------------------------------------------------------
+// Note cucina, registro attività, statistiche
+// ---------------------------------------------------------------------
+/** Nota interna su una prenotazione (collezione booking_notes). Visibile a tutti i ruoli attivi. */
+export interface BookingNote { id: string; booking_id: string; author_id: string | null; author_name: string; body: string; created_at: string; }
+/** Voce del registro attività: modifica di una prenotazione (anche eliminazioni, con booking null). */
+export interface ActivityEntry extends BookingChange { booking_label: string | null; booking_date: string | null; booking_kind: BookingKind | null; client_name: string | null; }
+/** Periodo delle statistiche: 1, 3 o 12 mesi a partire dal mese scelto. */
+export type StatsPeriod = "mese" | "3mesi" | "anno";
+/** Tipo di prenotazioni incluse nelle statistiche. */
+export type StatsKind = "tutti" | "evento" | "normale";
+/** Settimana (lun–dom) delle statistiche. `busiest_day`: giorno con più coperti (eventi + prenotazioni, esclusi appuntamenti), null se nessun coperto. `menus`: porzioni per menù della settimana, per porzioni decrescenti. */
+export interface WeekStats { week_start: string; week_end: string; event_covers: number; normal_covers: number; events: number; normal_bookings: number; busiest_day: { date: string; covers: number } | null; menus: MenuConsumption[]; }
+/** Porzioni consumate per menù (adulti: adults; bambini: kids_menus), solo eventi non annullati. */
+export interface MenuConsumption { menu_id: string; name: string; is_kids: boolean; servings: number; }
+export interface CoversStats { from: string; to: string; weeks: WeekStats[]; totals: { event_covers: number; normal_covers: number; events: number; normal_bookings: number }; /** Coperti totali del periodo (eventi + prenotazioni): base per le percentuali. */ period_total_covers: number; menus: MenuConsumption[]; }

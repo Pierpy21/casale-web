@@ -1,7 +1,7 @@
-import { canUseInventory, isAdmin } from "@/lib/permissions";
+import { canUseInventory, canViewActivityLog, isAdmin } from "@/lib/permissions";
 import type { Profile } from "@/lib/types";
 
-export type NavIcon = "event" | "agenda" | "dashboard" | "clients" | "operators" | "catalog" | "inventory";
+export type NavIcon = "event" | "agenda" | "dashboard" | "clients" | "operators" | "catalog" | "inventory" | "activity" | "stats";
 
 export interface NavLink {
   href: string;
@@ -24,10 +24,12 @@ const LINKS: NavDefinition[] = [
   { href: CREATE_EVENT_HREF, label: "Crea evento", icon: "event", prominent: true, mobileBar: false, visible: isAdmin },
   { href: "/admin/agenda", label: "Agenda", icon: "agenda", visible: (p) => p.active },
   { href: "/admin/dashboard", label: "Dashboard", icon: "dashboard", visible: isAdmin },
+  { href: "/admin/statistiche", label: "Statistiche", icon: "stats", mobileBar: false, visible: isAdmin },
   { href: "/admin/clienti", label: "Clienti", icon: "clients", visible: isAdmin },
   { href: "/admin/operatori", label: "Operatori", icon: "operators", visible: isAdmin },
   { href: "/admin/catalogo", label: "Menù & Sale", icon: "catalog", visible: isAdmin },
   { href: "/admin/giacenza", label: "Giacenza", icon: "inventory", visible: canUseInventory },
+  { href: "/admin/registro", label: "Registro", icon: "activity", visible: canViewActivityLog },
 ];
 
 /** Voci di navigazione filtrate per ruolo. */

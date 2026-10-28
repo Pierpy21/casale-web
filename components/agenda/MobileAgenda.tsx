@@ -1,25 +1,42 @@
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { EmptyState, StatusLegend } from "@/components/ui";
 import type { BookingListItem, Room } from "@/lib/types";
+import { AgendaKindSwitch } from "./AgendaKindSwitch";
 import { DaySummary } from "./DaySummary";
 import { MobileCalendar } from "./MobileCalendar";
 import { ReservationList } from "./ReservationList";
 import { SwipeDay } from "./SwipeDay";
-import { capitalize, formatIt, shiftPeriod, toDate } from "./agenda-utils";
+import { capitalize, dayCountLabel, formatIt, shiftPeriod, toDate, type AgendaKindFilter } from "./agenda-utils";
 
 export interface MobileAgendaProps {
   selected: string;
   today: string;
+  /** Banchetti del filtro corrente, per giorno (liste e riepilogo). */
   byDate: Map<string, BookingListItem[]>;
+  /** Tutti i banchetti per giorno (il calendario mostra i pallini solo degli eventi). */
+  calendarByDate: Map<string, BookingListItem[]>;
   isAdmin: boolean;
   rooms: Room[];
   /** Permesso di assegnare la sala alle prenotazioni normali. */
   canAssignRooms: boolean;
+  kind: AgendaKindFilter;
+  onKindChange: (kind: AgendaKindFilter) => void;
   onNavigate: (iso: string) => void;
 }
 
-/** Agenda mobile (< lg): calendario mensile in alto, lista del giorno sotto. La creazione è nel pulsante + globale (layout admin). */
-export function MobileAgenda({ selected, today, byDate, isAdmin, rooms, canAssignRooms, onNavigate }: MobileAgendaProps) {
+/** Agenda mobile (< lg): filtro per tipo, calendario mensile in alto, lista del giorno sotto. La creazione è nel pulsante + globale (layout admin). */
+export function MobileAgenda({
+  selected,
+  today,
+  byDate,
+  calendarByDate,
+  isAdmin,
+  rooms,
+  canAssignRooms,
+  kind,
+  onKindChange,
+  onNavigate,
+}: MobileAgendaProps) {
   const selectedDate = toDate(selected);
   const items = byDate.get(selected) ?? [];
   const cards = items.filter((b) => b.kind !== "normale");
@@ -27,22 +44,23 @@ export function MobileAgenda({ selected, today, byDate, isAdmin, rooms, canAssig
   const dayLabel = capitalize(formatIt(selectedDate, "EEEE d MMMM"));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 flex-col gap-6">
       <StatusLegend />
-      <MobileCalendar selected={selected} today={today} byDate={byDate} onNavigate={onNavigate} />
+      <MobileCalendar selected={selected} today={today} byDate={calendarByDate} onNavigate={onNavigate} />
+      <AgendaKindSwitch value={kind} onChange={onKindChange} />
 
       <section aria-labelledby="giorno-titolo" className="flex flex-col gap-4">
-        <div className="flex items-end justify-between gap-3 border-b border-sand pb-3">
+        <div className="flex min-w-0 items-end justify-between gap-3 border-b border-sand pb-3">
           <div className="flex min-w-0 flex-col gap-1">
             {selected === today && (
               <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-petrol">Oggi</p>
             )}
-            <h2 id="giorno-titolo" className="text-2xl">
+            <h2 id="giorno-titolo" className="break-words text-2xl">
               {dayLabel}
             </h2>
           </div>
-          <span className="shrink-0 text-[13px] text-slate-dark tabular-nums">
-            {items.length === 0 ? "Nessun evento" : `${items.length} ${items.length === 1 ? "banchetto" : "banchetti"}`}
+          <span className="min-w-0 max-w-[55%] text-right text-[13px] leading-snug text-slate-dark tabular-nums break-words">
+            {dayCountLabel(items)}
           </span>
         </div>
 
@@ -56,9 +74,11 @@ export function MobileAgenda({ selected, today, byDate, isAdmin, rooms, canAssig
             <EmptyState
               title="Nessun banchetto"
               description={
-                isAdmin
-                  ? "Questa giornata è libera. Puoi aggiungere una nuova prenotazione."
-                  : "Questa giornata è libera."
+                kind !== "tutti"
+                  ? "Nessun banchetto di questo tipo in questa giornata. Cambia il filtro per vedere gli altri."
+                  : isAdmin
+                    ? "Questa giornata è libera. Puoi aggiungere una nuova prenotazione."
+                    : "Questa giornata è libera."
               }
             />
           ) : (
@@ -71,7 +91,6 @@ export function MobileAgenda({ selected, today, byDate, isAdmin, rooms, canAssig
           )}
         </SwipeDay>
       </section>
-
     </div>
   );
 }

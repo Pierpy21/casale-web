@@ -10,6 +10,7 @@ import {
   type BookingAllergy,
   type BookingChange,
   type BookingDish,
+  type BookingNote,
   type BookingStatus,
   type Client,
   type Course,
@@ -167,6 +168,17 @@ export function mapAllergy(r: PbRecord): BookingAllergy {
     subject_name: nn(r.subject_name),
     condition: String(r.condition ?? ""),
     notes: nn(r.notes),
+  };
+}
+
+export function mapBookingNote(r: PbRecord): BookingNote {
+  return {
+    id: r.id,
+    booking_id: String(r.booking ?? ""),
+    author_id: nn(r.author),
+    author_name: String(r.author_name ?? ""),
+    body: String(r.body ?? ""),
+    created_at: toIsoDateTime(r.created),
   };
 }
 

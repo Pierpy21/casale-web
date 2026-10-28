@@ -14,6 +14,12 @@
   --color-sand: #d5d5b7;
   --color-cream: #edeedd;
   --color-paper: #f7f7f4;
+  /* Fondo dei campi (input, select, stepper): bianco puro, sopra la carta #f7f7f4. */
+  --color-field: #ffffff;
+  /* Bordo a riposo dei campi: grigio-salvia caldo, 3.60:1 su --color-field (WCAG 1.4.11, minimo 3:1). */
+  --color-field-edge: #7d8a82;
+  /* Bordo in hover: 4.32:1 su --color-field. */
+  --color-field-edge-hover: #6f7d75;
   --color-logo-cream: #faf1d7;
   --color-disabled: #b0b0b0;
   --color-danger: #9b3b32;
@@ -98,4 +104,13 @@ h3 {
   main#contenuto {
     padding: 0 !important;
   }
+}
+
+/* Nessun marker di sistema sulle tendine residue (<summary>). */
+summary {
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
 }

@@ -1,7 +1,9 @@
 export { cn } from "./cn";
 export { Button, ButtonLink, buttonClasses, type ButtonProps, type ButtonLinkProps, type ButtonVariant, type ButtonSize } from "./Button";
 export { SubmitButton, type SubmitButtonProps } from "./SubmitButton";
-export { Input, Textarea, Select, Checkbox, type InputProps, type TextareaProps, type SelectProps, type CheckboxProps } from "./Input";
+export { Input, Textarea, Checkbox, type InputProps, type TextareaProps, type CheckboxProps } from "./Input";
+export { Select, type SelectProps } from "./Select";
+export { Disclosure, type DisclosureProps } from "./Disclosure";
 export { Field, fieldIds, type FieldProps } from "./Field";
 export { Card } from "./Card";
 export { Stat, type StatProps } from "./Stat";

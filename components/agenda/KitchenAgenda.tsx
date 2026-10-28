@@ -1,143 +1,169 @@
-import Link from "next/link";
-import { KindBadge } from "@/components/bookings/KindBadge";
-import { bookingTitle, formatCovers, formatTime, groupDishes, totalCovers } from "@/components/bookings/format";
+"use client";
+
+import { useCallback, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { BookingCard } from "@/components/bookings/BookingCard";
 import { cn } from "@/components/ui/cn";
-import { BOOKING_KIND_LABELS, type BookingListItem } from "@/lib/types";
-import { agendaHref, capitalize, formatIt, shiftPeriod, toDate } from "./agenda-utils";
+import type { BookingListItem, BookingNote } from "@/lib/types";
+import { AgendaKindSwitch } from "./AgendaKindSwitch";
+import {
+  agendaHref,
+  capitalize,
+  dayCountLabel,
+  filterBookings,
+  formatIt,
+  groupByDate,
+  isRangeInside,
+  monthGridRange,
+  toDate,
+  type AgendaKindFilter,
+  type IsoRange,
+} from "./agenda-utils";
 import { MenuChips, summarizeDay } from "./DaySummary";
+import { MobileCalendar } from "./MobileCalendar";
 
 export interface KitchenAgendaProps {
-  /** Giorno mostrato (YYYY-MM-DD). */
-  date: string;
+  /** Giorno selezionato all'apertura (YYYY-MM-DD). */
+  initialDate: string;
+  /** Filtro per tipo all'apertura (query `tipo`). */
+  initialKind: AgendaKindFilter;
   today: string;
-  /** Prenotazioni del giorno, già ordinate per ora (senza annullate). */
+  /** Griglia mensile caricata dal server: navigare dentro questo intervallo non richiede rete. */
+  loadedRange: IsoRange;
+  /** Prenotazioni della griglia mensile (senza annullate). */
   bookings: BookingListItem[];
+  /** Note cucina delle prenotazioni caricate. */
+  notes: BookingNote[];
+  canAddNote: boolean;
+  currentUserId: string;
 }
 
-const NAV_LINK =
-  "inline-flex min-h-12 items-center justify-center border-2 border-ink px-5 text-[16px] font-semibold uppercase tracking-[0.08em] text-ink transition-colors hover:bg-ink hover:text-paper";
+const NO_NOTES: BookingNote[] = [];
+
+function groupNotes(notes: BookingNote[]): Map<string, BookingNote[]> {
+  const map = new Map<string, BookingNote[]>();
+  for (const note of notes) {
+    const bucket = map.get(note.booking_id);
+    if (bucket) bucket.push(note);
+    else map.set(note.booking_id, [note]);
+  }
+  return map;
+}
 
 /**
- * Agenda per la cucina: un giorno alla volta, schede grandi e leggibili (ora, coperti, menù, piatti per portata, allergie).
- * Sola lettura: nessun controllo di modifica, nessun dato di contatto del cliente.
+ * Agenda della cucina: calendario in alto (con i giorni), filtro per tipo, schede uguali a quelle di sala e admin
+ * (variante cucina di BookingCard). Sola lettura, tranne le note cucina.
  */
-export function KitchenAgenda({ date, today, bookings }: KitchenAgendaProps) {
-  const selected = toDate(date);
-  // Stessi conti della striscia del giorno: niente annullate né appuntamenti.
-  const summary = summarizeDay(bookings);
+export function KitchenAgenda({
+  initialDate,
+  initialKind,
+  today,
+  loadedRange,
+  bookings,
+  notes,
+  canAddNote,
+  currentUserId,
+}: KitchenAgendaProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [selected, setSelected] = useState(initialDate);
+  const [kind, setKind] = useState<AgendaKindFilter>(initialKind);
+  // Il calendario conta solo gli eventi: riceve tutti i banchetti.
+  const allByDate = useMemo(() => groupByDate(bookings), [bookings]);
+  const notesByBooking = useMemo(() => groupNotes(notes), [notes]);
 
-  return (
-    <div className="flex min-w-0 flex-col gap-8">
-      <header className="flex min-w-0 flex-col gap-5 border-b-4 border-ink pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-2">
-          {date === today && (
-            <p className="text-[16px] font-bold uppercase tracking-[0.12em] text-petrol">Oggi</p>
-          )}
-          <h1 className="font-serif text-4xl leading-tight wrap-anywhere sm:text-5xl">
-            {capitalize(formatIt(selected, "EEEE d MMMM"))}
-          </h1>
-          <p className="text-[20px] text-ink">
-            {bookings.length === 0
-              ? "Nessuna prenotazione"
-              : `${summary.bookingsCount} ${summary.bookingsCount === 1 ? "servizio" : "servizi"} · ${summary.covers} coperti`}
-          </p>
-        </div>
-
-        <nav aria-label="Cambia giorno" className="flex flex-wrap gap-2">
-          <Link href={agendaHref({ date: shiftPeriod(date, "day", -1), view: "day" })} className={NAV_LINK}>
-            ← Giorno prima
-          </Link>
-          <Link href={agendaHref({ date: today, view: "day" })} className={NAV_LINK}>
-            Oggi
-          </Link>
-          <Link href={agendaHref({ date: shiftPeriod(date, "day", 1), view: "day" })} className={NAV_LINK}>
-            Giorno dopo →
-          </Link>
-        </nav>
-      </header>
-
-      <MenuChips menus={summary.menus} size="lg" />
-
-      {bookings.length === 0 ? (
-        <p className="border-2 border-dashed border-ink/40 px-6 py-12 text-center text-[22px] text-ink">
-          Nessuna prenotazione in questa giornata.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-6">
-          {bookings.map((booking) => (
-            <li key={booking.id}>
-              <KitchenCard booking={booking} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+  const navigate = useCallback(
+    (target: string, nextKind: AgendaKindFilter = kind) => {
+      const href = agendaHref({ date: target, view: "day", kind: nextKind });
+      if (isRangeInside(monthGridRange(target), loadedRange)) {
+        setSelected(target);
+        setKind(nextKind);
+        window.history.replaceState(window.history.state, "", href);
+        return;
+      }
+      startTransition(() => {
+        router.push(href, { scroll: false });
+      });
+    },
+    [kind, loadedRange, router],
   );
-}
 
-function KitchenCard({ booking: b }: { booking: BookingListItem }) {
-  const time = formatTime(b.event_time);
-  const isEvent = b.kind === "evento";
-  const groups = isEvent ? groupDishes(b.dishes) : [];
-  const covers = totalCovers(b);
-  const headline = isEvent ? (b.menu?.name ?? "Menù da definire") : bookingTitle(b);
+  const dayItems = [...(allByDate.get(selected) ?? [])].sort((a, b) =>
+    (a.event_time ?? "").localeCompare(b.event_time ?? ""),
+  );
+  const items = filterBookings(dayItems, kind);
+  const events = items.filter((b) => b.kind === "evento");
+  const others = items.filter((b) => b.kind !== "evento");
+  const summary = summarizeDay(items);
+  const headline = capitalize(formatIt(toDate(selected), "EEEE d MMMM"));
+
+  const subline = dayCountLabel(items);
+
+  const kitchenCard = (booking: BookingListItem) => (
+    <li key={booking.id} className="min-w-0">
+      <BookingCard
+        booking={booking}
+        variant="full"
+        kitchen={{
+          notes: notesByBooking.get(booking.id) ?? NO_NOTES,
+          canAddNote,
+          currentUserId,
+        }}
+      />
+    </li>
+  );
 
   return (
-    <article
-      aria-label={`${BOOKING_KIND_LABELS[b.kind]} ${time ?? ""}, ${headline}`}
-      className={cn("flex min-w-0 flex-col gap-5 border-2 border-ink bg-paper p-5 sm:p-7", b.status === "annullato" && "opacity-60")}
+    <div
+      aria-busy={isPending}
+      className={cn("min-w-0 transition-opacity duration-200", isPending && "pointer-events-none opacity-60")}
     >
-      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <p className="font-serif text-6xl leading-none tabular-nums text-ink sm:text-7xl">{time ?? "—"}</p>
-        <KindBadge kind={b.kind} className="text-[13px]" />
-      </header>
+      <div className="flex min-w-0 flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-10">
+        <aside className="flex min-w-0 flex-col gap-5 lg:sticky lg:top-6">
+          <MobileCalendar selected={selected} today={today} byDate={allByDate} onNavigate={(iso) => navigate(iso)} />
+          <AgendaKindSwitch value={kind} onChange={(next) => navigate(selected, next)} />
+        </aside>
 
-      <div className="flex min-w-0 flex-col gap-2">
-        <h2 className="text-3xl font-bold leading-tight wrap-anywhere sm:text-4xl">{headline}</h2>
-        {isEvent && b.event_name && <p className="text-[20px] text-ink wrap-anywhere">{b.event_name}</p>}
-        <p className="text-[22px] text-ink">
-          <span className="font-bold tabular-nums">{covers}</span> coperti
-          {covers > 0 && <span className="text-[18px]"> ({formatCovers(b)})</span>}
-          {b.kids_menus > 0 && (
-            <span className="font-semibold"> · menù bambini ×{b.kids_menus}</span>
-          )}
-        </p>
-        {b.room && <p className="text-[18px] text-ink">Sala: {b.room.name}</p>}
-      </div>
-
-      {b.allergies.length > 0 && (
-        <section aria-label="Allergie" className="flex flex-col gap-2 border-l-[8px] border-danger bg-danger/10 px-5 py-4">
-          <p className="text-[16px] font-bold uppercase tracking-[0.1em] text-danger">Attenzione · allergie</p>
-          <ul className="flex flex-col gap-1.5 text-[20px] font-semibold leading-snug text-ink">
-            {b.allergies.map((allergy) => (
-              <li key={allergy.id} className="wrap-anywhere">
-                {allergy.condition}
-                {allergy.subject_name && <span className="font-normal"> · {allergy.subject_name}</span>}
-                {allergy.notes && <span className="font-normal text-[18px]"> ({allergy.notes})</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {groups.length > 0 && (
-        <dl className="grid grid-cols-1 gap-x-8 gap-y-5 border-t-2 border-ink pt-5 sm:grid-cols-2">
-          {groups.map((group) => (
-            <div key={group.course} className="flex min-w-0 flex-col gap-1.5">
-              <dt className="text-[15px] font-bold uppercase tracking-[0.12em] text-petrol">{group.label}</dt>
-              <dd>
-                <ul className="flex flex-col gap-1 text-[22px] leading-snug text-ink">
-                  {group.items.map((dish) => (
-                    <li key={dish.id} className="wrap-anywhere">
-                      {dish.name}
-                    </li>
-                  ))}
-                </ul>
-              </dd>
+        <div className="flex min-w-0 flex-col gap-6">
+          <header className="flex min-w-0 flex-col gap-4 border-b border-sand pb-5">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              {selected === today && (
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-petrol">Oggi</p>
+              )}
+              <h1 className="break-words text-3xl leading-tight sm:text-4xl">{headline}</h1>
+              <p className="text-[15px] text-slate-dark">{subline}</p>
             </div>
-          ))}
-        </dl>
-      )}
-    </article>
+          </header>
+
+          <MenuChips menus={summary.menus} size="lg" />
+
+          {items.length === 0 ? (
+            <p className="rounded-[2px] border border-dashed border-sand px-6 py-10 text-center text-[15px] text-slate-dark">
+              {kind === "tutti" ? "Nessuna prenotazione in questa giornata." : "Nessun elemento di questo tipo in questa giornata."}
+            </p>
+          ) : (
+            <>
+              {events.length > 0 && (
+                <section aria-label="Eventi del giorno" className="flex min-w-0 flex-col gap-4">
+                  <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+                    Eventi · {events.length}
+                  </h2>
+                  <ul className="flex min-w-0 flex-col gap-5">{events.map(kitchenCard)}</ul>
+                </section>
+              )}
+
+              {others.length > 0 && (
+                <section aria-label="Prenotazioni" className="flex min-w-0 flex-col gap-4">
+                  <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+                    Prenotazioni · {others.length}
+                  </h2>
+                  <ul className="flex min-w-0 flex-col gap-5">{others.map(kitchenCard)}</ul>
+                </section>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
