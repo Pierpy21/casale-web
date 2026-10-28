@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { deleteDish, upsertDish } from "@/app/actions/catalog";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import { Alert, Button, EmptyState, Field, Input, Modal, Switch, cn } from "@/components/ui";
 import { COURSE_LABELS, COURSE_ORDER, type Dish } from "@/lib/types";
 import { DishForm } from "./DishForm";
@@ -58,20 +60,28 @@ export function DishesPanel({ dishes }: DishesPanelProps) {
   function handleSaved(message: string) {
     setEditorOpen(false);
     setNotice({ tone: "success", text: message });
-    router.refresh();
+    if (isBrowserOnline()) router.refresh();
   }
 
   /** Prima chiamata senza force: se il piatto è nei menù, chiede conferma. */
   function requestRemove(dish: Dish) {
     setNotice(null);
     startTransition(async () => {
-      const result = await deleteDish(dish.id);
+      const result = await submitMutation("catalog.deleteDish", deleteDish, [dish.id, undefined], {
+        label: `Elimina piatto · ${dish.name}`,
+        entity: { type: "dish", id: dish.id },
+        expectedUpdated: updatedAtOf(dish),
+      });
       if (!result.ok) {
         if (result.code === "dish_in_use") {
           setRemoval({ dish, usedIn: result.usedIn ?? [] });
           return;
         }
         setNotice({ tone: "danger", text: result.error });
+        return;
+      }
+      if (isQueued(result)) {
+        setNotice({ tone: "success", text: `Eliminazione di "${dish.name}" salvata sul dispositivo: verrà inviata appena torna la rete.` });
         return;
       }
       setNotice({ tone: "success", text: `Piatto "${dish.name}" eliminato.` });
@@ -83,10 +93,19 @@ export function DishesPanel({ dishes }: DishesPanelProps) {
     const target = removal;
     if (!target) return;
     startTransition(async () => {
-      const result = await deleteDish(target.dish.id, { force: true });
+      const result = await submitMutation("catalog.deleteDish", deleteDish, [target.dish.id, { force: true }], {
+        label: `Elimina piatto · ${target.dish.name}`,
+        entity: { type: "dish", id: target.dish.id },
+        expectedUpdated: updatedAtOf(target.dish),
+        force: true,
+      });
       setRemoval(null);
       if (!result.ok) {
         setNotice({ tone: "danger", text: result.error });
+        return;
+      }
+      if (isQueued(result)) {
+        setNotice({ tone: "success", text: `Eliminazione di "${target.dish.name}" salvata sul dispositivo: verrà inviata appena torna la rete.` });
         return;
       }
       const count = result.data.removed_menu_items;
@@ -243,20 +262,32 @@ function DishRow({
     setActive(next);
     startTransition(async () => {
       // Nessuna azione dedicata: si richiama upsertDish con i dati attuali e il nuovo stato.
-      const result = await upsertDish({
-        id: dish.id,
-        name: dish.name,
-        course: dish.course,
-        description: dish.description ?? "",
-        active: next,
-        sort: dish.sort,
-      });
+      const result = await submitMutation(
+        "catalog.upsertDish",
+        upsertDish,
+        [
+          {
+            id: dish.id,
+            name: dish.name,
+            course: dish.course,
+            description: dish.description ?? "",
+            active: next,
+            sort: dish.sort,
+          },
+        ],
+        {
+          label: `${next ? "Attiva" : "Disattiva"} piatto · ${dish.name}`,
+          entity: { type: "dish", id: dish.id },
+          expectedUpdated: updatedAtOf(dish),
+        },
+      );
       if (!result.ok) {
         resetActive();
         onError(`Impossibile ${next ? "attivare" : "disattivare"} il piatto "${dish.name}": ${result.error}`);
         return;
       }
-      router.refresh();
+      // Offline lo stato resta quello scelto (ottimistico) finché la modifica non parte.
+      if (isBrowserOnline() && !isQueued(result)) router.refresh();
     });
   }
 

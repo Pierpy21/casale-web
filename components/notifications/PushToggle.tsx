@@ -3,6 +3,7 @@
 import { BellRing, Check, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { deletePushSubscription, savePushSubscription } from "@/app/actions/notifications";
+import { useOnline } from "@/components/offline/useOnline";
 import { Alert, Button, Skeleton } from "@/components/ui";
 
 type PushState = "checking" | "unsupported" | "ios-install" | "unconfigured" | "denied" | "off" | "on";
@@ -140,6 +141,7 @@ export function PushToggle() {
   const [state, setState] = useState<PushState>("checking");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const online = useOnline();
 
   useEffect(() => {
     let cancelled = false;
@@ -287,12 +289,12 @@ export function PushToggle() {
             <Check aria-hidden="true" className="size-4" />
             Notifiche attive su questo dispositivo
           </p>
-          <Button variant="ghost" size="sm" onClick={disable} disabled={busy} aria-busy={busy || undefined}>
+          <Button variant="ghost" size="sm" onClick={disable} disabled={busy || !online} aria-busy={busy || undefined}>
             Disattiva
           </Button>
         </div>
       ) : (
-        <Button variant="outline" size="sm" onClick={enable} disabled={busy} aria-busy={busy || undefined} className="w-full">
+        <Button variant="outline" size="sm" onClick={enable} disabled={busy || !online} aria-busy={busy || undefined} className="w-full">
           {busy ? (
             "Attivazione…"
           ) : (
@@ -302,6 +304,9 @@ export function PushToggle() {
             </>
           )}
         </Button>
+      )}
+      {!online && (
+        <p className="text-[13px] leading-relaxed text-slate-dark">Le notifiche si attivano o disattivano solo online.</p>
       )}
       {error && <Alert tone="danger">{error}</Alert>}
       {state === "off" && !error && (

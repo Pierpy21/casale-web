@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { markNotificationsRead, pollNotifications } from "@/app/actions/notifications";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { submitMutation } from "@/lib/offline/submit";
 import type { AppNotification } from "@/lib/types";
 
 /** Quante notifiche tenere in memoria nel pannello (come il caricamento iniziale). */
@@ -139,7 +141,7 @@ export function NotificationsProvider({ initialItems, initialUnread, children }:
       const readAt = new Date().toISOString();
       setItems((list) => list.map((n) => (n.id === id ? { ...n, read_at: readAt } : n)));
       setUnreadCount((count) => Math.max(0, count - 1));
-      void markNotificationsRead([id]).then((result) => {
+      void submitMutation("notifications.markNotificationsRead", markNotificationsRead, [[id]], { label: "Notifica letta" }).then((result) => {
         if (result.ok) return;
         // Rollback: la notifica torna non letta.
         setItems((list) => list.map((n) => (n.id === id ? { ...n, read_at: null } : n)));
@@ -151,14 +153,27 @@ export function NotificationsProvider({ initialItems, initialUnread, children }:
 
   const markAllRead = useCallback(() => {
     if (unreadCount === 0) return;
-    const previous = items;
+    const unreadIds = items.filter((n) => !n.read_at).map((n) => n.id);
+    // Online: come prima, il server segna tutte le non lette (anche quelle oltre le 30 in memoria).
+    // Offline, o se la chiamata online cade per rete e finisce in coda: vale l'istantanea delle non lette note al tap,
+    // così le notifiche arrivate nel frattempo restano non lette.
+    const online = isBrowserOnline();
+    if (!online && unreadIds.length === 0) return;
+    const snapshot = new Set(unreadIds);
+    const previousCount = unreadCount;
     const readAt = new Date().toISOString();
-    setItems((list) => list.map((n) => (n.read_at ? n : { ...n, read_at: readAt })));
-    setUnreadCount(0);
-    void markNotificationsRead().then((result) => {
+    setItems((list) => list.map((n) => (snapshot.has(n.id) ? { ...n, read_at: readAt } : n)));
+    setUnreadCount((count) => (online ? 0 : Math.max(0, count - unreadIds.length)));
+    void submitMutation(
+      "notifications.markNotificationsRead",
+      markNotificationsRead,
+      [online ? undefined : unreadIds],
+      { label: "Notifiche lette", queueArgs: [unreadIds] },
+    ).then((result) => {
       if (result.ok) return;
-      setItems(previous);
-      setUnreadCount(unreadCount);
+      // Rollback solo delle notifiche della richiesta: le altre (arrivate nel frattempo) non si toccano.
+      setItems((list) => list.map((n) => (snapshot.has(n.id) ? { ...n, read_at: null } : n)));
+      setUnreadCount(online ? previousCount : (count) => count + unreadIds.length);
     });
   }, [items, unreadCount]);
 

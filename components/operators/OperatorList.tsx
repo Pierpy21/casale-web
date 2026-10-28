@@ -5,6 +5,8 @@ import { useState, useTransition, type FormEvent } from "react";
 import { deleteOperator, resetOperatorPassword, setOperatorActive, updateOperator } from "@/app/actions/operators";
 import { useOptimisticActive } from "@/components/catalog/useOptimisticActive";
 import { ConfirmAction } from "@/components/bookings/ConfirmAction";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import {
   Alert,
   Badge,
@@ -58,13 +60,17 @@ function OperatorRow({ operator }: { operator: Profile }) {
     setError(null);
     setNotice(null);
     startToggle(async () => {
-      const result = await setOperatorActive(operator.id, next);
+      const result = await submitMutation("operators.setOperatorActive", setOperatorActive, [operator.id, next], {
+        label: `${next ? "Attiva" : "Disattiva"} operatore · ${operator.full_name}`,
+        entity: { type: "operator", id: operator.id },
+        expectedUpdated: updatedAtOf(operator),
+      });
       if (!result.ok) {
         resetActive();
         setError(`Impossibile ${next ? "attivare" : "disattivare"} ${operator.full_name}: ${result.error}`);
         return;
       }
-      router.refresh();
+      if (isBrowserOnline() && !isQueued(result)) router.refresh();
     });
   }
 
@@ -120,8 +126,16 @@ function OperatorRow({ operator }: { operator: Profile }) {
                   description="L’account verrà eliminato definitivamente e non potrà più accedere. Prenotazioni, storico e giacenze restano, con il suo nome. Per bloccare l’accesso senza eliminare, usa lo switch Attivo."
                   confirmLabel="Elimina definitivamente"
                   pendingLabel="Eliminazione…"
-                  run={() => deleteOperator(operator.id)}
-                  onSuccess={() => router.refresh()}
+                  run={() =>
+                    submitMutation("operators.deleteOperator", deleteOperator, [operator.id], {
+                      label: `Elimina operatore · ${operator.full_name}`,
+                      entity: { type: "operator", id: operator.id },
+                      expectedUpdated: updatedAtOf(operator),
+                    })
+                  }
+                  onSuccess={() => {
+                    if (isBrowserOnline()) router.refresh();
+                  }}
                 />
               </div>
             )}
@@ -177,7 +191,11 @@ function EditOperatorForm({
     setError(null);
     setFieldErrors({});
     startTransition(async () => {
-      const result = await updateOperator(operator.id, input);
+      const result = await submitMutation("operators.updateOperator", updateOperator, [operator.id, input], {
+        label: `Modifica operatore · ${input.full_name.trim()}`,
+        entity: { type: "operator", id: operator.id },
+        expectedUpdated: updatedAtOf(operator),
+      });
       if (!result.ok) {
         setError(result.error);
         const first: Record<string, string> = {};
@@ -187,7 +205,7 @@ function EditOperatorForm({
         setFieldErrors(first);
         return;
       }
-      router.refresh();
+      if (isBrowserOnline()) router.refresh();
       onDone(`Dati di ${input.full_name.trim()} aggiornati.`);
     });
   }
@@ -249,6 +267,11 @@ function ResetPasswordDialog({
     event.preventDefault();
     const password = String(new FormData(event.currentTarget).get("password") ?? "");
     setError(null);
+    // Password: solo online, non viene mai salvata nella coda del dispositivo.
+    if (!isBrowserOnline()) {
+      setError("La reimpostazione della password richiede la connessione.");
+      return;
+    }
     startTransition(async () => {
       const result = await resetOperatorPassword(operatorId, password);
       if (!result.ok) {

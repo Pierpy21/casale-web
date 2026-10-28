@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { upsertMenu } from "@/app/actions/catalog";
+import { submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import { Alert, Button, cn, Field, Input, Switch, Textarea } from "@/components/ui";
 import { COURSE_ORDER, type Course, type Dish, type Menu } from "@/lib/types";
 import { MENU_PHOTO_MAX_BYTES, MENU_PHOTO_MAX_COUNT, MENU_PHOTO_MIME_TYPES } from "@/lib/validation";
@@ -274,7 +275,13 @@ export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps)
     setPhotoError(null);
 
     startTransition(async () => {
-      const result = await upsertMenu(body);
+      // Le foto (File) restano nella coda insieme ai dati se la rete manca.
+      const result = await submitMutation("catalog.upsertMenu", upsertMenu, [body], {
+        label: menu ? `Modifica menù · ${input.name.trim()}` : `Nuovo menù · ${input.name.trim()}`,
+        entity: menu ? { type: "menu", id: menu.id } : undefined,
+        expectedUpdated: updatedAtOf(menu),
+        createsTempId: !menu,
+      });
       if (!result.ok) {
         setFormError(result.error);
         setErrors(toErrorMap(result.fieldErrors));

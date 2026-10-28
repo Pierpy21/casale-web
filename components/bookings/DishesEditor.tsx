@@ -7,6 +7,8 @@ import { CourseSections, ReorderButtons, inCourseOrder, moveWithinCourse, useFoc
 import { DishPicker } from "@/components/catalog/DishPicker";
 import { normalizeSearch } from "@/components/catalog/search";
 import { Alert, Button, Field, Textarea } from "@/components/ui";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { isQueued, submitMutation } from "@/lib/offline/submit";
 import { COURSE_ORDER, type BookingDish, type Course, type Dish } from "@/lib/types";
 import { ConfirmAction } from "./ConfirmAction";
 
@@ -42,6 +44,10 @@ export interface DishesEditorProps {
   catalog: Dish[];
   /** Chiude l'editor: `saved` è true dopo un salvataggio riuscito, false con "Annulla". */
   onClose: (saved: boolean) => void;
+  /** Salvataggio accodato offline: riceve i piatti scelti, da mostrare al posto di quelli del server. */
+  onQueued?: (dishes: DishPayload[]) => void;
+  /** `updated_at` della prenotazione letto con la pagina (controllo di conflitto offline). */
+  expectedUpdated?: string;
 }
 
 /**
@@ -50,7 +56,7 @@ export interface DishesEditorProps {
  * Il componente va montato con `key` legata alla versione dei piatti salvati: dopo un salvataggio
  * o un ripristino si riparte dai dati del server.
  */
-export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti", dishes, hasMenu, catalog, onClose }: DishesEditorProps) {
+export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti", dishes, hasMenu, catalog, onClose, onQueued, expectedUpdated }: DishesEditorProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const nextKey = useRef(0);
@@ -166,9 +172,19 @@ export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti",
     }
 
     startTransition(async () => {
-      const result = await updateBookingDishes(bookingId, payload);
+      const result = await submitMutation("bookings.updateBookingDishes", updateBookingDishes, [bookingId, payload], {
+        label: "Piatti dell’evento",
+        entity: { type: "booking", id: bookingId },
+        expectedUpdated,
+      });
       if (!result.ok) {
         setFormError(result.error);
+        return;
+      }
+      if (isQueued(result)) {
+        // Offline: si mostrano i piatti scelti; il refresh richiede la rete.
+        onQueued?.(payload);
+        onClose(true);
         return;
       }
       router.refresh();
@@ -224,8 +240,17 @@ export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti",
             description="I piatti attuali dell’evento verranno sostituiti con quelli del menù selezionato. Le modifiche non salvate andranno perse."
             confirmLabel="Ripristina"
             pendingLabel="Ripristino…"
-            run={() => resetDishesFromMenu(bookingId)}
-            onSuccess={() => router.refresh()}
+            run={() =>
+              submitMutation("bookings.resetDishesFromMenu", resetDishesFromMenu, [bookingId], {
+                label: "Ripristino piatti dal menù",
+                entity: { type: "booking", id: bookingId },
+                expectedUpdated,
+              })
+            }
+            onSuccess={() => {
+              // Offline la pagina resta quella di prima: il ripristino parte appena torna la rete.
+              if (isBrowserOnline()) router.refresh();
+            }}
           />
         )}
       </div>

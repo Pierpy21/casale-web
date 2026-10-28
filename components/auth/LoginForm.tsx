@@ -2,11 +2,13 @@
 
 import { useActionState } from "react";
 import { signIn } from "@/app/actions/auth";
+import { useOnline } from "@/components/offline/useOnline";
 import { Alert, Field, Input, SubmitButton, fieldIds } from "@/components/ui";
 import type { ActionResult } from "@/lib/types";
 
 export function LoginForm() {
   const [state, formAction] = useActionState<ActionResult | null, FormData>(signIn, null);
+  const online = useOnline();
   const failure = state && !state.ok ? state : null;
   const fieldErrors = failure?.fieldErrors;
   const emailIds = fieldIds("email");
@@ -43,7 +45,8 @@ export function LoginForm() {
         />
       </Field>
 
-      <SubmitButton size="lg" className="mt-2 w-full" pendingLabel="Accesso in corso…">
+      {!online && <Alert tone="warning">L’accesso richiede la connessione: torna online e riprova.</Alert>}
+      <SubmitButton size="lg" className="mt-2 w-full" pendingLabel="Accesso in corso…" disabled={!online}>
         Accedi
       </SubmitButton>
     </form>

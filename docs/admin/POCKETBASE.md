@@ -28,6 +28,7 @@ Le migrazioni sono in `pocketbase/pb_migrations/` del repository:
 - `1793000009_booking_status_rules.js`: stato delle prenotazioni. Prenotazioni normali in "opzione" → "confermato"; eventi in "opzione" con almeno un acconto → "confermato" (gli eventi senza acconti restano in "opzione"). Idempotente, down no-op.
 - `1793000010_booking_notes.js`: note interne sulle prenotazioni (`booking_notes`: prenotazione, autore, nome autore, testo max 2000 caratteri), cancellate a cascata con la prenotazione. Riservata all'account di servizio. Idempotente, con down (elimina la collezione).
 - `1793000011_hide_appointment_notifications.js`: le notifiche delle prenotazioni di tipo appuntamento (`kind` = appuntamento) restano solo agli admin: elimina quelle destinate ad altri utenti. Idempotente, down no-op.
+- `1793000012_applied_mutations.js`: modalità offline (sezione 10). Crea `applied_mutations` (modifiche applicate o in corso, per l'idempotenza dei reinvii, con `status` `pending`/`done`) e aggiunge `rooms.updated` (data di ultima modifica delle sale, per il controllo di conflitto). Riservata all'account di servizio. Idempotente, con down (elimina la collezione e il campo).
 
 Le migrazioni già applicate non si modificano: `1793000000` può essere già in produzione, quindi le modifiche vanno in file nuovi.
 
@@ -143,7 +144,7 @@ Copia i backup fuori dal server (storage cifrato) e prova periodicamente il ripr
 ## 9. Note operative e limiti
 
 - **Email**: SMTP non configurato. Verifica email e reset password non funzionano: non usarli nei flussi dell'app. La creazione degli utenti è fatta dall'app (account di servizio), con email già considerata verificata.
-- **Token utente**: 3 giorni. Il middleware rinnova il token quando scade entro 24 ore. Un operatore disattivato perde l'accesso al prossimo controllo (`authRule active = true`).
+- **Token utente**: 3 giorni. Il middleware rinnova il token quando scade entro 24 ore. Un operatore disattivato perde l'accesso al prossimo controllo (`authRule active = true`). Il login alle pagine (`lib/auth.ts`) rimanda a `/admin/login` solo per sessione non valida (401/403/404 di PocketBase, utente inattivo). Errori di rete o 5xx di PocketBase danno una pagina di errore, senza disconnettere l'utente.
 - **Rate limit**: 10 tentativi di login ogni 60 secondi (regola `*:authWithPassword`).
 - **SDK**: il progetto usa il client `pocketbase` 0.28 contro un server 0.40. Il REST di records, auth e batch è compatibile, ma conviene allineare il pacchetto (`npm install pocketbase@^0.40`) dopo un test.
 - **Ricevute**: file protetti. Passano sempre dall'app (`/api/receipts/[id]`), che controlla la sessione admin e scarica il file con il token dell'account di servizio.
@@ -151,3 +152,43 @@ Copia i backup fuori dal server (storage cifrato) e prova periodicamente il ripr
 - **Permessi**: admin crea eventi, normali e appuntamenti, modifica tutto, gestisce preventivi, pagamenti, rubrica e operatori. La sala vede tutto, modifica solo i coperti e crea solo prenotazioni normali (il cliente si inserisce come nuovo cliente). La cucina non modifica prenotazioni (il flag chef non dà più permessi) e usa la giacenza: report di presenza e da ordinare, PDF da `/api/inventory/[id]/pdf`.
 - **Giacenza**: l'invio di un report notifica gli admin (push se configurato) con il riepilogo "Da ordinare: Viagrande 5, Amadori 3". Il report resta nello storico e l'admin lo segna come visto. Il PDF raggruppa per fornitore; `/api/inventory/[id]/pdf?supplier=viagrande` esporta la lista d'ordine di un solo fornitore. Il fornitore dei prodotti lo modifica solo l'admin. Le righe dei report conservano lo snapshot di fornitore e categoria al momento dell'invio.
 - **Notifiche (polling)**: nessuna connessione realtime. Ogni 20 secondi, a scheda visibile, la campanella chiede le novità al server (`pollNotifications`). Con la scheda nascosta il polling è sospeso; al ritorno o al focus parte subito una richiesta. Dopo errori ripetuti l'intervallo cresce fino a 5 minuti. Se la sessione scade, l'app torna al login. Il carico è di una richiesta per utente ogni 20 secondi: per i numeri di questo progetto è trascurabile.
+
+---
+
+## 10. Modifiche offline: idempotenza e conflitti
+
+Nell'admin le modifiche fatte senza rete finiscono in una coda sul dispositivo e vengono reinviate alle stesse server action (contratto in `lib/offline/contract.ts`). Il server le rende sicure in due modi, implementati in `lib/mutations.ts`:
+
+- **Idempotenza** (`applied_mutations`, migrazione 1793000012): ogni modifica porta un `mutationId` (UUID v4). Il server prenota l'id prima di eseguire l'azione: inserisce una riga con `status: "pending"`, `claimed_at` (ISO) e `actor`. Se la riga esiste già, il comportamento dipende dal suo stato (tabella sotto). A successo la riga diventa `status: "done"` con `result` (`{ ok, data }`). Se l'azione restituisce `ok: false` (validazione, permessi, conflitto: nessuna scrittura) la riga si elimina, così la coda può correggere e reinviare. Se l'azione lancia un'eccezione, la riga resta con `result: { ok: false, uncertain: true, error }`: l'esito è incerto e non si riesegue mai. L'indice unico su `mutation_id` impedisce che due richieste con lo stesso id eseguano entrambe.
+- **Nessuna ripresa automatica**: una modifica il cui esito non è certo (riga pending vecchia, o eccezione) non viene mai rieseguita. Il server risponde "Esito incerto" e la coda la segna in errore: l'utente controlla i dati e, se serve, la scarta.
+- **Reinvii** (`replay: true`): solo la coda offline li imposta. Se la collezione manca, un reinvio NON viene eseguito e riceve `code: "in_progress"` con il messaggio "Sincronizzazione non disponibile: aggiornamento del server in corso. Riprova più tardi." (fail-closed). Una prima chiamata dal form, invece, esegue senza idempotenza e scrive un avviso nei log una sola volta.
+- **Conflitti**: la modifica di un record esistente porta `expectedUpdated` (il `updated` letto dall'utente). Se sul server il record è cambiato, l'azione non scrive e risponde `code: "conflict"` con `conflict.currentUpdated` e `conflict.updatedByName`. Per i coperti, i piatti, le allergie e le note il confronto è con la prenotazione genitore. Con `force` il controllo è saltato ("Sovrascrivi").
+- **Eliminazione di un record già eliminato**: risponde ok solo nei reinvii (`replay: true`). Dal form resta il messaggio "non trovato" di prima.
+- **Sessione**: se manca la sessione, `authorize` risponde `code: "unauthenticated"`: la coda si ferma finché l'utente non rientra.
+
+Tabella decisionale di `withMutation` (`lib/mutations.ts`). `run` è l'azione vera e propria.
+
+| Situazione | Risposta | `run` |
+|---|---|---|
+| `mutationId` non valido | `ok: false` (nessun code) | no |
+| Riga `done` | risultato salvato | no |
+| Riga `pending` con `uncertain` (eccezione precedente) | `ok: false`, "Esito incerto…" (nessun code) | no |
+| Riga `pending`, `claimed_at` meno di 2 minuti fa | `ok: false`, `code: "in_progress"` | no |
+| Riga `pending`, `claimed_at` 2 minuti o più fa (o illeggibile) | `ok: false`, "Esito incerto…" (nessun code) | no |
+| Errore del database in lettura o creazione della riga | `ok: false`, `code: "in_progress"` | no |
+| Riga sparita tra il tentativo di creazione e la rilettura | `ok: false`, `code: "in_progress"` | no |
+| Collezione `applied_mutations` assente, reinvio (`replay: true`) | `ok: false`, `code: "in_progress"` (messaggio "Sincronizzazione non disponibile…") | no |
+| Collezione assente, prima chiamata dal form | esecuzione senza idempotenza (avviso nei log) | sì |
+| Riga nuova, `run` → `ok: true` | riga `done` con il risultato; se la registrazione fallisce si ritenta, la risposta resta `ok: true` | sì |
+| Riga nuova, `run` → `ok: false` | riga eliminata (sblocco), risposta di `run` | sì |
+| Riga nuova, `run` lancia un'eccezione | riga marcata `uncertain`, risposta "Esito incerto…" (nessun code) | sì |
+
+Il `code: "in_progress"` non è un errore definitivo: la coda riprova con attesa crescente. L'"Esito incerto" non si riprova: la coda segna la modifica in errore e l'utente decide.
+
+**Scritture della riga.** Dopo `run`, la registrazione (`done`, sblocco o marcatura incerta) si ritenta tre volte in circa 5 secondi. Se fallisce ancora, si programmano altri tentativi in background con `after()` (10 s, 30 s, 90 s). In quel caso la risposta resta quella di `run`. Se nemmeno i tentativi in background riescono, la riga resta `pending` e dopo 2 minuti i reinvii ricevono "Esito incerto…": nessuna modifica viene riapplicata.
+
+**Limite noto.** Un'azione che impiega più di 2 minuti (riga ancora `pending`) viene trattata come incerta anche se poi va a buon fine: il reinvio risponde "Esito incerto…" e l'utente deve verificare il dato. Il caso è raro, perché le azioni sono brevi.
+
+**Pulizia.** Le righe più vecchie di 30 giorni (campo `created`) si eliminano in background, al massimo una volta all'ora per istanza del server, fino a 2000 righe per esecuzione. È best-effort: un errore va nei log e non blocca né fa fallire l'azione. Non serve nessun cron. L'indice su `created` rende il filtro leggero.
+
+Le chiamate senza opzioni (uso online) non cambiano comportamento.

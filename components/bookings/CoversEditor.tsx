@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { updateBookingCovers } from "@/app/actions/bookings";
+import { isQueued, submitMutation } from "@/lib/offline/submit";
 import { Alert, Button } from "@/components/ui";
 import { CountStepper } from "./CountStepper";
 
@@ -11,31 +12,47 @@ export interface CoversEditorProps {
   adults: number;
   childCount: number;
   kidsMenus: number;
+  /** `updated_at` della prenotazione letto con la pagina (controllo di conflitto offline). */
+  expectedUpdated?: string;
 }
 
 type Errors = Record<string, string[]>;
 
 /** Modifica dei soli coperti (sala e admin). Salva via updateBookingCovers e ricarica la pagina. */
-export function CoversEditor({ bookingId, adults, childCount, kidsMenus }: CoversEditorProps) {
+export function CoversEditor({ bookingId, adults, childCount, kidsMenus, expectedUpdated }: CoversEditorProps) {
   const router = useRouter();
   const [values, setValues] = useState({ adults, children: childCount, kids_menus: kidsMenus });
+  // Valori considerati salvati: di norma quelli ricevuti; dopo un salvataggio in coda, quelli inviati.
+  const [base, setBase] = useState({ adults, children: childCount, kids_menus: kidsMenus });
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [saved, setSaved] = useState(false);
+  const [queued, setQueued] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const dirty =
-    values.adults !== adults || values.children !== childCount || values.kids_menus !== kidsMenus;
+    values.adults !== base.adults || values.children !== base.children || values.kids_menus !== base.kids_menus;
 
   const save = () => {
     setError(null);
     setErrors({});
     setSaved(false);
+    setQueued(false);
     startTransition(async () => {
-      const result = await updateBookingCovers(bookingId, values);
+      const result = await submitMutation("bookings.updateBookingCovers", updateBookingCovers, [bookingId, values], {
+        label: `Coperti · ${values.adults} adulti, ${values.children} bambini`,
+        entity: { type: "booking", id: bookingId },
+        expectedUpdated,
+      });
       if (!result.ok) {
         setError(result.error);
         setErrors(result.fieldErrors ?? {});
+        return;
+      }
+      if (isQueued(result)) {
+        // Offline: niente aggiornamento della pagina (richiede la rete); i valori restano quelli scelti.
+        setBase(values);
+        setQueued(true);
         return;
       }
       setSaved(true);
@@ -44,10 +61,11 @@ export function CoversEditor({ bookingId, adults, childCount, kidsMenus }: Cover
   };
 
   const reset = () => {
-    setValues({ adults, children: childCount, kids_menus: kidsMenus });
+    setValues(base);
     setError(null);
     setErrors({});
     setSaved(false);
+    setQueued(false);
   };
 
   return (
@@ -99,6 +117,11 @@ export function CoversEditor({ bookingId, adults, childCount, kidsMenus }: Cover
         {saved && !dirty && (
           <span role="status" className="text-[13px] text-success">
             Coperti aggiornati.
+          </span>
+        )}
+        {queued && !dirty && (
+          <span role="status" className="text-[13px] text-success">
+            Salvato sul dispositivo: verrà inviato appena torna la rete.
           </span>
         )}
       </div>

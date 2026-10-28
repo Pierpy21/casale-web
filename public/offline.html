@@ -8,13 +8,14 @@
     <style>
       :root { color-scheme: light; }
       * { box-sizing: border-box; }
-      html, body { height: 100%; margin: 0; }
+      html, body { min-height: 100%; margin: 0; }
       body {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         gap: 1.25rem;
+        min-height: 100dvh;
         padding: calc(env(safe-area-inset-top) + 2rem) 1.5rem calc(env(safe-area-inset-bottom) + 2rem);
         background: #F7F7F4;
         color: #1C2B2D;
@@ -45,23 +46,47 @@
         font-size: 1.75rem;
         line-height: 1.15;
       }
-      p { margin: 0; max-width: 22rem; font-size: 15px; line-height: 1.5; color: #5A6668; }
-      button {
+      p { margin: 0; max-width: 24rem; font-size: 15px; line-height: 1.5; color: #5A6668; }
+      .note {
+        max-width: 24rem;
+        padding: 0.875rem 1rem;
+        border: 1px solid #D5D5B7;
+        border-radius: 2px;
+        background: #FFFFFF;
+        font-size: 14px;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.75rem;
         margin-top: 0.5rem;
+      }
+      a.button, button {
+        display: inline-block;
         border: 1px solid #355A63;
         border-radius: 2px;
         background: #355A63;
         color: #F7F7F4;
-        padding: 0.875rem 2rem;
+        padding: 0.875rem 1.5rem;
         font: inherit;
         font-size: 13px;
         font-weight: 500;
         letter-spacing: 0.12em;
         text-transform: uppercase;
+        text-decoration: none;
         cursor: pointer;
       }
-      button:hover { background: #2A4A52; }
-      button:focus-visible { outline: 2px solid #355A63; outline-offset: 2px; }
+      a.button:hover, button:hover { background: #2A4A52; }
+      a.button.secondary, button.secondary {
+        background: transparent;
+        color: #355A63;
+      }
+      a.button.secondary:hover, button.secondary:hover { background: #355A63; color: #F7F7F4; }
+      a.button:focus-visible, button:focus-visible { outline: 2px solid #355A63; outline-offset: 2px; }
+      @media (prefers-reduced-motion: reduce) {
+        a.button, button { transition: none; }
+      }
     </style>
   </head>
   <body>
@@ -70,7 +95,13 @@
     </div>
     <p class="eyebrow">Agenda digitale</p>
     <h1>Sei offline</h1>
-    <p>Sei offline — riconnettiti per vedere l'agenda.</p>
-    <button type="button" onclick="location.reload()">Riprova</button>
+    <p>Questa pagina non è stata aperta mentre eri connesso da questo dispositivo, quindi non è disponibile senza rete.</p>
+    <p class="note">
+      Le schermate aperte di recente e quelle preparate in anticipo, quando eri online, restano consultabili anche senza connessione.
+    </p>
+    <div class="actions">
+      <a class="button" href="/admin/agenda">Apri l&rsquo;agenda</a>
+      <button type="button" class="secondary" onclick="location.reload()">Riprova</button>
+    </div>
   </body>
 </html>

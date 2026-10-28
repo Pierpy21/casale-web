@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition, type FormEvent, type KeyboardEvent 
 import { createInventoryProduct, submitInventoryReport } from "@/app/actions/inventory";
 import { Alert, Button, Field, Input, cn } from "@/components/ui";
 import { compareInventoryProducts } from "@/lib/inventory-utils";
+import { isQueued, submitMutation } from "@/lib/offline/submit";
 import {
   INVENTORY_CATEGORIES,
   INVENTORY_CATEGORY_LABELS,
@@ -140,14 +141,24 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
 
   /** Crea un prodotto nel catalogo e lo inserisce nell'elenco (anche se esisteva già: si usa il dato del server). */
   const createProduct = async (input: NewInventoryProductInput): Promise<string | null> => {
-    const result = await createInventoryProduct({
-      name: input.name,
-      unit: input.unit,
-      category: input.category,
-      ...(input.supplier ? { supplier: input.supplier } : {}),
-    });
+    const result = await submitMutation(
+      "inventory.createInventoryProduct",
+      createInventoryProduct,
+      [
+        {
+          name: input.name,
+          unit: input.unit,
+          category: input.category,
+          ...(input.supplier ? { supplier: input.supplier } : {}),
+        },
+      ],
+      { label: `Nuovo prodotto · ${input.name}`, createsTempId: true },
+    );
     if (!result.ok) return result.error;
-    const ref = result.data;
+    // Offline il server non ha ancora risposto: il prodotto locale usa l'id temporaneo e i dati inseriti.
+    const ref = isQueued(result)
+      ? { id: result.data.id, name: input.name, unit: input.unit, category: input.category, supplier: input.supplier ?? ("altro" as const) }
+      : result.data;
     setProducts((list) => {
       if (list.some((p) => p.id === ref.id)) return list;
       const created: InventoryProduct = {
@@ -158,6 +169,8 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
         supplier: ref.supplier,
         sort: APPENDED_SORT,
         active: true,
+        // Vuoto: nessuna verifica di conflitto lato server per un prodotto appena creato.
+        updated_at: "",
       };
       return [...list, created].sort(compareInventoryProducts);
     });
@@ -189,16 +202,22 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
       return;
     }
     startTransition(async () => {
-      const result = await submitInventoryReport({
-        report_date: reportDate,
-        notes: notes.trim() || null,
-        lines: filledLines,
-      });
+      const result = await submitMutation(
+        "inventory.submitInventoryReport",
+        submitInventoryReport,
+        [{ report_date: reportDate, notes: notes.trim() || null, lines: filledLines }],
+        { label: `Giacenza del ${reportDate}`, createsTempId: true },
+      );
       if (!result.ok) {
         setFormError(result.error);
         return;
       }
       clearInventoryDraft();
+      // Offline il report non ha ancora un id reale: si torna all'elenco (in cache).
+      if (isQueued(result)) {
+        router.push("/admin/giacenza");
+        return;
+      }
       router.push(`/admin/giacenza/${result.data.id}`);
     });
   };

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { createBooking, updateBooking } from "@/app/actions/bookings";
+import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import { Alert, Field, Input, Select, Textarea } from "@/components/ui";
 import {
   EVENT_TYPES,
@@ -241,20 +242,35 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       focusFirstInvalid(formRef.current);
     };
 
+    const who = isEdit && booking ? `${booking.client.first_name} ${booking.client.last_name}` : newClient.full_name.trim();
+
     startTransition(async () => {
       if (isEdit && booking) {
-        const result = await updateBooking(booking.id, payload);
+        const result = await submitMutation("bookings.updateBooking", updateBooking, [booking.id, payload], {
+          label: `Modifica prenotazione · ${who}`,
+          entity: { type: "booking", id: booking.id },
+          expectedUpdated: updatedAtOf(booking),
+        });
         if (!result.ok) {
           applyError(result);
           return;
         }
+        // Offline: torna al dettaglio (in cache), che mostra le modifiche in attesa.
         router.push(`/admin/prenotazioni/${booking.id}`);
         return;
       }
 
-      const result = await createBooking(payload);
+      const result = await submitMutation("bookings.createBooking", createBooking, [payload, undefined], {
+        label: `Nuova prenotazione · ${who || "cliente"}`,
+        createsTempId: true,
+      });
       if (!result.ok) {
         applyError(result);
+        return;
+      }
+      // Offline: la prenotazione non ha ancora un id reale, quindi si torna all'agenda (in cache).
+      if (isQueued(result)) {
+        router.push(`/admin/agenda?date=${values.event_date}&view=day`);
         return;
       }
       const { id, warnings: serverWarnings } = result.data;

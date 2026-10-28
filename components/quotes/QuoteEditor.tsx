@@ -8,6 +8,7 @@ import { deleteQuote, updateQuote } from "@/app/actions/quotes";
 import { ConfirmAction } from "@/components/bookings/ConfirmAction";
 import { parseFinalTotal } from "@/components/bookings/quote-draft";
 import { Alert, Button, DocumentDownload, Field, Input, Textarea, buttonClasses } from "@/components/ui";
+import { submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import { buildQuoteDocumentModel } from "@/lib/documents/quote-model";
 import { DOCX_MIME, computeQuoteTotals, formatEUR, quoteFileName, round2 } from "@/lib/quote-utils";
 import type { QuoteLine, QuoteWithBooking } from "@/lib/types";
@@ -155,15 +156,27 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
     }
     const currentSnapshot = snapshot;
     startTransition(async () => {
-      const result = await updateQuote(quote.id, {
-        issued_at: issuedAt,
-        valid_until: validUntil || null,
-        lines: rows.map((r) => ({ description: r.description, quantity: r.quantity, unit_price: r.unit_price })),
-        discount,
-        final_total: finalTotal,
-        vat_rate: vatRate,
-        notes: notes.trim() || null,
-      });
+      const result = await submitMutation(
+        "quotes.updateQuote",
+        updateQuote,
+        [
+          quote.id,
+          {
+            issued_at: issuedAt,
+            valid_until: validUntil || null,
+            lines: rows.map((r) => ({ description: r.description, quantity: r.quantity, unit_price: r.unit_price })),
+            discount,
+            final_total: finalTotal,
+            vat_rate: vatRate,
+            notes: notes.trim() || null,
+          },
+        ],
+        {
+          label: `Modifica preventivo n. ${quote.number}`,
+          entity: { type: "quote", id: quote.id },
+          expectedUpdated: updatedAtOf(quote),
+        },
+      );
       if (!result.ok) {
         setFormError(result.error);
         setErrors(result.fieldErrors ?? {});
@@ -309,7 +322,13 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
               description={`Il preventivo n. ${quote.number} verrà eliminato definitivamente.`}
               confirmLabel="Elimina"
               pendingLabel="Eliminazione…"
-              run={() => deleteQuote(quote.id)}
+              run={() =>
+                submitMutation("quotes.deleteQuote", deleteQuote, [quote.id], {
+                  label: `Elimina preventivo n. ${quote.number}`,
+                  entity: { type: "quote", id: quote.id },
+                  expectedUpdated: updatedAtOf(quote),
+                })
+              }
               onSuccess={() => router.push(`/admin/prenotazioni/${quote.booking_id}`)}
             />
           </div>

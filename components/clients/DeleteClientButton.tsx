@@ -4,14 +4,17 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteClient } from "@/app/actions/clients";
 import { Alert, Button, Modal } from "@/components/ui";
+import { isQueued, submitMutation } from "@/lib/offline/submit";
 
 export interface DeleteClientButtonProps {
   clientId: string;
   clientName: string;
+  /** `updated_at` del cliente letto con la pagina (controllo di conflitto offline). */
+  expectedUpdated?: string;
 }
 
 /** Elimina il cliente dopo conferma. Se ha prenotazioni, l'errore del server viene mostrato nella finestra. */
-export function DeleteClientButton({ clientId, clientName }: DeleteClientButtonProps) {
+export function DeleteClientButton({ clientId, clientName, expectedUpdated }: DeleteClientButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +28,16 @@ export function DeleteClientButton({ clientId, clientName }: DeleteClientButtonP
   function handleDelete() {
     setError(null);
     startTransition(async () => {
-      const result = await deleteClient(clientId);
+      const result = await submitMutation("clients.deleteClient", deleteClient, [clientId], {
+        label: `Elimina cliente · ${clientName}`,
+        entity: { type: "client", id: clientId },
+        expectedUpdated,
+      });
+      if (isQueued(result)) {
+        // Offline: si torna all'elenco clienti (in cache); l'eliminazione parte appena torna la rete.
+        router.push("/admin/clienti");
+        return;
+      }
       if (!result.ok) {
         setError(result.error);
         return;

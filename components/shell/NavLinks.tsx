@@ -8,6 +8,7 @@ import {
   History,
   LayoutDashboard,
   PartyPopper,
+  RefreshCw,
   UserCog,
   UtensilsCrossed,
   Users,
@@ -19,6 +20,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { signOut } from "@/app/actions/auth";
 import { InstallAppButton } from "@/components/pwa/InstallAppButton";
+import { SignOutForm } from "@/components/pwa/SignOutForm";
+import { QueueBadge } from "@/components/offline/QueueBadge";
+import { useOnline } from "@/components/offline/useOnline";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { cn } from "@/components/ui/cn";
 import type { NavIcon, NavLink } from "./nav";
@@ -33,6 +37,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   inventory: Boxes,
   activity: History,
   stats: BarChart3,
+  sync: RefreshCw,
 };
 
 /** Numero di voci dirette nella barra mobile; le altre finiscono nel menù "Altro". */
@@ -86,6 +91,7 @@ export function SidebarNav({ items }: { items: NavLink[] }) {
               >
                 <Icon aria-hidden="true" className="size-[18px] shrink-0" />
                 {item.label}
+                {item.badge === "queue" && <QueueBadge className="ml-auto" />}
               </Link>
             </li>
           );
@@ -107,6 +113,7 @@ export function BottomNav({ items }: { items: NavLink[] }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const sheetRef = useRef<HTMLDialogElement>(null);
   const sheetTitleId = useId();
+  const online = useOnline();
 
   // Su telefono la creazione passa dal pulsante +: le voci con mobileBar=false restano fuori dalla barra.
   const mobileItems = items.filter((item) => item.mobileBar !== false);
@@ -149,6 +156,9 @@ export function BottomNav({ items }: { items: NavLink[] }) {
                   )}
                   <Icon aria-hidden="true" className="size-5 shrink-0" />
                   <span className="block max-w-full truncate">{item.label}</span>
+                  {item.badge === "queue" && (
+                    <QueueBadge className="absolute left-[calc(50%+0.5rem)] top-1 h-4 min-w-4 px-1 text-[10px]" />
+                  )}
                 </Link>
               </li>
             );
@@ -218,6 +228,7 @@ export function BottomNav({ items }: { items: NavLink[] }) {
                     >
                       <Icon aria-hidden="true" className="size-5 shrink-0" />
                       {item.label}
+                      {item.badge === "queue" && <QueueBadge className="ml-auto" />}
                     </Link>
                   </li>
                 );
@@ -227,11 +238,12 @@ export function BottomNav({ items }: { items: NavLink[] }) {
         )}
 
         <div className="border-t border-sand px-5 py-4">
-          <form action={signOut}>
-            <SubmitButton variant="outline" size="md" className="w-full" pendingLabel="Uscita…">
+          <SignOutForm action={signOut}>
+            <SubmitButton variant="outline" size="md" className="w-full" pendingLabel="Uscita…" disabled={!online}>
               Esci
             </SubmitButton>
-          </form>
+          </SignOutForm>
+          {!online && <p className="mt-2 text-center text-[13px] text-slate">Uscita disponibile solo online.</p>}
         </div>
       </dialog>
     </>

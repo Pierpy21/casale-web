@@ -1,7 +1,7 @@
 import { canUseInventory, canViewActivityLog, isAdmin } from "@/lib/permissions";
 import type { Profile } from "@/lib/types";
 
-export type NavIcon = "event" | "agenda" | "dashboard" | "clients" | "operators" | "catalog" | "inventory" | "activity" | "stats";
+export type NavIcon = "event" | "agenda" | "dashboard" | "clients" | "operators" | "catalog" | "inventory" | "activity" | "stats" | "sync";
 
 export interface NavLink {
   href: string;
@@ -11,6 +11,8 @@ export interface NavLink {
   prominent?: boolean;
   /** false: la voce non compare nella barra inferiore mobile. */
   mobileBar?: boolean;
+  /** Contatore mostrato accanto alla voce: "queue" = modifiche offline in coda (lato client). */
+  badge?: "queue";
 }
 
 interface NavDefinition extends NavLink {
@@ -19,6 +21,9 @@ interface NavDefinition extends NavLink {
 
 /** Crea evento: link alla stessa pagina di creazione prenotazioni, con il tipo evento preselezionato. */
 export const CREATE_EVENT_HREF = "/admin/prenotazioni/nuova?tipo=evento";
+
+/** Coda delle modifiche offline (per tutti i ruoli). */
+export const SYNC_HREF = "/admin/sincronizzazione";
 
 const LINKS: NavDefinition[] = [
   { href: CREATE_EVENT_HREF, label: "Crea evento", icon: "event", prominent: true, mobileBar: false, visible: isAdmin },
@@ -30,15 +35,17 @@ const LINKS: NavDefinition[] = [
   { href: "/admin/catalogo", label: "Menù & Sale", icon: "catalog", visible: isAdmin },
   { href: "/admin/giacenza", label: "Giacenza", icon: "inventory", visible: canUseInventory },
   { href: "/admin/registro", label: "Registro", icon: "activity", visible: canViewActivityLog },
+  { href: SYNC_HREF, label: "Sincronizzazione", icon: "sync", badge: "queue", visible: () => true },
 ];
 
 /** Voci di navigazione filtrate per ruolo. */
 export function getNavLinks(profile: Profile): NavLink[] {
-  return LINKS.filter((link) => link.visible(profile)).map(({ href, label, icon, prominent, mobileBar }) => ({
+  return LINKS.filter((link) => link.visible(profile)).map(({ href, label, icon, prominent, mobileBar, badge }) => ({
     href,
     label,
     icon,
     prominent,
     mobileBar,
+    badge,
   }));
 }

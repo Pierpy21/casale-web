@@ -7,6 +7,8 @@ import { getAdminPb } from "@/lib/pocketbase/admin";
 import { chunk, type PbRecord } from "@/lib/pocketbase/helpers";
 import { listAll, countWhere } from "@/lib/pocketbase/queries";
 import { mapNotification } from "@/lib/pocketbase/mappers";
+import { withMutation } from "@/lib/mutations";
+import type { MutationOptions } from "@/lib/offline/contract";
 import type { ActionResult, AppNotification } from "@/lib/types";
 
 // Notifiche e sottoscrizioni push: tutti gli utenti attivi, solo sulle proprie righe.
@@ -86,7 +88,7 @@ const PushSubscriptionInput = z.object({
 });
 
 /** Segna come lette le notifiche indicate (senza ids: tutte quelle non lette dell'utente). */
-export async function markNotificationsRead(ids?: string[]): Promise<ActionResult> {
+export async function markNotificationsRead(ids?: string[], opts?: MutationOptions): Promise<ActionResult> {
   const parsed = IdsInput.safeParse(ids);
   if (!parsed.success) return invalidInput(parsed.error);
 
@@ -94,26 +96,28 @@ export async function markNotificationsRead(ids?: string[]): Promise<ActionResul
   if (!auth.ok) return auth;
   const { db, profile } = auth;
 
-  if (parsed.data && parsed.data.length === 0) return { ok: true, data: undefined };
+  return withMutation(db, opts, "notifications.markNotificationsRead", profile.id, async (): Promise<ActionResult> => {
+    if (parsed.data && parsed.data.length === 0) return { ok: true, data: undefined };
 
-  try {
-    let rows = await listAll(db, "notifications", db.filter("user = {:u} && read_at = ''", { u: profile.id }), {
-      fields: "id,user,read_at",
-    });
-    if (parsed.data) {
-      const wanted = new Set(parsed.data);
-      rows = rows.filter((r) => wanted.has(r.id));
+    try {
+      let rows = await listAll(db, "notifications", db.filter("user = {:u} && read_at = ''", { u: profile.id }), {
+        fields: "id,user,read_at",
+      });
+      if (parsed.data) {
+        const wanted = new Set(parsed.data);
+        rows = rows.filter((r) => wanted.has(r.id));
+      }
+      const readAt = new Date().toISOString();
+      for (const group of chunk(rows, 100)) {
+        const batch = db.createBatch();
+        for (const row of group) batch.collection("notifications").update(row.id, { read_at: readAt });
+        if (group.length > 0) await batch.send();
+      }
+      return { ok: true, data: undefined };
+    } catch (err) {
+      return dbFail(err);
     }
-    const readAt = new Date().toISOString();
-    for (const group of chunk(rows, 100)) {
-      const batch = db.createBatch();
-      for (const row of group) batch.collection("notifications").update(row.id, { read_at: readAt });
-      if (group.length > 0) await batch.send();
-    }
-    return { ok: true, data: undefined };
-  } catch (err) {
-    return dbFail(err);
-  }
+  });
 }
 
 /**

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { markInventoryReportSeen } from "@/app/actions/inventory";
 import { Alert, Button } from "@/components/ui";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { isQueued, submitMutation } from "@/lib/offline/submit";
 
 /** Segna il report come visto (solo admin). Dopo l'azione la pagina si ricarica dal server. */
 export function MarkSeenButton({ reportId, seen }: { reportId: string; seen: boolean }) {
@@ -31,12 +33,15 @@ export function MarkSeenButton({ reportId, seen }: { reportId: string; seen: boo
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            const result = await markInventoryReportSeen(reportId);
+            const result = await submitMutation("inventory.markInventoryReportSeen", markInventoryReportSeen, [reportId], {
+              label: "Report giacenza · segnato come visto",
+              entity: { type: "inventory_report", id: reportId },
+            });
             if (!result.ok) {
               setError(result.error);
               return;
             }
-            router.refresh();
+            if (isBrowserOnline() && !isQueued(result)) router.refresh();
           });
         }}
       >

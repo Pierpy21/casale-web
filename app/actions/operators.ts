@@ -5,91 +5,103 @@ import { OperatorInput, OperatorUpdateInput, PasswordInput } from "@/lib/validat
 import { authorize, dbFail, fail, invalidInput, isRecordId } from "@/lib/action-utils";
 import { isAdmin } from "@/lib/permissions";
 import { fetchOne } from "@/lib/pocketbase/queries";
+import { checkConflict, withMutation } from "@/lib/mutations";
+import type { MutationOptions } from "@/lib/offline/contract";
 import type { ActionResult } from "@/lib/types";
 
 /** Crea l'utente (collezione users) con il profilo: ruolo, chef, stato. */
-export async function createOperator(input: unknown): Promise<ActionResult<{ id: string }>> {
+export async function createOperator(input: unknown, opts?: MutationOptions): Promise<ActionResult<{ id: string }>> {
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
 
-  const parsed = OperatorInput.safeParse(input);
-  if (!parsed.success) return invalidInput(parsed.error);
-  const { full_name, email, password, role, is_chef } = parsed.data;
+  return withMutation(auth.db, opts, "operators.createOperator", auth.profile.id, async (): Promise<ActionResult<{ id: string }>> => {
+    const parsed = OperatorInput.safeParse(input);
+    if (!parsed.success) return invalidInput(parsed.error);
+    const { full_name, email, password, role, is_chef } = parsed.data;
 
-  try {
-    const record = await auth.db.collection("users").create({
-      email,
-      password,
-      passwordConfirm: password,
-      full_name,
-      role,
-      is_chef,
-      active: true,
-      // Niente `verified`: lo può impostare solo chi ha la manage rule di users; il login con password non lo richiede.
-      emailVisibility: true,
-    });
-    revalidatePath("/admin/operatori");
-    return { ok: true, data: { id: record.id } };
-  } catch (err) {
-    const data = (err as { response?: { data?: Record<string, { code?: string }> } })?.response?.data;
-    if (data?.email?.code === "validation_not_unique") {
-      return fail("Esiste già un utente con questa email.");
+    try {
+      const record = await auth.db.collection("users").create({
+        email,
+        password,
+        passwordConfirm: password,
+        full_name,
+        role,
+        is_chef,
+        active: true,
+        // Niente `verified`: lo può impostare solo chi ha la manage rule di users; il login con password non lo richiede.
+        emailVisibility: true,
+      });
+      revalidatePath("/admin/operatori");
+      return { ok: true, data: { id: record.id } };
+    } catch (err) {
+      const data = (err as { response?: { data?: Record<string, { code?: string }> } })?.response?.data;
+      if (data?.email?.code === "validation_not_unique") {
+        return fail("Esiste già un utente con questa email.");
+      }
+      if (data?.password) {
+        return fail("Password non accettata: usa almeno 8 caratteri.");
+      }
+      return dbFail(err, "Impossibile creare l'utente. Controlla i dati e riprova.");
     }
-    if (data?.password) {
-      return fail("Password non accettata: usa almeno 8 caratteri.");
-    }
-    return dbFail(err, "Impossibile creare l'utente. Controlla i dati e riprova.");
-  }
+  });
 }
 
 /** Modifica nome, ruolo, flag chef e stato attivo. Non è possibile modificare l'amministratore. */
-export async function updateOperator(id: string, input: unknown): Promise<ActionResult> {
+export async function updateOperator(id: string, input: unknown, opts?: MutationOptions): Promise<ActionResult> {
   if (!isRecordId(id)) return fail("Operatore non valido.");
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
 
-  const parsed = OperatorUpdateInput.safeParse(input);
-  if (!parsed.success) return invalidInput(parsed.error);
+  return withMutation(auth.db, opts, "operators.updateOperator", auth.profile.id, async (): Promise<ActionResult> => {
+    const parsed = OperatorUpdateInput.safeParse(input);
+    if (!parsed.success) return invalidInput(parsed.error);
 
-  const target = await fetchOne(auth.db, "users", id);
-  if (!target) return fail("Operatore non trovato.");
-  if (target.role === "admin") return fail("Non è possibile modificare l'amministratore.");
+    const target = await fetchOne(auth.db, "users", id);
+    if (!target) return fail("Operatore non trovato.");
+    if (target.role === "admin") return fail("Non è possibile modificare l'amministratore.");
+    const conflict = await checkConflict(auth.db, opts, target);
+    if (conflict) return conflict;
 
-  try {
-    // authRule (active = true) blocca il login degli operatori disattivati; la sessione esistente
-    // viene rifiutata alla prossima verifica (loadProfileFromToken).
-    await auth.db.collection("users").update(id, parsed.data);
-  } catch (err) {
-    return dbFail(err);
-  }
+    try {
+      // authRule (active = true) blocca il login degli operatori disattivati; la sessione esistente
+      // viene rifiutata alla prossima verifica (loadProfileFromToken).
+      await auth.db.collection("users").update(id, parsed.data);
+    } catch (err) {
+      return dbFail(err);
+    }
 
-  revalidatePath("/admin/operatori");
-  return { ok: true, data: undefined };
+    revalidatePath("/admin/operatori");
+    return { ok: true, data: undefined };
+  });
 }
 
 /** Imposta una nuova password (invalida le sessioni dell'operatore). Non consentito per l'amministratore. */
-export async function resetOperatorPassword(id: string, password: string): Promise<ActionResult> {
+export async function resetOperatorPassword(id: string, password: string, opts?: MutationOptions): Promise<ActionResult> {
   if (!isRecordId(id)) return fail("Operatore non valido.");
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
 
-  const parsed = PasswordInput.safeParse({ password });
-  if (!parsed.success) return invalidInput(parsed.error);
+  return withMutation(auth.db, opts, "operators.resetOperatorPassword", auth.profile.id, async (): Promise<ActionResult> => {
+    const parsed = PasswordInput.safeParse({ password });
+    if (!parsed.success) return invalidInput(parsed.error);
 
-  const target = await fetchOne(auth.db, "users", id);
-  if (!target) return fail("Operatore non trovato.");
-  if (target.role === "admin") return fail("Non è possibile reimpostare la password dell'amministratore da qui.");
+    const target = await fetchOne(auth.db, "users", id);
+    if (!target) return fail("Operatore non trovato.");
+    if (target.role === "admin") return fail("Non è possibile reimpostare la password dell'amministratore da qui.");
+    const conflict = await checkConflict(auth.db, opts, target);
+    if (conflict) return conflict;
 
-  try {
-    await auth.db.collection("users").update(id, {
-      password: parsed.data.password,
-      passwordConfirm: parsed.data.password,
-    });
-  } catch {
-    return fail("Impossibile aggiornare la password. Riprova.");
-  }
+    try {
+      await auth.db.collection("users").update(id, {
+        password: parsed.data.password,
+        passwordConfirm: parsed.data.password,
+      });
+    } catch {
+      return fail("Impossibile aggiornare la password. Riprova.");
+    }
 
-  return { ok: true, data: undefined };
+    return { ok: true, data: undefined };
+  });
 }
 
 /**
@@ -97,44 +109,55 @@ export async function resetOperatorPassword(id: string, password: string): Promi
  * Prenotazioni, storico, preventivi e giacenze restano: il riferimento all'utente si svuota
  * (relazioni facoltative), il nome resta nei campi *_name. Notifiche e iscrizioni push vanno via in cascata.
  */
-export async function deleteOperator(id: string): Promise<ActionResult> {
+export async function deleteOperator(id: string, opts?: MutationOptions): Promise<ActionResult> {
   if (!isRecordId(id)) return fail("Operatore non valido.");
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
-  if (id === auth.profile.id) return fail("Non puoi eliminare il tuo account.");
 
-  const target = await fetchOne(auth.db, "users", id);
-  if (!target) return fail("Operatore non trovato.");
-  if (target.role === "admin") return fail("Non è possibile eliminare l'amministratore.");
+  return withMutation(auth.db, opts, "operators.deleteOperator", auth.profile.id, async (): Promise<ActionResult> => {
+    if (id === auth.profile.id) return fail("Non puoi eliminare il tuo account.");
 
-  try {
-    await auth.db.collection("users").delete(id);
-  } catch (err) {
-    return dbFail(err, "Impossibile eliminare l'operatore. Riprova.");
-  }
+    const target = await fetchOne(auth.db, "users", id);
+    // Coda offline: operatore già eliminato (solo nel reinvio) = successo. Dal form: "non trovato", come prima.
+    if (!target) return opts?.replay === true ? { ok: true, data: undefined } : fail("Operatore non trovato.");
+    if (target.role === "admin") return fail("Non è possibile eliminare l'amministratore.");
+    const conflict = await checkConflict(auth.db, opts, target);
+    if (conflict) return conflict;
 
-  revalidatePath("/admin/operatori");
-  return { ok: true, data: undefined };
+    try {
+      await auth.db.collection("users").delete(id);
+    } catch (err) {
+      return dbFail(err, "Impossibile eliminare l'operatore. Riprova.");
+    }
+
+    revalidatePath("/admin/operatori");
+    return { ok: true, data: undefined };
+  });
 }
 
 /** Attiva o disattiva l'accesso di un operatore (switch nella lista). Non per l'amministratore né per sé stessi. */
-export async function setOperatorActive(id: string, active: boolean): Promise<ActionResult> {
+export async function setOperatorActive(id: string, active: boolean, opts?: MutationOptions): Promise<ActionResult> {
   if (!isRecordId(id)) return fail("Operatore non valido.");
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
-  if (id === auth.profile.id) return fail("Non puoi disattivare il tuo account.");
 
-  const target = await fetchOne(auth.db, "users", id);
-  if (!target) return fail("Operatore non trovato.");
-  if (target.role === "admin") return fail("Non è possibile disattivare l'amministratore.");
+  return withMutation(auth.db, opts, "operators.setOperatorActive", auth.profile.id, async (): Promise<ActionResult> => {
+    if (id === auth.profile.id) return fail("Non puoi disattivare il tuo account.");
 
-  try {
-    // authRule (active = true) blocca il login; la sessione esistente viene rifiutata alla prossima verifica.
-    await auth.db.collection("users").update(id, { active: active === true });
-  } catch (err) {
-    return dbFail(err);
-  }
+    const target = await fetchOne(auth.db, "users", id);
+    if (!target) return fail("Operatore non trovato.");
+    if (target.role === "admin") return fail("Non è possibile disattivare l'amministratore.");
+    const conflict = await checkConflict(auth.db, opts, target);
+    if (conflict) return conflict;
 
-  revalidatePath("/admin/operatori");
-  return { ok: true, data: undefined };
+    try {
+      // authRule (active = true) blocca il login; la sessione esistente viene rifiutata alla prossima verifica.
+      await auth.db.collection("users").update(id, { active: active === true });
+    } catch (err) {
+      return dbFail(err);
+    }
+
+    revalidatePath("/admin/operatori");
+    return { ok: true, data: undefined };
+  });
 }

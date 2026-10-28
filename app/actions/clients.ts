@@ -7,7 +7,9 @@ import { z } from "zod";
 import { ClientInput, type ClientInputType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId } from "@/lib/action-utils";
 import { canCreateAnyBooking, isAdmin } from "@/lib/permissions";
-import { countWhere } from "@/lib/pocketbase/queries";
+import { checkConflictById, withMutation } from "@/lib/mutations";
+import type { MutationOptions } from "@/lib/offline/contract";
+import { countWhere, fetchOne } from "@/lib/pocketbase/queries";
 import type { ActionResult, ClientSuggestion } from "@/lib/types";
 
 // Ricerca suggerimenti cliente (campo Nome nelle prenotazioni). Limiti in caratteri/risultati.
@@ -95,61 +97,75 @@ function clientFields(data: ClientInputType) {
   };
 }
 
-export async function createClient(input: unknown): Promise<ActionResult<{ id: string }>> {
+export async function createClient(input: unknown, opts?: MutationOptions): Promise<ActionResult<{ id: string }>> {
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
 
-  const parsed = ClientInput.safeParse(input);
-  if (!parsed.success) return invalidInput(parsed.error);
+  return withMutation(auth.db, opts, "clients.createClient", auth.profile.id, async (): Promise<ActionResult<{ id: string }>> => {
+    const parsed = ClientInput.safeParse(input);
+    if (!parsed.success) return invalidInput(parsed.error);
 
-  try {
-    const record = await auth.db.collection("clients").create(clientFields(parsed.data));
-    revalidatePath("/admin/clienti");
-    return { ok: true, data: { id: record.id } };
-  } catch (err) {
-    return dbFail(err);
-  }
-}
-
-export async function updateClient(id: string, input: unknown): Promise<ActionResult> {
-  if (!isRecordId(id)) return fail("Cliente non valido.");
-  const auth = await authorize(isAdmin);
-  if (!auth.ok) return auth;
-
-  const parsed = ClientInput.safeParse(input);
-  if (!parsed.success) return invalidInput(parsed.error);
-
-  try {
-    await auth.db.collection("clients").update(id, clientFields(parsed.data));
-  } catch (err) {
-    return dbFail(err);
-  }
-
-  revalidatePath("/admin/clienti");
-  revalidatePath(`/admin/clienti/${id}`);
-  return { ok: true, data: undefined };
-}
-
-export async function deleteClient(id: string): Promise<ActionResult> {
-  if (!isRecordId(id)) return fail("Cliente non valido.");
-  const auth = await authorize(isAdmin);
-  if (!auth.ok) return auth;
-
-  // Restrict: il cliente con prenotazioni non si elimina (PocketBase non blocca la relazione da solo).
-  const bookings = await countWhere(auth.db, "bookings", auth.db.filter("client = {:id}", { id }));
-  if (bookings > 0) return fail("Impossibile eliminare: il cliente ha prenotazioni collegate.");
-
-  try {
-    await auth.db.collection("clients").delete(id);
-  } catch (err) {
-    // Backstop: bookings.client e' required senza cascade, quindi PocketBase rifiuta la delete
-    // se nel frattempo e' comparsa una prenotazione (race con la pre-verifica).
-    if (err instanceof ClientResponseError && err.status === 400) {
-      return fail("Impossibile eliminare: il cliente ha prenotazioni collegate.");
+    try {
+      const record = await auth.db.collection("clients").create(clientFields(parsed.data));
+      revalidatePath("/admin/clienti");
+      return { ok: true, data: { id: record.id } };
+    } catch (err) {
+      return dbFail(err);
     }
-    return dbFail(err);
-  }
+  });
+}
 
-  revalidatePath("/admin/clienti");
-  return { ok: true, data: undefined };
+export async function updateClient(id: string, input: unknown, opts?: MutationOptions): Promise<ActionResult> {
+  if (!isRecordId(id)) return fail("Cliente non valido.");
+  const auth = await authorize(isAdmin);
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "clients.updateClient", auth.profile.id, async (): Promise<ActionResult> => {
+    const parsed = ClientInput.safeParse(input);
+    if (!parsed.success) return invalidInput(parsed.error);
+
+    const conflict = await checkConflictById(auth.db, "clients", id, opts);
+    if (conflict) return conflict;
+
+    try {
+      await auth.db.collection("clients").update(id, clientFields(parsed.data));
+    } catch (err) {
+      return dbFail(err);
+    }
+
+    revalidatePath("/admin/clienti");
+    revalidatePath(`/admin/clienti/${id}`);
+    return { ok: true, data: undefined };
+  });
+}
+
+export async function deleteClient(id: string, opts?: MutationOptions): Promise<ActionResult> {
+  if (!isRecordId(id)) return fail("Cliente non valido.");
+  const auth = await authorize(isAdmin);
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "clients.deleteClient", auth.profile.id, async (): Promise<ActionResult> => {
+    // Coda offline: cliente già eliminato (solo nel reinvio) = successo. Dal form resta com'era.
+    if (opts?.replay === true && !(await fetchOne(auth.db, "clients", id))) return { ok: true, data: undefined };
+    const conflict = await checkConflictById(auth.db, "clients", id, opts);
+    if (conflict) return conflict;
+
+    // Restrict: il cliente con prenotazioni non si elimina (PocketBase non blocca la relazione da solo).
+    const bookings = await countWhere(auth.db, "bookings", auth.db.filter("client = {:id}", { id }));
+    if (bookings > 0) return fail("Impossibile eliminare: il cliente ha prenotazioni collegate.");
+
+    try {
+      await auth.db.collection("clients").delete(id);
+    } catch (err) {
+      // Backstop: bookings.client e' required senza cascade, quindi PocketBase rifiuta la delete
+      // se nel frattempo e' comparsa una prenotazione (race con la pre-verifica).
+      if (err instanceof ClientResponseError && err.status === 400) {
+        return fail("Impossibile eliminare: il cliente ha prenotazioni collegate.");
+      }
+      return dbFail(err);
+    }
+
+    revalidatePath("/admin/clienti");
+    return { ok: true, data: undefined };
+  });
 }

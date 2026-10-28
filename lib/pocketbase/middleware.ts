@@ -43,6 +43,8 @@ async function refreshToken(token: string): Promise<string | null> {
       headers: { Authorization: token },
       cache: "no-store",
     });
+    // Solo un rifiuto vero (401/403/404) invalida la sessione: con un 5xx di PocketBase si tiene il token, come per gli errori di rete.
+    if (res.status >= 500) return token;
     if (!res.ok) return null;
     const body = (await res.json()) as { token?: string };
     return body.token ?? null;
