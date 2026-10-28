@@ -142,7 +142,7 @@ export function ReservationList({ bookings, rooms, canAssign }: ReservationListP
                         aria-label={`Sala per ${title}`}
                         value={currentId ?? ""}
                         onChange={(e) => assign(booking, e.target.value === "" ? null : e.target.value)}
-                        wrapperClassName="min-w-0 flex-1"
+                        wrapperClassName="w-56 min-w-0 max-w-full"
                       >
                         <option value="">Nessuna</option>
                         {inactiveCurrent && (

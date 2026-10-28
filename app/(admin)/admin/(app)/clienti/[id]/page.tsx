@@ -37,8 +37,13 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
               <ArrowLeft aria-hidden="true" className="size-4" />
               Clienti
             </ButtonLink>
-            <ButtonLink href={newBookingHref} variant="primary" size="md">
-              <CalendarPlus aria-hidden="true" className="size-4" />
+            <ButtonLink
+              href={newBookingHref}
+              variant="primary"
+              size="md"
+              className="max-sm:w-full max-sm:whitespace-normal max-sm:px-5 max-sm:text-center"
+            >
+              <CalendarPlus aria-hidden="true" className="size-4 shrink-0" />
               Nuova prenotazione per questo cliente
             </ButtonLink>
           </>
