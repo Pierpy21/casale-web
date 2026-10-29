@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { cn } from "@/components/ui/cn";
-import type { BookingListItem, BookingNote } from "@/lib/types";
+import type { BookingListItem, BookingNote, NextEventBrief } from "@/lib/types";
 import { AgendaKindSwitch } from "./AgendaKindSwitch";
 import {
   agendaHref,
@@ -21,6 +21,7 @@ import {
 } from "./agenda-utils";
 import { MenuChips, summarizeDay } from "./DaySummary";
 import { MobileCalendar } from "./MobileCalendar";
+import { EmptyDay, nextEventFrom } from "./NextEventHint";
 
 export interface KitchenAgendaProps {
   /** Giorno selezionato all'apertura (YYYY-MM-DD). */
@@ -36,6 +37,8 @@ export interface KitchenAgendaProps {
   notes: BookingNote[];
   canAddNote: boolean;
   currentUserId: string;
+  /** Primo evento dopo la griglia caricata (riquadro del giorno vuoto). */
+  nextEventAfterRange: NextEventBrief | null;
 }
 
 const NO_NOTES: BookingNote[] = [];
@@ -63,6 +66,7 @@ export function KitchenAgenda({
   notes,
   canAddNote,
   currentUserId,
+  nextEventAfterRange,
 }: KitchenAgendaProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -71,6 +75,7 @@ export function KitchenAgenda({
   // Il calendario conta solo gli eventi: riceve tutti i banchetti.
   const allByDate = useMemo(() => groupByDate(bookings), [bookings]);
   const notesByBooking = useMemo(() => groupNotes(notes), [notes]);
+  const nextEvent = useMemo(() => nextEventFrom(bookings, selected, nextEventAfterRange), [bookings, selected, nextEventAfterRange]);
 
   const navigate = useCallback(
     (target: string, nextKind: AgendaKindFilter = kind) => {
@@ -138,9 +143,7 @@ export function KitchenAgenda({
           <MenuChips menus={summary.menus} size="lg" />
 
           {items.length === 0 ? (
-            <p className="rounded-[2px] border border-dashed border-sand px-6 py-10 text-center text-[15px] text-slate-dark">
-              {kind === "tutti" ? "Nessuna prenotazione in questa giornata." : "Nessun elemento di questo tipo in questa giornata."}
-            </p>
+            <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={(iso) => navigate(iso)} />
           ) : (
             <>
               {events.length > 0 && (

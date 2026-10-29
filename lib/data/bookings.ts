@@ -7,7 +7,7 @@ import { isRecordId, dayEndPb, dayStartPb, nn, num, toDateOnly, type PbRecord } 
 import { mapChange } from "@/lib/pocketbase/mappers";
 import { listAll, listByParents, fetchOne } from "@/lib/pocketbase/queries";
 import { addDaysISO, monthBounds, romeToday } from "@/lib/dates";
-import { canSeeAppointments, canViewActivityLog, isAdmin } from "@/lib/permissions";
+import { canAssignRoom, canSeeAppointments, canViewActivityLog, isAdmin } from "@/lib/permissions";
 import { mondayOf } from "@/lib/stats-period";
 import {
   BOOKING_KINDS,
@@ -19,7 +19,10 @@ import {
   type CoversStats,
   type DashboardStats,
   type MenuConsumption,
+  type NextEventBrief,
   type Profile,
+  type ReservationSheet,
+  type ReservationSheetRow,
   type RoomBookingSlot,
   type StatsKind,
   type WeekStats,
@@ -119,6 +122,109 @@ export async function getBookingsInRange(
   );
   const items = await bookingListItems(db, sortBookingRecords(records));
   return items.map((i) => hideKitchenPhone(isAdmin(me) ? i : zeroMenuPrices(i), me));
+}
+
+/** Tavolo di una prenotazione normale: numero > 0, altrimenti null (0 nel record = nessun tavolo). */
+function tableOf(record: PbRecord): number | null {
+  return num(record.table_number) > 0 ? num(record.table_number) : null;
+}
+
+/**
+ * Foglio prenotazioni di un giorno (export PDF/DOCX): prenotazioni normali non annullate.
+ * Ordine: sala (ordine della sala, poi nome; senza sala in fondo), tavolo crescente (senza tavolo in fondo), orario, nome.
+ * Null se non loggato o se non admin / sala attiva. I dati mancanti restano null (non bloccano l'export).
+ */
+export async function getReservationSheet(date: string): Promise<ReservationSheet | null> {
+  if (!ISO_DATE.test(date)) return null;
+  const me = await getCurrentProfile();
+  if (!me || !canAssignRoom(me, "normale")) return null;
+  const db = await getAdminPb();
+  const records = await listAll(
+    db,
+    "bookings",
+    db.filter("event_date >= {:from} && event_date <= {:to} && status != {:s} && kind = {:k}", {
+      from: dayStartPb(date),
+      to: dayEndPb(date),
+      s: "annullato",
+      k: "normale",
+    }),
+    { expand: "client,room" },
+  );
+
+  const roomOf = (r: PbRecord): PbRecord | undefined => r.expand?.room as PbRecord | undefined;
+  const clientOf = (r: PbRecord): PbRecord | undefined => r.expand?.client as PbRecord | undefined;
+  const nameOf = (r: PbRecord): string => {
+    const client = clientOf(r);
+    return [client?.first_name, client?.last_name].map((v) => String(v ?? "").trim()).filter(Boolean).join(" ");
+  };
+
+  const sorted = [...records].sort((a, b) => {
+    const ra = roomOf(a);
+    const rb = roomOf(b);
+    if (!ra !== !rb) return ra ? -1 : 1;
+    if (ra && rb) {
+      const byRoomSort = num(ra.sort) - num(rb.sort);
+      if (byRoomSort !== 0) return byRoomSort;
+      const byRoomName = String(ra.name ?? "").localeCompare(String(rb.name ?? ""), "it");
+      if (byRoomName !== 0) return byRoomName;
+    }
+    const ta = tableOf(a);
+    const tb = tableOf(b);
+    if ((ta === null) !== (tb === null)) return ta === null ? 1 : -1;
+    if (ta !== null && tb !== null && ta !== tb) return ta - tb;
+    const timeA = a.event_time ? String(a.event_time).slice(0, 5) : "99:99";
+    const timeB = b.event_time ? String(b.event_time).slice(0, 5) : "99:99";
+    if (timeA !== timeB) return timeA < timeB ? -1 : 1;
+    return nameOf(a).localeCompare(nameOf(b), "it");
+  });
+
+  const rows: ReservationSheetRow[] = sorted.map((r) => {
+    const room = roomOf(r);
+    return {
+      name: nameOf(r),
+      room: room?.name ? String(room.name) : null,
+      table: tableOf(r),
+      time: r.event_time ? String(r.event_time).slice(0, 5) : null,
+      phone: nn(clientOf(r)?.phone)?.trim() || null,
+    };
+  });
+  return { date, rows };
+}
+
+/**
+ * Primo evento (banchetto non annullato) con data successiva a `date`, per l'empty state dell'agenda. Ogni profilo attivo; errori → null.
+ */
+export async function getNextEventAfter(date: string): Promise<NextEventBrief | null> {
+  if (!ISO_DATE.test(date)) return null;
+  try {
+    const me = await getCurrentProfile();
+    if (!me || !me.active) return null;
+    const db = await getAdminPb();
+    const page = await db.collection("bookings").getList(1, 1, {
+      filter: db.filter("kind = {:k} && status != {:s} && event_date > {:after}", {
+        k: "evento",
+        s: "annullato",
+        after: dayEndPb(date),
+      }),
+      sort: "event_date,event_time",
+      expand: "client",
+      skipTotal: true,
+    });
+    const r = page.items[0] as unknown as PbRecord | undefined;
+    if (!r) return null;
+    const client = r.expand?.client as PbRecord | undefined;
+    const eventName = r.event_name ? String(r.event_name).trim() : "";
+    const clientName = client ? `${client.first_name} ${client.last_name}`.trim() : "";
+    return {
+      id: r.id,
+      event_date: toDateOnly(r.event_date),
+      event_time: nn(r.event_time),
+      // Stessa regola di bookingTitle (components/bookings/format.ts): nome evento, altrimenti cliente.
+      title: eventName || clientName || "Evento",
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function getBooking(id: string): Promise<BookingDetail | null> {

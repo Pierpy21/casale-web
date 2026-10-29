@@ -53,10 +53,23 @@ export function Sidebar({ profile, links }: { profile: Profile; links: NavLink[]
   );
 }
 
-/** Header mobile (< lg): logo compatto ed uscita. */
+/**
+ * Header mobile (< lg): logo compatto ed uscita.
+ * Fisso e su un layer GPU, non sticky: su iOS un header sticky segue il rimbalzo elastico dello scroll e sembra
+ * in ritardo. Altezza fissa (safe area + 4rem) uguale allo spaziatore sotto e agli offset degli elementi sticky.
+ */
 export function MobileHeader() {
   return (
-    <header className="no-print sticky top-0 z-30 flex items-center justify-between gap-3 bg-ink px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] lg:hidden">
+    <>
+      <MobileHeaderBar />
+      <div aria-hidden="true" className="no-print h-[calc(env(safe-area-inset-top)+4rem)] lg:hidden" />
+    </>
+  );
+}
+
+function MobileHeaderBar() {
+  return (
+    <header className="no-print fixed inset-x-0 top-0 z-30 flex h-[calc(env(safe-area-inset-top)+4rem)] transform-gpu items-center justify-between gap-3 bg-ink px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] lg:hidden">
       <Image
         src="/logo.svg"
         alt="Il Casale del Notaio"

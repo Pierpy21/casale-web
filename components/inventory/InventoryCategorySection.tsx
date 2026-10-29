@@ -30,8 +30,15 @@ export interface InventoryCategorySectionProps {
   /** Prodotti compilati della categoria (giacenza o da ordinare > 0), senza filtro. */
   filledCount: number;
   counts: Record<string, InventoryDraftCount>;
-  open: boolean;
-  onToggle: () => void;
+  /** Solo modalità a fisarmonica (default true). */
+  open?: boolean;
+  /** Solo modalità a fisarmonica. */
+  onToggle?: () => void;
+  /**
+   * Modalità incorporata (tablet, gruppo aperto): niente intestazione a fisarmonica, il titolo è nella pagina
+   * chiamante; restano righe prodotto e aggiunta di un prodotto nuovo.
+   */
+  embedded?: boolean;
   onChangeCount: (productId: string, field: InventoryCountField, value: number) => void;
   onCreate: (input: NewInventoryProductInput) => Promise<string | null>;
   disabled: boolean;
@@ -46,8 +53,9 @@ export function InventoryCategorySection({
   totalCount,
   filledCount,
   counts,
-  open,
+  open = true,
   onToggle,
+  embedded = false,
   onChangeCount,
   onCreate,
   disabled,
@@ -61,6 +69,47 @@ export function InventoryCategorySection({
     filledCount > 0
       ? `${filledCount} compilati su ${totalCount}`
       : `${totalCount} ${totalCount === 1 ? "prodotto" : "prodotti"}`;
+
+  const body = (
+    <>
+      {products.length === 0 ? (
+        <p className="px-4 py-4 text-[15px] text-slate-dark sm:px-5">Nessun prodotto in questa sezione.</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-sand">
+          {products.map((product) => (
+            <ProductRow
+              key={product.id}
+              product={product}
+              count={counts[product.id]}
+              disabled={disabled}
+              onChange={onChangeCount}
+            />
+          ))}
+        </ul>
+      )}
+
+      <div className="border-t border-sand px-4 py-3 sm:px-5">
+        {adding ? (
+          <InventoryNewProductForm
+            idPrefix={`${uid}-new`}
+            category={category}
+            onCreate={(input) => onCreate({ ...input, supplier })}
+            onClose={() => setAdding(false)}
+            disabled={disabled}
+          />
+        ) : (
+          <Button variant="outline" size="md" onClick={() => setAdding(true)} disabled={disabled} className="min-h-11 w-full sm:w-auto">
+            <Plus aria-hidden="true" className="size-4" />
+            Aggiungi prodotto
+          </Button>
+        )}
+      </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div className="min-w-0 border border-sand bg-paper">{body}</div>;
+  }
 
   return (
     <section aria-label={label} className="min-w-0 border border-sand bg-paper">
@@ -84,38 +133,7 @@ export function InventoryCategorySection({
       </h3>
 
       <div id={panelId} role="region" aria-labelledby={headerId} hidden={!open} className="border-t border-sand">
-        {products.length === 0 ? (
-          <p className="px-4 py-4 text-[15px] text-slate-dark sm:px-5">Nessun prodotto in questa sezione.</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-sand">
-            {products.map((product) => (
-              <ProductRow
-                key={product.id}
-                product={product}
-                count={counts[product.id]}
-                disabled={disabled}
-                onChange={onChangeCount}
-              />
-            ))}
-          </ul>
-        )}
-
-        <div className="border-t border-sand px-4 py-3 sm:px-5">
-          {adding ? (
-            <InventoryNewProductForm
-              idPrefix={`${uid}-new`}
-              category={category}
-              onCreate={(input) => onCreate({ ...input, supplier })}
-              onClose={() => setAdding(false)}
-              disabled={disabled}
-            />
-          ) : (
-            <Button variant="outline" size="md" onClick={() => setAdding(true)} disabled={disabled} className="min-h-11 w-full sm:w-auto">
-              <Plus aria-hidden="true" className="size-4" />
-              Aggiungi prodotto
-            </Button>
-          )}
-        </div>
+        {body}
       </div>
     </section>
   );

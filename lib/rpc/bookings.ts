@@ -346,6 +346,30 @@ export async function assignBookingRoom(
   await batch.send();
 }
 
+/**
+ * Assegna (o libera, con table null) il tavolo di una prenotazione normale, con audit (campo "Tavolo").
+ * 0 nel record = nessun tavolo. I controlli di ruolo e di tipo sono fatti dal chiamante (app/actions/bookings.ts).
+ */
+export async function assignBookingTable(
+  db: PocketBase,
+  bookingId: string,
+  table: number | null,
+  actor: Actor,
+): Promise<void> {
+  const booking = await loadBooking(db, bookingId);
+  const current = num(booking.table_number) > 0 ? num(booking.table_number) : null;
+  if (current === table) return;
+  const batch = db.createBatch();
+  batch.collection("bookings").update(bookingId, { table_number: table ?? 0, updated_by: actor.id });
+  queueAudit(batch, actor, {
+    bookingId,
+    field: "Tavolo",
+    old: current === null ? null : String(current),
+    new: table === null ? null : String(table),
+  });
+  await batch.send();
+}
+
 /** Imposta lo stato di una prenotazione (solo se cambia), con audit. Le regole per tipo sono in app/actions. */
 export async function setBookingStatusRecord(
   db: PocketBase,

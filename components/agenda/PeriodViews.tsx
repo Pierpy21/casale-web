@@ -1,9 +1,10 @@
 import { format } from "date-fns";
 import { BookingCard } from "@/components/bookings/BookingCard";
-import { EmptyState, cn } from "@/components/ui";
-import type { BookingListItem, Room } from "@/lib/types";
-import { dayCountLabel, formatIt, toISO } from "./agenda-utils";
+import { cn } from "@/components/ui";
+import type { BookingListItem, NextEventBrief, Room } from "@/lib/types";
+import { dayCountLabel, formatIt, toISO, type AgendaKindFilter } from "./agenda-utils";
 import { DaySummary } from "./DaySummary";
+import { EmptyDay } from "./NextEventHint";
 import { ReservationList } from "./ReservationList";
 
 /** Vista settimana desktop: 7 colonne con card ricche (menù per portata, allergie). */
@@ -65,14 +66,27 @@ export function WeekView({
  * Vista giorno desktop: eventi e appuntamenti come card ricche, in un unico elenco verticale;
  * le prenotazioni normali sotto, come lista compatta con la sala assegnabile.
  */
-export function DayView({ items, rooms, canAssignRooms }: { items: BookingListItem[]; rooms: Room[]; canAssignRooms: boolean }) {
+export function DayView({
+  items,
+  rooms,
+  canAssignRooms,
+  selected,
+  kind,
+  nextEvent = null,
+  onOpenNextEvent,
+}: {
+  items: BookingListItem[];
+  rooms: Room[];
+  canAssignRooms: boolean;
+  /** Giorno selezionato (ISO): riferimento per il riquadro "Prossimo evento". */
+  selected: string;
+  nextEvent?: NextEventBrief | null;
+  /** Filtro tipo attivo: con "prenotazioni" il giorno vuoto invita a cambiarlo. */
+  kind: AgendaKindFilter;
+  onOpenNextEvent: (iso: string) => void;
+}) {
   if (items.length === 0) {
-    return (
-      <EmptyState
-        title="Nessun banchetto"
-        description="Non ci sono eventi in questa giornata. Dalla vista mese puoi scegliere un altro giorno."
-      />
-    );
+    return <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={onOpenNextEvent} />;
   }
   const cards = items.filter((b) => b.kind !== "normale");
   const reservations = items.filter((b) => b.kind === "normale");
@@ -86,7 +100,7 @@ export function DayView({ items, rooms, canAssignRooms }: { items: BookingListIt
           ))}
         </section>
       )}
-      {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} canAssign={canAssignRooms} />}
+      {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} date={selected} canAssign={canAssignRooms} />}
     </div>
   );
 }

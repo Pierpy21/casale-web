@@ -26,10 +26,14 @@ export const EVENT_TYPES = ["Matrimonio", "Battesimo", "Comunione", "Cresima", "
 
 export interface Booking {
   id: string; client_id: string; kind: BookingKind; event_type: string | null; event_name: string | null; event_date: string; event_time: string | null;
-  room_id: string | null; adults: number; children: number; kids_menus: number;
+  room_id: string | null; /** Tavolo (solo prenotazioni normali): null se non assegnato. */ table_number: number | null; adults: number; children: number; kids_menus: number;
   menu_id: string | null; kids_menu_id: string | null; setup_colors: string[]; setup_notes: string | null;
   status: BookingStatus; notes: string | null; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string;
 }
+/** Riga del foglio prenotazioni (export PDF/DOCX): prenotazioni normali del giorno. */
+export interface ReservationSheetRow { name: string; room: string | null; table: number | null; time: string | null; /** HH:MM */ phone: string | null; }
+/** Foglio prenotazioni di un giorno (`date` YYYY-MM-DD), già ordinato. */
+export interface ReservationSheet { date: string; rows: ReservationSheetRow[]; }
 export interface BookingListItem extends Booking {
   client: Pick<Client, "id" | "first_name" | "last_name" | "phone">;
   room: Pick<Room, "id" | "name" | "capacity"> | null;
@@ -41,6 +45,8 @@ export interface BookingListItem extends Booking {
 export type ClientOption = Pick<Client, "id" | "first_name" | "last_name" | "phone">;
 /** Suggerimento di ricerca cliente (campo Nome nelle prenotazioni). `email` è null per il ruolo sala. */
 export interface ClientSuggestion { id: string; first_name: string; last_name: string; phone: string; email: string | null; }
+/** Prossimo evento dopo un giorno (giorno vuoto dell'agenda, tutti i ruoli). `event_date` YYYY-MM-DD, `event_time` HH:MM:SS o null. */
+export interface NextEventBrief { id: string; event_date: string; event_time: string | null; title: string; }
 /** Slot di occupazione sala per la vista agenda (select minima, senza annullati). */
 export interface RoomBookingSlot { id: string; event_date: string; event_name: string | null; room_id: string; client_name: string; adults: number; children: number; }
 export interface BookingDetail extends Booking {

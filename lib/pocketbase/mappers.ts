@@ -138,6 +138,7 @@ export function mapBooking(r: PbRecord): Booking {
     event_date: toDateOnly(r.event_date),
     event_time: nn(r.event_time),
     room_id: nn(r.room),
+    table_number: num(r.table_number) > 0 ? num(r.table_number) : null,
     adults: num(r.adults),
     children: num(r.children),
     kids_menus: num(r.kids_menus),

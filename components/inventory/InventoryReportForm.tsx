@@ -1,8 +1,8 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent, type KeyboardEvent } from "react";
 import { createInventoryProduct, submitInventoryReport } from "@/app/actions/inventory";
 import { Alert, Button, Field, Input, cn } from "@/components/ui";
 import { compareInventoryProducts } from "@/lib/inventory-utils";
@@ -25,6 +25,8 @@ import {
   type InventoryDraftCount,
 } from "./inventory-draft";
 import { normalizeSearchText } from "./inventory-search";
+import { InventoryGroupGrid } from "./InventoryGroupGrid";
+import { useIsTablet } from "./use-is-tablet";
 
 export interface InventoryReportFormProps {
   /** Prodotti attivi dal catalogo. */
@@ -86,6 +88,28 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
   const [restored, setRestored] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [addingFromSearch, setAddingFromSearch] = useState(false);
+  // Tablet: griglia di gruppi con un gruppo aperto alla volta. Su telefono e desktop resta la fisarmonica.
+  // Lo stato dei prodotti è in `counts` (non nel DOM): i gruppi non visibili non perdono quantità all'invio.
+  const isTablet = useIsTablet();
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const groupTitleRef = useRef<HTMLHeadingElement>(null);
+  // Gruppo aperto in precedenza: al ritorno alla griglia il focus va sul suo riquadro.
+  const lastGroupKey = useRef<string | null>(null);
+
+  // Il bottone toccato sparisce al cambio di vista: il focus va sul titolo del gruppo o sul riquadro di partenza.
+  useEffect(() => {
+    if (activeKey) {
+      lastGroupKey.current = activeKey;
+      groupTitleRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const previous = lastGroupKey.current;
+    if (!previous) return;
+    listRef.current
+      ?.querySelector<HTMLButtonElement>(`[data-group-key="${CSS.escape(previous)}"]`)
+      ?.focus({ preventScroll: true });
+  }, [activeKey]);
 
   // Bozza: si legge dopo il primo render (localStorage non esiste sul server) e poi si salva a ogni modifica.
   useEffect(() => {
@@ -117,7 +141,22 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
   const filledTotal = products.filter((p) => isFilled(counts[p.id])).length;
   const toOrderTotal = products.filter((p) => (counts[p.id]?.to_order ?? 0) > 0).length;
 
+  // Griglia/gruppo solo su tablet e senza ricerca; con una ricerca attiva si torna alla lista filtrata.
+  const tileMode = isTablet && !searching;
+  const activeIndex = groups.findIndex((g) => g.key === activeKey);
+  const activeGroup = activeIndex >= 0 ? groups[activeIndex] : undefined;
+  const prevGroup = activeIndex > 0 ? groups[activeIndex - 1] : undefined;
+  const nextGroup = activeIndex >= 0 && activeIndex < groups.length - 1 ? groups[activeIndex + 1] : undefined;
+  const tiles = groups.map((g) => ({ key: g.key, label: g.label, total: g.all.length, filled: g.filled }));
+  const backLabel = groupBy === "supplier" ? "Tutti i fornitori" : "Tutte le categorie";
+
   const isOpen = (key: string) => searching || openGroups.has(key);
+
+  /** Apre un gruppo (key) o torna alla griglia (null) portando la lista in vista sotto la barra di ricerca. */
+  const selectGroup = (key: string | null) => {
+    setActiveKey(key);
+    listRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
 
   const toggleGroup = (key: string) => {
     setOpenGroups((current) => {
@@ -316,24 +355,88 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
         </div>
       )}
 
-      <div className="flex min-w-0 flex-col gap-3" aria-label={groupBy === "supplier" ? "Prodotti per fornitore" : "Prodotti per categoria"}>
-        {visibleGroups.map((group) => (
-          <InventoryCategorySection
-            key={group.key}
-            category={group.category}
-            supplier={group.supplier}
-            label={group.label}
-            products={group.shown}
-            totalCount={group.all.length}
-            filledCount={group.filled}
-            counts={counts}
-            open={isOpen(group.key)}
-            onToggle={() => toggleGroup(group.key)}
-            onChangeCount={changeCount}
-            onCreate={createProduct}
-            disabled={pending}
-          />
-        ))}
+      <div
+        ref={listRef}
+        className="flex min-w-0 scroll-mt-40 flex-col gap-3"
+        aria-label={groupBy === "supplier" ? "Prodotti per fornitore" : "Prodotti per categoria"}
+      >
+        {tileMode && !activeGroup && <InventoryGroupGrid groups={tiles} onSelect={(key) => selectGroup(key)} />}
+
+        {tileMode && activeGroup && (
+          <section aria-labelledby="inventory-group-title" className="flex min-w-0 flex-col gap-4">
+            <Button variant="outline" size="md" onClick={() => selectGroup(null)} disabled={pending} className="min-h-11 max-w-full self-start">
+              <ChevronLeft aria-hidden="true" className="size-4 shrink-0" />
+              <span className="truncate">{backLabel}</span>
+            </Button>
+
+            <div className="flex min-w-0 flex-col gap-1 border-b border-sand pb-3">
+              <h2 id="inventory-group-title" ref={groupTitleRef} tabIndex={-1} className="wrap-anywhere font-serif text-3xl leading-tight text-ink outline-none">
+                {activeGroup.label}
+              </h2>
+              <p className="text-[14px] tabular-nums text-slate-dark">
+                {activeGroup.filled > 0
+                  ? `${activeGroup.filled} di ${activeGroup.all.length} compilati`
+                  : `${activeGroup.all.length} ${activeGroup.all.length === 1 ? "prodotto" : "prodotti"}`}
+              </p>
+            </div>
+
+            <InventoryCategorySection
+              // Nuova istanza per gruppo: il form "Aggiungi prodotto" non passa da un gruppo all'altro.
+              key={activeGroup.key}
+              embedded
+              category={activeGroup.category}
+              supplier={activeGroup.supplier}
+              label={activeGroup.label}
+              products={activeGroup.shown}
+              totalCount={activeGroup.all.length}
+              filledCount={activeGroup.filled}
+              counts={counts}
+              onChangeCount={changeCount}
+              onCreate={createProduct}
+              disabled={pending}
+            />
+
+            {(prevGroup || nextGroup) && (
+              <nav aria-label="Altri gruppi" className="grid grid-cols-2 gap-3">
+                {prevGroup ? (
+                  <Button variant="outline" size="md" onClick={() => selectGroup(prevGroup.key)} disabled={pending} className="min-h-11 min-w-0">
+                    <ChevronLeft aria-hidden="true" className="size-4 shrink-0" />
+                    <span className="truncate">{prevGroup.label}</span>
+                  </Button>
+                ) : (
+                  <span />
+                )}
+                {nextGroup ? (
+                  <Button variant="outline" size="md" onClick={() => selectGroup(nextGroup.key)} disabled={pending} className="min-h-11 min-w-0">
+                    <span className="truncate">{nextGroup.label}</span>
+                    <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+                  </Button>
+                ) : (
+                  <span />
+                )}
+              </nav>
+            )}
+          </section>
+        )}
+
+        {!tileMode &&
+          visibleGroups.map((group) => (
+            <InventoryCategorySection
+              key={group.key}
+              category={group.category}
+              supplier={group.supplier}
+              label={group.label}
+              products={group.shown}
+              totalCount={group.all.length}
+              filledCount={group.filled}
+              counts={counts}
+              open={isOpen(group.key)}
+              onToggle={() => toggleGroup(group.key)}
+              onChangeCount={changeCount}
+              onCreate={createProduct}
+              disabled={pending}
+            />
+          ))}
       </div>
 
       <div

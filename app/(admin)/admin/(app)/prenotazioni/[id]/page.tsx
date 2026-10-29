@@ -79,6 +79,8 @@ export default async function BookingDetailPage({
   const kitchen = profile.role === "cucina";
   // Preventivi, acconti e prezzi esistono solo per gli eventi, e si gestiscono solo dall'admin.
   const isEvent = booking.kind === "evento";
+  // Tavolo: solo per le prenotazioni normali, solo se assegnato.
+  const tableLabel = booking.kind === "normale" && booking.table_number ? `Tavolo ${booking.table_number}` : null;
   const financeVisible = admin && isEvent;
 
   const [changes, notes, rooms, menus, quotes, payments, catalog] = await Promise.all([
@@ -238,7 +240,10 @@ export default async function BookingDetailPage({
       <span className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
         <SummaryItem label="Data">{capitalize(formatIt(eventDate, "EEE d MMM yyyy"))}</SummaryItem>
         <SummaryItem label="Ora">{time ?? "Non indicata"}</SummaryItem>
-        <SummaryItem label="Sala">{booking.room?.name ?? "Da assegnare"}</SummaryItem>
+        <SummaryItem label="Sala">
+          {booking.room?.name ?? "Da assegnare"}
+          {tableLabel && <span className="text-slate-dark"> · {tableLabel}</span>}
+        </SummaryItem>
         {isEvent && (
           <SummaryItem label="Menù">
             {booking.menu ? <MenuBadge menuId={booking.menu.id} name={booking.menu.name} /> : "Non scelto"}
@@ -427,7 +432,10 @@ export default async function BookingDetailPage({
             <dl className="flex min-w-0 flex-col gap-4">
               <InfoRow label="Data">{capitalize(formatIt(eventDate, "EEEE d MMMM yyyy"))}</InfoRow>
               <InfoRow label="Ora">{time ?? "Non indicata"}</InfoRow>
-              <InfoRow label="Sala">{booking.room?.name ?? "Da assegnare"}</InfoRow>
+              <InfoRow label="Sala">
+                {booking.room?.name ?? "Da assegnare"}
+                {tableLabel && <span className="text-slate-dark"> · {tableLabel}</span>}
+              </InfoRow>
               <InfoRow label="Stato">
                 <StatusBadge status={booking.status} />
               </InfoRow>

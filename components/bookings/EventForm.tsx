@@ -587,7 +587,7 @@ export function EventForm({
             {/* Portale nel body: l'editor è un form e non può stare dentro il form dell'evento. */}
             {dishesEditorOpen &&
               createPortal(
-                <Modal open onClose={() => setDishesEditorOpen(false)} title="Piatti dell’evento" size="lg">
+                <Modal open onClose={() => setDishesEditorOpen(false)} title="Piatti dell’evento" size="xl" bare>
                   <DishesEditor
                     dishes={customDishes ?? menuDishes}
                     hasMenu={false}

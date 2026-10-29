@@ -3,16 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import { resetDishesFromMenu, updateBookingDishes } from "@/app/actions/bookings";
-import { CourseSections, ReorderButtons, inCourseOrder, moveWithinCourse, useFocusNewRow } from "@/components/catalog/CourseSections";
-import { DishPicker } from "@/components/catalog/DishPicker";
+import { CourseDishesEditor, type CourseDishRow } from "@/components/catalog/CourseDishesEditor";
+import { inCourseOrder, moveWithinCourse, useFocusNewRow } from "@/components/catalog/CourseSections";
 import { normalizeSearch } from "@/components/catalog/search";
-import { Alert, Button, Field, Textarea } from "@/components/ui";
+import { Alert, Button } from "@/components/ui";
 import { isBrowserOnline } from "@/lib/offline/network";
 import { isQueued, submitMutation } from "@/lib/offline/submit";
-import { COURSE_ORDER, type BookingDish, type Course, type Dish } from "@/lib/types";
+import { type BookingDish, type Course, type Dish } from "@/lib/types";
 import { ConfirmAction } from "./ConfirmAction";
-
-const DESCRIPTION_MAX = 500;
 
 /** Riga dei piatti dell'evento: copia libera (nessun collegamento al catalogo). */
 interface DishDraft {
@@ -51,10 +49,13 @@ export interface DishesEditorProps {
 }
 
 /**
- * Piatti dell'evento (solo admin), stesso editor del menù: sezioni per portata, scelta dal catalogo
+ * Piatti dell'evento (solo admin), stesso editor del menù: una card per portata, scelta dal catalogo
  * o nome libero. Scegliere un piatto copia nome, portata e descrizione: nessun legame al catalogo.
  * Il componente va montato con `key` legata alla versione dei piatti salvati: dopo un salvataggio
  * o un ripristino si riparte dai dati del server.
+ *
+ * Layout: il contenuto scorre nell'area centrale, la barra con Annulla / Applica resta in fondo.
+ * Nella finestra "bare" della creazione evento l'altezza è data dalla finestra stessa.
  */
 export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti", dishes, hasMenu, catalog, onClose, onQueued, expectedUpdated }: DishesEditorProps) {
   const router = useRouter();
@@ -76,14 +77,6 @@ export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti",
     })),
   );
   const [formError, setFormError] = useState<string | null>(null);
-
-  const pickableByCourse = useMemo(
-    () =>
-      new Map<Course, Dish[]>(
-        COURSE_ORDER.map((course): [Course, Dish[]] => [course, catalog.filter((dish) => dish.active && dish.course === course)]),
-      ),
-    [catalog],
-  );
 
   /** Righe da salvare nell'ordine delle portate. Le righe senza nome non vengono salvate. */
   const saveRows = useMemo(
@@ -108,7 +101,9 @@ export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti",
     const taken = new Set(
       items.filter((other) => other.key !== item.key && other.course === item.course).map((other) => normalizeSearch(other.name)),
     );
-    const blocked = (pickableByCourse.get(item.course) ?? []).filter((dish) => taken.has(normalizeSearch(dish.name)));
+    const blocked = catalog.filter(
+      (dish) => dish.active && dish.course === item.course && taken.has(normalizeSearch(dish.name)),
+    );
     return new Set(blocked.map((dish) => dish.id));
   }
 
@@ -192,168 +187,83 @@ export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti",
     });
   }
 
+  // Righe per il componente condiviso: testo libero, nessun collegamento al catalogo.
+  const rows: CourseDishRow[] = items.map((item) => ({
+    key: item.key,
+    course: item.course,
+    name: item.name,
+    description: item.description,
+    showDescription: item.showDescription,
+    dishId: null,
+    unavailableIds: unavailableFor(item),
+    nameError: duplicateKeys.has(item.key) ? "Questo piatto è già nell’elenco." : undefined,
+  }));
+
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="Piatti dell’evento" className="flex min-w-0 flex-col gap-6">
-      <fieldset className="flex min-w-0 flex-col gap-6">
-        <legend className="mb-1 text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark">Piatti per portata</legend>
-        <CourseSections
-          idPrefix="booking-dishes"
-          items={items}
-          disabled={pending}
-          emptyText="Nessun piatto. Aggiungi una portata o ripristina dal menù."
-          onAdd={addItem}
-          renderItem={(item, position) => (
-            <DishRow
-              key={item.key}
-              item={item}
-              options={pickableByCourse.get(item.course) ?? []}
-              unavailableIds={unavailableFor(item)}
-              isFirst={position.isFirst}
-              isLast={position.isLast}
-              nameError={duplicateKeys.has(item.key) ? "Questo piatto è già nell’elenco." : undefined}
-              disabled={pending}
-              onNameChange={(key, text) => updateItem(key, { name: text })}
-              onSelect={selectDish}
-              onMove={moveItem}
-              onRemove={removeItem}
-              onToggleDescription={toggleDescription}
-              onDescriptionChange={(key, text) => updateItem(key, { description: text })}
+    <form onSubmit={handleSubmit} noValidate aria-label="Piatti dell’evento" className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-cream/40 px-4 py-5 sm:px-6">
+        <fieldset className="min-w-0 border-0 p-0">
+          <legend className="sr-only">Piatti per portata</legend>
+          <CourseDishesEditor
+            idPrefix="booking-dishes"
+            rows={rows}
+            catalog={catalog}
+            disabled={pending}
+            emptyText="Nessun piatto. Aggiungi una portata o ripristina dal menù."
+            onAddRow={addItem}
+            onMoveRow={moveItem}
+            onRemoveRow={removeItem}
+            onNameChange={(key, text) => updateItem(key, { name: text })}
+            onSelectDish={selectDish}
+            onToggleDescription={toggleDescription}
+            onDescriptionChange={(key, text) => updateItem(key, { description: text })}
+          />
+        </fieldset>
+      </div>
+
+      <div className="shrink-0 border-t border-sand bg-paper px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-10px_24px_-18px_rgba(28,43,45,0.45)] sm:px-6 sm:pb-4">
+        {formError && (
+          <div className="mb-3">
+            <Alert tone="danger">{formError}</Alert>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" variant="primary" size="md" disabled={pending} aria-busy={pending || undefined} className="min-h-11 flex-1 sm:flex-none">
+            {pending ? "Salvataggio…" : submitLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="md"
+            disabled={pending}
+            onClick={() => onClose(false)}
+            className="min-h-11 flex-1 sm:flex-none"
+          >
+            Annulla
+          </Button>
+          {hasMenu && bookingId && (
+            <ConfirmAction
+              label="Ripristina dal menù"
+              variant="outline"
+              title="Ripristinare i piatti dal menù?"
+              description="I piatti attuali dell’evento verranno sostituiti con quelli del menù selezionato. Le modifiche non salvate andranno perse."
+              confirmLabel="Ripristina"
+              pendingLabel="Ripristino…"
+              run={() =>
+                submitMutation("bookings.resetDishesFromMenu", resetDishesFromMenu, [bookingId], {
+                  label: "Ripristino piatti dal menù",
+                  entity: { type: "booking", id: bookingId },
+                  expectedUpdated,
+                })
+              }
+              onSuccess={() => {
+                // Offline la pagina resta quella di prima: il ripristino parte appena torna la rete.
+                if (isBrowserOnline()) router.refresh();
+              }}
             />
           )}
-        />
-      </fieldset>
-
-      {formError && <Alert tone="danger">{formError}</Alert>}
-
-      <div className="flex flex-wrap items-center gap-3 border-t border-sand pt-5">
-        <Button type="submit" variant="primary" size="md" disabled={pending} aria-busy={pending || undefined}>
-          {pending ? "Salvataggio…" : submitLabel}
-        </Button>
-        <Button type="button" variant="outline" size="md" disabled={pending} onClick={() => onClose(false)}>
-          Annulla
-        </Button>
-        {hasMenu && bookingId && (
-          <ConfirmAction
-            label="Ripristina dal menù"
-            variant="outline"
-            title="Ripristinare i piatti dal menù?"
-            description="I piatti attuali dell’evento verranno sostituiti con quelli del menù selezionato. Le modifiche non salvate andranno perse."
-            confirmLabel="Ripristina"
-            pendingLabel="Ripristino…"
-            run={() =>
-              submitMutation("bookings.resetDishesFromMenu", resetDishesFromMenu, [bookingId], {
-                label: "Ripristino piatti dal menù",
-                entity: { type: "booking", id: bookingId },
-                expectedUpdated,
-              })
-            }
-            onSuccess={() => {
-              // Offline la pagina resta quella di prima: il ripristino parte appena torna la rete.
-              if (isBrowserOnline()) router.refresh();
-            }}
-          />
-        )}
+        </div>
       </div>
     </form>
-  );
-}
-
-interface DishRowProps {
-  item: DishDraft;
-  /** Piatti attivi della portata della riga. */
-  options: Dish[];
-  /** Piatti già presenti in altre righe della portata. */
-  unavailableIds: ReadonlySet<string>;
-  isFirst: boolean;
-  isLast: boolean;
-  nameError?: string;
-  disabled: boolean;
-  onNameChange: (key: number, text: string) => void;
-  onSelect: (key: number, dish: Dish) => void;
-  onMove: (key: number, delta: -1 | 1) => void;
-  onRemove: (key: number) => void;
-  onToggleDescription: (key: number, open: boolean) => void;
-  onDescriptionChange: (key: number, text: string) => void;
-}
-
-/** Riga di un piatto dell'evento: campo piatto (catalogo o testo libero), descrizione facoltativa, ordine e rimozione. */
-function DishRow({
-  item,
-  options,
-  unavailableIds,
-  isFirst,
-  isLast,
-  nameError,
-  disabled,
-  onNameChange,
-  onSelect,
-  onMove,
-  onRemove,
-  onToggleDescription,
-  onDescriptionChange,
-}: DishRowProps) {
-  // Id `item-<key>-name`: il focus della riga appena aggiunta lo cerca con questo nome.
-  const nameId = `item-${item.key}-name`;
-  const nameErrorId = `item-${item.key}-name-error`;
-  const descriptionId = `item-${item.key}-description`;
-  const label = item.name.trim() || "piatto senza nome";
-
-  return (
-    <li className="flex min-w-0 flex-col gap-2 border-l-[3px] border-sand bg-paper py-1 pl-3 sm:pl-4">
-      {/* Il campo nome occupa sempre tutta la riga: il testo del piatto non viene troncato dai pulsanti. */}
-      <div className="w-full min-w-0">
-        <label htmlFor={nameId} className="sr-only">
-          Piatto
-        </label>
-        <DishPicker
-          id={nameId}
-          value={item.name}
-          options={options}
-          unavailableIds={unavailableIds}
-          invalid={!!nameError}
-          describedBy={nameError ? nameErrorId : undefined}
-          showNewHint={false}
-          onChangeText={(text) => onNameChange(item.key, text)}
-          onSelect={(dish) => onSelect(item.key, dish)}
-        />
-        {nameError && (
-          <p id={nameErrorId} className="mt-1.5 text-[13px] text-danger">
-            {nameError}
-          </p>
-        )}
-      </div>
-
-      {item.showDescription ? (
-        <Field label="Descrizione" htmlFor={descriptionId} hint={`Facoltativa, massimo ${DESCRIPTION_MAX} caratteri.`}>
-          <Textarea
-            id={descriptionId}
-            rows={2}
-            maxLength={DESCRIPTION_MAX}
-            value={item.description}
-            onChange={(e) => onDescriptionChange(item.key, e.target.value)}
-          />
-        </Field>
-      ) : null}
-
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onToggleDescription(item.key, !item.showDescription)}
-          disabled={disabled}
-          aria-expanded={item.showDescription}
-        >
-          {item.showDescription ? "Rimuovi descrizione" : "Aggiungi descrizione"}
-        </Button>
-        <ReorderButtons
-          label={label}
-          isFirst={isFirst}
-          isLast={isLast}
-          disabled={disabled}
-          onMove={(delta) => onMove(item.key, delta)}
-          onRemove={() => onRemove(item.key)}
-        />
-      </div>
-    </li>
   );
 }
