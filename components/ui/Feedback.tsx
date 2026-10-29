@@ -49,7 +49,7 @@ export function PageHeader({ eyebrow, title, description, actions, compact = fal
             {eyebrow}
           </p>
         )}
-        <h1 className="text-3xl lg:text-4xl">{title}</h1>
+        <h1 className="text-3xl desk:text-4xl">{title}</h1>
         {description && <p className="max-w-2xl text-[15px] text-slate">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}

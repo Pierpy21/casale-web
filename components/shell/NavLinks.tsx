@@ -132,10 +132,10 @@ export function BottomNav({ items }: { items: NavLink[] }) {
     <>
       <nav
         aria-label="Navigazione principale"
-        className="no-print fixed inset-x-0 bottom-0 left-0 right-0 z-30 w-full max-w-full border-t border-sand/15 bg-ink pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] lg:hidden"
+        className="no-print fixed inset-x-0 bottom-0 left-0 right-0 z-30 w-full max-w-full border-t border-sand/15 bg-ink pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] desk:hidden"
       >
         <ul
-          className="grid w-full"
+          className="grid w-full optouch:mx-auto optouch:max-w-[56rem]"
           style={{ gridTemplateColumns: `repeat(${direct.length + 1}, minmax(0, 1fr))` }}
         >
           {direct.map((item) => {
@@ -189,7 +189,7 @@ export function BottomNav({ items }: { items: NavLink[] }) {
         ref={sheetRef}
         onClose={() => setMoreOpen(false)}
         aria-labelledby={sheetTitleId}
-        className="no-print fixed inset-x-0 bottom-0 top-auto m-0 w-full max-w-none rounded-none border-t border-sand bg-paper p-0 pb-[env(safe-area-inset-bottom)] text-ink shadow-2xl shadow-ink/30 backdrop:bg-ink/50 lg:hidden"
+        className="no-print fixed inset-x-0 bottom-0 top-auto m-0 w-full max-w-none rounded-none border-t border-sand bg-paper p-0 pb-[env(safe-area-inset-bottom)] text-ink shadow-2xl shadow-ink/30 backdrop:bg-ink/50 desk:hidden"
       >
         <div className="flex items-center justify-between gap-4 border-b border-sand px-5 py-4">
           <h2 id={sheetTitleId} className="font-serif text-2xl">

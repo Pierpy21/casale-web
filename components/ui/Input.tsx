@@ -14,7 +14,7 @@ export const FIELD_BASE =
   "w-full min-h-11 min-w-0 max-w-full rounded-lg border bg-field px-3.5 py-2.5 text-ink placeholder:text-slate shadow-[inset_0_1px_2px_rgb(28_43_45/0.04)] transition-[border-color,box-shadow,background-color] duration-200 focus:outline-none disabled:cursor-not-allowed disabled:border-ink/10 disabled:bg-cream/50 disabled:text-disabled disabled:shadow-none";
 
 /** Testo dei campi: 16px su mobile (niente zoom iOS), 15px da lg. */
-export const FIELD_TEXT = "text-[16px] lg:text-[15px]";
+export const FIELD_TEXT = "text-[16px] desk:text-[15px]";
 /** Testo grande dei campi (date e ricerche in primo piano). */
 export const FIELD_TEXT_LARGE = "text-[17px]";
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireProfile } from "@/lib/auth";
 import { getRooms } from "@/lib/data/catalog";
-import { getBookingsInRange } from "@/lib/data/bookings";
+import { getBookingsInRange, getNextEventAfter } from "@/lib/data/bookings";
 import { getBookingNotesFor } from "@/lib/data/notes";
 import { canAddBookingNote, canAssignRoom, isAdmin } from "@/lib/permissions";
 import { AgendaBoard } from "@/components/agenda/AgendaBoard";
@@ -30,7 +30,10 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   if (profile.role === "cucina") {
     const day = parseDateParam(params.date);
     const kitchenRange = monthGridRange(day);
-    const kitchenBookings = await getBookingsInRange(kitchenRange.from, kitchenRange.to);
+    const [kitchenBookings, kitchenNextEvent] = await Promise.all([
+      getBookingsInRange(kitchenRange.from, kitchenRange.to),
+      getNextEventAfter(kitchenRange.to),
+    ]);
     const kitchenNotes = await getBookingNotesFor(kitchenBookings.map((b) => b.id));
     return (
       <KitchenAgenda
@@ -43,6 +46,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
         notes={Object.values(kitchenNotes).flat()}
         canAddNote={canAddBookingNote(profile)}
         currentUserId={profile.id}
+        nextEventAfterRange={kitchenNextEvent}
       />
     );
   }
@@ -52,7 +56,12 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const selected = parseDateParam(params.date);
   // Si carica l'intera griglia mensile (con i giorni dei mesi adiacenti): il resto della navigazione è client-side.
   const loadedRange = monthGridRange(selected);
-  const [bookings, rooms] = await Promise.all([getBookingsInRange(loadedRange.from, loadedRange.to), getRooms({ includeInactive: true })]);
+  const [bookings, rooms, nextEventAfterRange] = await Promise.all([
+    getBookingsInRange(loadedRange.from, loadedRange.to),
+    getRooms({ includeInactive: true }),
+    // Prossimo evento oltre la griglia caricata: serve al riquadro del giorno vuoto (tutti i ruoli).
+    getNextEventAfter(loadedRange.to),
+  ]);
 
   return (
     <AgendaBoard
@@ -66,6 +75,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       isAdmin={admin}
       rooms={rooms}
       canAssignRooms={canAssignRoom(profile, "normale")}
+      nextEventAfterRange={nextEventAfterRange}
     />
   );
 }

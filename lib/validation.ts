@@ -263,6 +263,18 @@ export const BookingInput = z
     event_date: dateSchema,
     event_time: z.preprocess(emptyToNull, timeSchema.nullable()),
     room_id: optUuid,
+    /** Tavolo (solo prenotazioni normali), 1-9999. Assente = non modificare; null = nessun tavolo. */
+    table_number: z
+      .preprocess(
+        (v) => (v === "" ? null : v),
+        z
+          .number({ message: "Numero del tavolo non valido" })
+          .int("Numero del tavolo non valido: usa un numero intero")
+          .min(1, "Numero del tavolo non valido: usa un numero da 1 a 9999.")
+          .max(9999, "Numero del tavolo non valido: usa un numero da 1 a 9999.")
+          .nullable(),
+      )
+      .optional(),
     ...coversShape,
     menu_id: optUuid,
     kids_menu_id: optUuid,

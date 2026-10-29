@@ -1,5 +1,30 @@
 @import "tailwindcss";
 
+/*
+ * Layout "da computer" (sidebar, viste mese/settimana, griglie larghe): usare desk:/deskxl:/desk2xl: al posto di
+ * lg:/xl:/2xl: nei componenti che vedono anche sala e cucina.
+ * - Mouse o trackpad (pointer fine/none): da 1024px come lg, per tutti i ruoli.
+ * - Touch (tablet): da 1024px solo per l'admin. Sala e cucina restano sul layout da telefono, ingrandito
+ *   (attributo data-shell="operator" sul contenitore dell'app, app/(admin)/admin/(app)/layout.tsx; :has copre anche i portali nel body).
+ * La stessa regola in JS è isDeskLayout() in components/shell/shell-mode.ts.
+ */
+@custom-variant desk {
+  @media (min-width: 64rem) and (pointer: fine), (min-width: 64rem) and (pointer: none) { @slot; }
+  @media (min-width: 64rem) and (pointer: coarse) { &:where(:not(html:has([data-shell="operator"]) *)) { @slot; } }
+}
+@custom-variant deskxl {
+  @media (min-width: 80rem) and (pointer: fine), (min-width: 80rem) and (pointer: none) { @slot; }
+  @media (min-width: 80rem) and (pointer: coarse) { &:where(:not(html:has([data-shell="operator"]) *)) { @slot; } }
+}
+@custom-variant desk2xl {
+  @media (min-width: 96rem) and (pointer: fine), (min-width: 96rem) and (pointer: none) { @slot; }
+  @media (min-width: 96rem) and (pointer: coarse) { &:where(:not(html:has([data-shell="operator"]) *)) { @slot; } }
+}
+/* Sala e cucina su tablet: layout da telefono in una colonna centrata e più ampia. */
+@custom-variant optouch {
+  @media (min-width: 48rem) and (pointer: coarse) { &:where(html:has([data-shell="operator"]) *) { @slot; } }
+}
+
 /* Token di brand (SPEC §1). Usati come classi: bg-petrol, text-ink, border-sand, ... */
 @theme {
   --color-ink: #1c2b2d;

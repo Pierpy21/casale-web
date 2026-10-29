@@ -12,6 +12,7 @@ import { checkConflict, withMutation } from "@/lib/mutations";
 import type { MutationOptions } from "@/lib/offline/contract";
 import {
   assignBookingRoom as writeRoomAssignment,
+  assignBookingTable as writeTableAssignment,
   countPayments,
   setBookingStatusRecord,
   deleteBookingRecord,
@@ -345,6 +346,43 @@ export async function assignBookingRoom(bookingId: string, roomId: string | null
 
     try {
       await writeRoomAssignment(auth.db, bookingId, roomId, { id: auth.profile.id, full_name: auth.profile.full_name });
+    } catch (err) {
+      return dbFail(err);
+    }
+
+    revalidateBooking(bookingId, String(booking.client ?? "") || undefined);
+    return { ok: true, data: undefined };
+  });
+}
+
+/**
+ * Assegna (o libera, con table null) il tavolo di una prenotazione normale (admin e sala attiva).
+ * Il tavolo è un intero 1..9999, facoltativo.
+ */
+export async function assignBookingTable(bookingId: string, table: number | null, opts?: MutationOptions): Promise<ActionResult> {
+  if (!isRecordId(bookingId)) return fail("Prenotazione non valida.");
+  if (table !== null && (!Number.isInteger(table) || table < 1 || table > 9999)) {
+    return fail("Numero del tavolo non valido: usa un numero da 1 a 9999.");
+  }
+  const auth = await authorize(
+    (p) => isAdmin(p) || (p.active && p.role === "sala"),
+    "Non sei autorizzato ad assegnare il tavolo.",
+  );
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "bookings.assignBookingTable", auth.profile.id, async (): Promise<ActionResult> => {
+    const booking = await fetchOne(auth.db, "bookings", bookingId);
+    if (!booking || (!canSeeAppointments(auth.profile) && kindOf(booking) === "appuntamento")) {
+      return fail("Prenotazione non trovata.");
+    }
+    if (!canAssignRoom(auth.profile, kindOf(booking))) {
+      return fail("Solo le prenotazioni normali hanno il tavolo.");
+    }
+    const conflict = await checkConflict(auth.db, opts, booking);
+    if (conflict) return conflict;
+
+    try {
+      await writeTableAssignment(auth.db, bookingId, table, { id: auth.profile.id, full_name: auth.profile.full_name });
     } catch (err) {
       return dbFail(err);
     }

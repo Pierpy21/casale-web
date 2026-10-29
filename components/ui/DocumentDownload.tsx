@@ -39,7 +39,7 @@ export function DocumentDownload({
   mimeType: string;
   className?: string;
   children: ReactNode;
-  /** Chiamato al clic, prima del download (es. per chiudere un menu che lo contiene). */
+  /** Chiamato a fine clic (su computer subito dopo, su telefono a fine flusso): es. per chiudere un menu che lo contiene. */
   onActivate?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -56,19 +56,22 @@ export function DocumentDownload({
   }
 
   const onClick = async (event: MouseEvent<HTMLAnchorElement>) => {
-    onActivate?.();
     const touch = window.matchMedia("(pointer: coarse)").matches;
-    if (!touch) return; // computer: download normale
+    if (!touch) {
+      // Computer: download normale. Il chiamante si chiude dopo il clic (differito, così il link non si smonta durante l'azione).
+      setTimeout(() => onActivate?.(), 0);
+      return;
+    }
     event.preventDefault();
     if (busy) return;
 
-    if (typeof navigator.share !== "function" || isIosOtherBrowser()) {
-      window.location.href = inlineHref(href);
-      return;
-    }
-
+    // Touch: il chiamante (onActivate) viene avvisato solo a flusso finito, così il link non si smonta durante il download.
     setBusy(true);
     try {
+      if (typeof navigator.share !== "function" || isIosOtherBrowser()) {
+        window.location.href = inlineHref(href);
+        return;
+      }
       const response = await fetch(href, { credentials: "same-origin" });
       if (!response.ok) throw new Error(`Documento non disponibile (${response.status})`);
       const file = new File([await response.blob()], fileName, { type: mimeType });
@@ -85,6 +88,7 @@ export function DocumentDownload({
       window.location.href = inlineHref(href);
     } finally {
       setBusy(false);
+      onActivate?.();
     }
   };
 

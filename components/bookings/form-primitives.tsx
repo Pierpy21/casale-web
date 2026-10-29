@@ -166,7 +166,18 @@ export function MenuChoice({
   /** Torna ai piatti del menù. */
   onReset?: () => void;
 }) {
-  const dishes = <CourseList items={items} className="text-[13px]" />;
+  // Tendina dei piatti: si apre con il pulsante, non seleziona né deseleziona il menù.
+  // Il menù appena scelto si apre da solo; poi resta come l'utente lo lascia.
+  const [expanded, setExpanded] = useState(checked);
+  // Derivazione dello stato durante il render: quando il menù diventa selezionato (anche dall'esterno)
+  // la tendina si apre. Se torna non selezionato resta com'è. Niente effetti, niente loop.
+  const [wasChecked, setWasChecked] = useState(checked);
+  if (checked !== wasChecked) {
+    setWasChecked(checked);
+    if (checked) setExpanded(true);
+  }
+  const count = items.length;
+
   return (
     <div
       className={cn(
@@ -174,12 +185,21 @@ export function MenuChoice({
         checked ? "border-petrol bg-petrol/5 ring-1 ring-petrol" : "border-sand",
       )}
     >
-      {/* L'overlay dell'etichetta rende cliccabile tutta la card; matita e tendina dei piatti stanno sopra (z-10). */}
+      {/* L'overlay dell'etichetta rende cliccabile tutta la card; matita, tendina e note stanno sopra (z-10). */}
       <div className="flex min-w-0 items-start justify-between gap-3">
-        <label className="flex min-w-0 flex-1 cursor-pointer flex-col gap-3 after:absolute after:inset-0 after:content-['']">
-          <input type="radio" name={name} checked={checked} onChange={() => onSelect()} className="sr-only" />
+        <label className="flex min-w-0 flex-1 cursor-pointer flex-col gap-2 after:absolute after:inset-0 after:content-['']">
+          <input
+            type="radio"
+            name={name}
+            checked={checked}
+            onChange={() => onSelect()}
+            className="sr-only"
+          />
           <span className="min-w-0 wrap-anywhere font-serif text-xl leading-tight text-ink">{title}</span>
           <span className="text-[14px] font-medium text-petrol">{price}</span>
+          <span className="text-[13px] text-slate-dark">
+            {count} {count === 1 ? "piatto" : "piatti"}
+          </span>
         </label>
         {checked && (
           <div className="relative z-10 -mr-1.5 -mt-1.5 flex shrink-0 items-center gap-1">
@@ -208,14 +228,18 @@ export function MenuChoice({
           )}
         </p>
       )}
-      {items.length > 0 && (
-        <>
-          {/* Mobile e tablet: piatti compressi. Da xl sempre visibili. */}
-          <Disclosure className="relative z-10 -my-1 border-t border-sand xl:hidden" summary={`Vedi piatti (${items.length})`}>
-            <div className="pb-1 pt-1">{dishes}</div>
-          </Disclosure>
-          <div className="hidden xl:block">{dishes}</div>
-        </>
+      {count > 0 && (
+        <Disclosure
+          className="relative z-10 border-t border-sand pt-2"
+          open={expanded}
+          onOpenChange={setExpanded}
+          summary={expanded ? "Nascondi piatti" : "Mostra piatti"}
+          summaryClassName="min-h-11 w-full min-w-0 items-center justify-between gap-3 text-left text-[13px] font-medium text-petrol transition-colors duration-200 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-petrol"
+        >
+          <div className="pb-1 pt-2">
+            <CourseList items={items} className="text-[13px]" />
+          </div>
+        </Disclosure>
       )}
     </div>
   );
@@ -600,7 +624,7 @@ export function BookingFormHeader({
     // Stretto: una colonna. Da @lg: titolo | indietro, poi data | invio. Da @5xl: tutto su una riga.
     <header className="@container min-w-0 border-b border-sand pb-5">
       <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 @lg:grid-cols-[minmax(0,1fr)_auto] @lg:items-end @5xl:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-        <h1 className="min-w-0 text-3xl leading-tight wrap-anywhere lg:text-4xl">{title}</h1>
+        <h1 className="min-w-0 text-3xl leading-tight wrap-anywhere desk:text-4xl">{title}</h1>
         <ButtonLink
           href={backHref}
           variant="ghost"

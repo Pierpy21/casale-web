@@ -175,6 +175,10 @@ function bookingRecordFields(
     event_date: dayStartPb(input.event_date),
     event_time: input.event_time ?? "",
     room: input.room_id ?? "",
+    // Tavolo: solo per le prenotazioni normali (0 = nessuno). Assente nel payload: non si tocca.
+    ...(input.table_number !== undefined || input.kind !== "normale"
+      ? { table_number: input.kind === "normale" ? (input.table_number ?? 0) : 0 }
+      : {}),
     adults: input.adults,
     children: input.children,
     kids_menus: input.kids_menus,
@@ -259,6 +263,19 @@ export async function upsertBooking(
       notes: input.notes ?? null,
     });
     queueAuditEntries(batch, actor, bookingId, diffBookingFields(before_, after_));
+    // Tavolo: stessa riga di registro di assignBookingTable, solo se il payload lo cambia.
+    if ("table_number" in fields) {
+      const oldTable = mapBooking(before as PbRecord).table_number;
+      const newTable = (fields.table_number ?? 0) > 0 ? (fields.table_number ?? null) : null;
+      if (oldTable !== newTable) {
+        queueAudit(batch, actor, {
+          bookingId,
+          field: "Tavolo",
+          old: oldTable === null ? null : String(oldTable),
+          new: newTable === null ? null : String(newTable),
+        });
+      }
+    }
   }
 
   // Allergie: sostituzione completa, una sola riga riassuntiva.
@@ -343,6 +360,30 @@ export async function assignBookingRoom(
   const batch = db.createBatch();
   batch.collection("bookings").update(bookingId, { room: roomId ?? "", updated_by: actor.id });
   queueAudit(batch, actor, { bookingId, field: "Sala", old: oldName, new: newName });
+  await batch.send();
+}
+
+/**
+ * Assegna (o libera, con table null) il tavolo di una prenotazione normale, con audit (campo "Tavolo").
+ * 0 nel record = nessun tavolo. I controlli di ruolo e di tipo sono fatti dal chiamante (app/actions/bookings.ts).
+ */
+export async function assignBookingTable(
+  db: PocketBase,
+  bookingId: string,
+  table: number | null,
+  actor: Actor,
+): Promise<void> {
+  const booking = await loadBooking(db, bookingId);
+  const current = num(booking.table_number) > 0 ? num(booking.table_number) : null;
+  if (current === table) return;
+  const batch = db.createBatch();
+  batch.collection("bookings").update(bookingId, { table_number: table ?? 0, updated_by: actor.id });
+  queueAudit(batch, actor, {
+    bookingId,
+    field: "Tavolo",
+    old: current === null ? null : String(current),
+    new: table === null ? null : String(table),
+  });
   await batch.send();
 }
 

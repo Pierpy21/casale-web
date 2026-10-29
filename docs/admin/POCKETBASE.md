@@ -29,6 +29,7 @@ Le migrazioni sono in `pocketbase/pb_migrations/` del repository:
 - `1793000010_booking_notes.js`: note interne sulle prenotazioni (`booking_notes`: prenotazione, autore, nome autore, testo max 2000 caratteri), cancellate a cascata con la prenotazione. Riservata all'account di servizio. Idempotente, con down (elimina la collezione).
 - `1793000011_hide_appointment_notifications.js`: le notifiche delle prenotazioni di tipo appuntamento (`kind` = appuntamento) restano solo agli admin: elimina quelle destinate ad altri utenti. Idempotente, down no-op.
 - `1793000012_applied_mutations.js`: modalità offline (sezione 10). Crea `applied_mutations` (modifiche applicate o in corso, per l'idempotenza dei reinvii, con `status` `pending`/`done`) e aggiunge `rooms.updated` (data di ultima modifica delle sale, per il controllo di conflitto). Riservata all'account di servizio. Idempotente, con down (elimina la collezione e il campo).
+- `1793000013_booking_table_number.js`: tavolo delle prenotazioni normali (`bookings.table_number`, numero intero 0-9999, facoltativo, 0 = nessun tavolo). Idempotente, con down (rimuove il campo).
 
 Le migrazioni già applicate non si modificano: `1793000000` può essere già in produzione, quindi le modifiche vanno in file nuovi.
 

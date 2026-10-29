@@ -37,10 +37,10 @@ const ADMIN_OPTIONS: CreateOption[] = [
 ];
 
 const FAB_CLASS =
-  "no-print fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-5 z-40 grid size-14 place-items-center rounded-[2px] bg-petrol text-paper shadow-lg shadow-ink/30 transition-colors duration-200 hover:bg-petrol-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol lg:bottom-8 lg:right-8 lg:size-16";
+  "no-print fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-5 z-40 grid size-14 place-items-center rounded-[2px] bg-petrol text-paper shadow-lg shadow-ink/30 transition-colors duration-200 hover:bg-petrol-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol desk:bottom-8 desk:right-8 desk:size-16";
 
 const SHEET_CLASS =
-  "no-print fixed inset-x-0 bottom-0 top-auto m-0 w-full max-w-none rounded-none border-t border-sand bg-paper p-0 pb-[env(safe-area-inset-bottom)] text-ink shadow-2xl shadow-ink/30 backdrop:bg-ink/50 lg:inset-auto lg:bottom-28 lg:right-8 lg:w-[24rem] lg:rounded-[2px] lg:border lg:pb-0";
+  "no-print fixed inset-x-0 bottom-0 top-auto m-0 w-full max-w-none rounded-none border-t border-sand bg-paper p-0 pb-[env(safe-area-inset-bottom)] text-ink shadow-2xl shadow-ink/30 backdrop:bg-ink/50 desk:inset-auto desk:bottom-28 desk:right-8 desk:w-[24rem] desk:rounded-[2px] desk:border desk:pb-0";
 
 /** Giorno selezionato in agenda (?date=YYYY-MM-DD), letto al momento del tap: l'agenda lo aggiorna con replaceState. */
 function agendaDate(pathname: string): string | null {

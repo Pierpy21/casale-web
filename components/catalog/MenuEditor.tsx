@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { upsertMenu } from "@/app/actions/catalog";
 import { submitMutation, updatedAtOf } from "@/lib/offline/submit";
-import { Alert, Button, cn, Field, Input, Switch, Textarea } from "@/components/ui";
-import { COURSE_ORDER, type Course, type Dish, type Menu } from "@/lib/types";
+import { Alert, Button, cn, Field, Input, Switch } from "@/components/ui";
+import { type Course, type Dish, type Menu } from "@/lib/types";
 import { MENU_PHOTO_MAX_BYTES, MENU_PHOTO_MAX_COUNT, MENU_PHOTO_MIME_TYPES } from "@/lib/validation";
-import { CourseSections, ReorderButtons, inCourseOrder, moveWithinCourse, useFocusNewRow } from "./CourseSections";
-import { DishPicker } from "./DishPicker";
+import { inCourseOrder, moveWithinCourse, useFocusNewRow } from "./CourseSections";
+import { CourseDishesEditor, type CourseDishRow } from "./CourseDishesEditor";
 import { normalizeSearch } from "./search";
 
 interface DraftItem {
@@ -39,8 +39,9 @@ export interface MenuEditorProps {
 type ErrorMap = Record<string, string>;
 
 const PHOTO_ACCEPT = MENU_PHOTO_MIME_TYPES.join(",");
-const DESCRIPTION_MAX = 500;
-const LABEL_CLASS = "break-words text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark";
+/** Card di una sezione: fondo paper sullo sfondo cream dell'area di scorrimento. */
+const CARD_CLASS = "flex min-w-0 flex-col gap-4 rounded-xl border border-sand bg-paper p-4 sm:p-5";
+const COUNT_BADGE_CLASS = "rounded-full bg-cream px-2.5 py-0.5 text-[12px] font-medium tabular-nums text-slate-dark";
 
 /** Converte fieldErrors Zod (chiavi tipo "items.2.name") in messaggi per campo. */
 function toErrorMap(raw: Record<string, string[]> | undefined): ErrorMap {
@@ -73,7 +74,7 @@ function isBlank(item: DraftItem): boolean {
   return item.dish_id === null && item.name.trim() === "";
 }
 
-/** Editor di un menù: dati generali, piatti raggruppati per portata e foto. */
+/** Editor di un menù: dati generali e foto a sinistra (desktop), piatti per portata a destra. */
 export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps) {
   const [pending, startTransition] = useTransition();
   const nextKey = useRef(0);
@@ -95,13 +96,6 @@ export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps)
   }, []);
 
   const dishById = useMemo(() => new Map<string, Dish>(dishes.map((dish): [string, Dish] => [dish.id, dish])), [dishes]);
-  const pickableByCourse = useMemo(
-    () =>
-      new Map<Course, Dish[]>(
-        COURSE_ORDER.map((course): [Course, Dish[]] => [course, dishes.filter((dish) => dish.active && dish.course === course)]),
-      ),
-    [dishes],
-  );
 
   const [items, setItems] = useState<DraftItem[]>(() =>
     (menu?.items ?? []).map((item) => ({
@@ -291,358 +285,315 @@ export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps)
     });
   }
 
+  // Righe per il componente condiviso: nome del catalogo se collegato, errori per riga.
+  const rowViews: CourseDishRow[] = items.map((item) => {
+    const catalogDish = item.dish_id ? dishById.get(item.dish_id) : undefined;
+    return {
+      key: item.key,
+      course: item.course,
+      name: catalogDish?.name ?? item.name,
+      description: item.description,
+      showDescription: item.showDescription,
+      dishId: item.dish_id,
+      catalogDescription: catalogDish?.description ?? null,
+      unavailableIds: unavailableFor(item.key),
+      nameError: fieldErrorFor(item, "name"),
+      descriptionError: fieldErrorFor(item, "description"),
+    };
+  });
+
+  /** Chiave -> riga, per tradurre le azioni del componente condiviso nelle funzioni di questo editor. */
+  function withItem(key: number, action: (item: DraftItem) => void) {
+    const item = items.find((candidate) => candidate.key === key);
+    if (item) action(item);
+  }
+
+  // Errori generali mostrati nella barra in basso: restano visibili anche con il form scorso in fondo.
+  const footerErrors = [formError, errors._form].filter((message): message is string => Boolean(message));
+
   return (
     <form
       onSubmit={handleSubmit}
       noValidate
       aria-label={menu ? "Modifica menù" : "Nuovo menù"}
-      // Nella finestra "bare": scorre solo il contenuto, il piè di pagina resta fisso in fondo.
+      // Nella finestra "bare": scorre solo il contenuto, la barra azioni resta fissa in fondo alla finestra.
       className="flex min-h-0 flex-1 flex-col"
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-6 py-5">
-        {formError && <Alert tone="danger">{formError}</Alert>}
-        {errors._form && <Alert tone="danger">{errors._form}</Alert>}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-cream/40">
+        <div className="mx-auto grid w-full max-w-6xl gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
+          {/* Mobile: una colonna nell'ordine Dati, Foto, Piatti. Desktop: a sinistra dati e foto, a destra i piatti. */}
+          <div className="flex min-w-0 flex-col gap-4">
+            <section aria-labelledby={fieldId("section-data")} className={CARD_CLASS}>
+              <h3 id={fieldId("section-data")} className="font-serif text-xl leading-tight text-ink">
+                Dati del menù
+              </h3>
 
-        <div className="flex flex-col gap-4">
-          {/* Nome con l'ordine in elenco (campo piccolo) a fianco. */}
-          <div className="flex min-w-0 items-start gap-4">
-            <Field
-              label="Nome del menù"
-              htmlFor={fieldId("name")}
-              required
-              error={errors.name}
-              className="min-w-0 flex-1"
-            >
-              <Input id={fieldId("name")} name="name" defaultValue={menu?.name ?? ""} required invalid={!!errors.name} />
-            </Field>
-            <Field label="Ordine" htmlFor={fieldId("sort")} error={errors.sort} className="w-20 shrink-0">
-              <Input
-                id={fieldId("sort")}
-                name="sort"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                defaultValue={String(menu?.sort ?? 0)}
-                invalid={!!errors.sort}
-              />
-            </Field>
-          </div>
+              <div className="flex min-w-0 items-start gap-3">
+                <Field
+                  label="Nome del menù"
+                  htmlFor={fieldId("name")}
+                  required
+                  error={errors.name}
+                  className="min-w-0 flex-1"
+                >
+                  <Input id={fieldId("name")} name="name" defaultValue={menu?.name ?? ""} required invalid={!!errors.name} />
+                </Field>
+                <Field
+                  label="Ordine"
+                  htmlFor={fieldId("sort")}
+                  error={errors.sort}
+                  hint="Più basso = prima"
+                  className="w-24 shrink-0"
+                >
+                  <Input
+                    id={fieldId("sort")}
+                    name="sort"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1}
+                    defaultValue={String(menu?.sort ?? 0)}
+                    invalid={!!errors.sort}
+                  />
+                </Field>
+              </div>
 
-          {/* items-end: se un'etichetta va a capo i campi restano allineati. */}
-          <div className="grid grid-cols-2 items-end gap-4">
-            <Field label="Stagione" htmlFor={fieldId("season")} error={errors.season} className="min-w-0">
-              <Input
-                id={fieldId("season")}
-                name="season"
-                defaultValue={menu?.season ?? ""}
-                placeholder="Es. Autunno 2026"
-                invalid={!!errors.season}
-              />
-            </Field>
-            <Field label="Prezzo a persona (€)" htmlFor={fieldId("price")} required error={errors.price_per_person} className="min-w-0">
-              <Input
-                id={fieldId("price")}
-                name="price_per_person"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min={0}
-                defaultValue={menu ? String(menu.price_per_person) : ""}
+              <Field label="Stagione" htmlFor={fieldId("season")} error={errors.season}>
+                <Input
+                  id={fieldId("season")}
+                  name="season"
+                  defaultValue={menu?.season ?? ""}
+                  placeholder="Es. Autunno 2026"
+                  invalid={!!errors.season}
+                />
+              </Field>
+
+              <Field
+                label="Prezzo a persona (€)"
+                htmlFor={fieldId("price")}
                 required
-                invalid={!!errors.price_per_person}
-              />
-            </Field>
-          </div>
+                error={errors.price_per_person}
+              >
+                <Input
+                  id={fieldId("price")}
+                  name="price_per_person"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min={0}
+                  defaultValue={menu ? String(menu.price_per_person) : ""}
+                  required
+                  invalid={!!errors.price_per_person}
+                />
+              </Field>
 
-          {/* Menù bambini e visibilità affiancati. */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <span className={LABEL_CLASS}>Menù bambini</span>
-              <div className="flex h-11 items-center">
-                <Switch
+              <div className="flex flex-col gap-3">
+                <ToggleRow
+                  title="Menù bambini"
+                  hint="Tariffa dedicata ai bambini"
+                  label="Menù bambini"
                   checked={isKids}
                   onCheckedChange={setIsKids}
-                  disabled={pending}
-                  label="Menù bambini"
                   onLabel="Sì"
                   offLabel="No"
+                  disabled={pending}
                 />
-              </div>
-            </div>
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <span className={LABEL_CLASS}>Visibilità</span>
-              <div className="flex h-11 items-center">
-                <Switch
+                <ToggleRow
+                  title="Visibilità"
+                  hint="Attiva o nascondi il menù"
+                  label="Visibilità del menù"
                   checked={visible}
                   onCheckedChange={setVisible}
-                  disabled={pending}
-                  label="Visibilità del menù"
                   onLabel="Visibile"
                   offLabel="Nascosto"
+                  disabled={pending}
                 />
               </div>
-            </div>
-          </div>
-        </div>
+            </section>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-          <fieldset className="flex min-w-0 flex-col gap-6 border-t border-sand pt-5 lg:border-t-0 lg:pt-0">
-            <legend className="mb-1 text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark">
-              Piatti per portata
-            </legend>
+            <section aria-labelledby={fieldId("section-photos")} className={CARD_CLASS}>
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 id={fieldId("section-photos")} className="font-serif text-xl leading-tight text-ink">
+                  Foto
+                </h3>
+                <span className={COUNT_BADGE_CLASS}>
+                  {keptPhotoCount + newPhotos.length}/{MENU_PHOTO_MAX_COUNT}
+                </span>
+              </div>
+              <p className="-mt-2 text-[13px] leading-snug text-slate-dark">
+                Fino a {MENU_PHOTO_MAX_COUNT} foto per menù, 5 MB ciascuna (JPG, PNG, WebP o AVIF).
+              </p>
 
-            <CourseSections
-              idPrefix={fieldId("course")}
-              items={items}
-              disabled={pending}
-              emptyText="Nessun piatto. Aggiungi le portate del menù."
-              onAdd={addItem}
-              renderItem={(item, position) => (
-                <DishRow
-                  key={item.key}
-                  item={item}
-                  catalogDish={item.dish_id ? dishById.get(item.dish_id) : undefined}
-                  options={pickableByCourse.get(item.course) ?? []}
-                  unavailableIds={unavailableFor(item.key)}
-                  isFirst={position.isFirst}
-                  isLast={position.isLast}
-                  nameError={fieldErrorFor(item, "name")}
-                  descriptionError={fieldErrorFor(item, "description")}
-                  disabled={pending}
-                  onTextChange={changeText}
-                  onSelect={selectDish}
-                  onMove={moveItem}
-                  onRemove={removeItem}
-                  onToggleDescription={toggleDescription}
-                  onDescriptionChange={(key, text) => updateItem(key, { description: text })}
-                />
+              {existingPhotos.length > 0 && (
+                <ul aria-label="Foto attuali" className="grid grid-cols-2 gap-3">
+                  {existingPhotos.map((photo, index) => {
+                    const removing = removedPhotos.includes(photo.file);
+                    return (
+                      <li key={photo.file} className="flex min-w-0 flex-col gap-2">
+                        <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-sand bg-cream">
+                          <img
+                            src={photo.url}
+                            alt={`Foto ${index + 1} del menù`}
+                            className={cn("size-full object-cover transition-opacity", removing && "opacity-40")}
+                          />
+                          {removing && (
+                            <span className="absolute inset-x-0 bottom-0 bg-ink/75 px-2 py-1 text-center text-[11px] uppercase tracking-[0.14em] text-paper">
+                              Da rimuovere
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleRemovePhoto(photo.file)}
+                          disabled={pending}
+                          aria-label={`${removing ? "Annulla rimozione" : "Rimuovi"} foto ${index + 1}`}
+                          className="min-h-11 w-full"
+                        >
+                          {removing ? "Annulla" : "Rimuovi"}
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
-            />
-          </fieldset>
 
-          <fieldset className="flex min-w-0 flex-col gap-4 border-t border-sand pt-5 lg:border-t-0 lg:pt-0">
-            <legend className="mb-3 text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark">Foto</legend>
-            <p className="text-[13px] text-slate-dark">
-              Fino a {MENU_PHOTO_MAX_COUNT} foto per menù, 5 MB ciascuna (JPG, PNG, WebP o AVIF).
-            </p>
-
-            {existingPhotos.length > 0 && (
-              <ul aria-label="Foto attuali" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
-                {existingPhotos.map((photo, index) => {
-                  const removing = removedPhotos.includes(photo.file);
-                  return (
-                    <li key={photo.file} className="flex flex-col gap-2">
-                      <div className="relative aspect-[4/3] overflow-hidden border border-sand bg-cream">
-                        <img
-                          src={photo.url}
-                          alt={`Foto ${index + 1} del menù`}
-                          className={cn("size-full object-cover transition-opacity", removing && "opacity-40")}
-                        />
-                        {removing && (
-                          <span className="absolute inset-x-0 bottom-0 bg-ink/75 px-2 py-1 text-center text-[11px] uppercase tracking-[0.14em] text-paper">
-                            Da rimuovere
-                          </span>
-                        )}
+              {newPhotos.length > 0 && (
+                <ul aria-label="Nuove foto da caricare" className="grid grid-cols-2 gap-3">
+                  {newPhotos.map((photo, index) => (
+                    <li key={photo.key} className="flex min-w-0 flex-col gap-2">
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-petrol/40 bg-cream">
+                        <img src={photo.previewUrl} alt={`Nuova foto ${index + 1}`} className="size-full object-cover" />
+                        <span className="absolute inset-x-0 bottom-0 bg-petrol/85 px-2 py-1 text-center text-[11px] uppercase tracking-[0.14em] text-paper">
+                          Nuova
+                        </span>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => toggleRemovePhoto(photo.file)}
+                        onClick={() => removeNewPhoto(photo.key)}
                         disabled={pending}
-                        aria-label={`${removing ? "Annulla rimozione" : "Rimuovi"} foto ${index + 1}`}
-                        className="self-start"
+                        aria-label={`Rimuovi nuova foto ${index + 1}`}
+                        className="min-h-11 w-full"
                       >
-                        {removing ? "Annulla" : "Rimuovi"}
+                        Rimuovi
                       </Button>
                     </li>
-                  );
-                })}
-              </ul>
-            )}
+                  ))}
+                </ul>
+              )}
 
-            {newPhotos.length > 0 && (
-              <ul aria-label="Nuove foto da caricare" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
-                {newPhotos.map((photo, index) => (
-                  <li key={photo.key} className="flex flex-col gap-2">
-                    <div className="relative aspect-[4/3] overflow-hidden border border-petrol/40 bg-cream">
-                      <img src={photo.previewUrl} alt={`Nuova foto ${index + 1}`} className="size-full object-cover" />
-                      <span className="absolute inset-x-0 bottom-0 bg-petrol/85 px-2 py-1 text-center text-[11px] uppercase tracking-[0.14em] text-paper">
-                        Nuova
-                      </span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeNewPhoto(photo.key)}
-                      disabled={pending}
-                      aria-label={`Rimuovi nuova foto ${index + 1}`}
-                      className="self-start"
-                    >
-                      Rimuovi
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
+              <Field
+                label="Aggiungi foto"
+                htmlFor={fieldId("photos")}
+                error={photoMessage}
+                hint={photoSlotsLeft > 0 ? `Puoi aggiungere ancora ${photoSlotsLeft} foto.` : "Limite di foto raggiunto."}
+              >
+                <input
+                  id={fieldId("photos")}
+                  type="file"
+                  multiple
+                  accept={PHOTO_ACCEPT}
+                  onChange={handleAddPhotos}
+                  disabled={pending || photoSlotsLeft === 0}
+                  aria-invalid={photoMessage ? true : undefined}
+                  className="block min-h-11 w-full min-w-0 text-[14px] text-ink file:mr-4 file:min-h-11 file:cursor-pointer file:rounded-btn file:border file:border-petrol file:bg-transparent file:px-4 file:py-2 file:text-[11px] file:font-medium file:uppercase file:tracking-[0.14em] file:text-petrol hover:file:bg-cream disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </Field>
+            </section>
+          </div>
 
-            <Field
-              label="Aggiungi foto"
-              htmlFor={fieldId("photos")}
-              error={photoMessage}
-              hint={photoSlotsLeft > 0 ? `Puoi aggiungere ancora ${photoSlotsLeft} foto.` : "Limite di foto raggiunto."}
-            >
-              <input
-                id={fieldId("photos")}
-                type="file"
-                multiple
-                accept={PHOTO_ACCEPT}
-                onChange={handleAddPhotos}
-                disabled={pending || photoSlotsLeft === 0}
-                aria-invalid={photoMessage ? true : undefined}
-                className="block w-full min-w-0 text-[14px] text-ink file:mr-4 file:cursor-pointer file:rounded-btn file:border file:border-petrol file:bg-transparent file:px-4 file:py-2 file:text-[11px] file:font-medium file:uppercase file:tracking-[0.14em] file:text-petrol hover:file:bg-cream disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </Field>
-          </fieldset>
+          <section aria-labelledby={fieldId("section-dishes")} className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 items-baseline justify-between gap-3">
+              <h3 id={fieldId("section-dishes")} className="font-serif text-xl leading-tight text-ink">
+                Piatti
+              </h3>
+              <span className={COUNT_BADGE_CLASS}>
+                {items.length} {items.length === 1 ? "piatto" : "piatti"}
+              </span>
+            </div>
+            <p className="-mt-2 text-[13px] leading-snug text-slate-dark">
+              Scrivi il nome o cercalo nel catalogo. I piatti con etichetta Catalogo si modificano nella sezione Piatti.
+              Le frecce cambiano l&apos;ordine nella portata.
+            </p>
+
+            <CourseDishesEditor
+              idPrefix={fieldId("course")}
+              rows={rowViews}
+              catalog={dishes}
+              disabled={pending}
+              showNewHint
+              emptyText="Nessun piatto. Aggiungi le portate del menù."
+              onAddRow={addItem}
+              onMoveRow={moveItem}
+              onRemoveRow={removeItem}
+              onNameChange={(key, text) => withItem(key, (item) => changeText(item, text))}
+              onSelectDish={selectDish}
+              onToggleDescription={toggleDescription}
+              onDescriptionChange={(key, text) => updateItem(key, { description: text })}
+            />
+          </section>
         </div>
       </div>
 
-      <div className="flex shrink-0 gap-3 border-t border-sand bg-paper px-6 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:justify-end sm:pb-4">
-        <Button variant="ghost" size="md" onClick={onCancel} disabled={pending} className="flex-1 sm:flex-none">
-          Annulla
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          size="md"
-          disabled={pending}
-          aria-busy={pending || undefined}
-          className="flex-1 sm:flex-none"
-        >
-          {pending ? "Salvataggio…" : "Salva menù"}
-        </Button>
+      <div className="shrink-0 border-t border-sand bg-paper px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-10px_24px_-18px_rgba(28,43,45,0.45)] sm:px-6 sm:pb-4">
+        {footerErrors.length > 0 && (
+          <div className="mb-3 flex flex-col gap-2">
+            {footerErrors.map((message) => (
+              <Alert key={message} tone="danger">
+                {message}
+              </Alert>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-3 sm:justify-end">
+          <Button variant="ghost" size="md" onClick={onCancel} disabled={pending} className="min-h-11 flex-1 sm:flex-none">
+            Annulla
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            disabled={pending}
+            aria-busy={pending || undefined}
+            className="min-h-11 flex-1 sm:flex-none"
+          >
+            {pending ? "Salvataggio…" : "Salva menù"}
+          </Button>
+        </div>
       </div>
     </form>
   );
 }
 
-interface DishRowProps {
-  item: DraftItem;
-  /** Piatto del catalogo collegato alla riga (se presente). */
-  catalogDish: Dish | undefined;
-  /** Piatti attivi della portata della riga. */
-  options: Dish[];
-  /** Piatti già presenti in altre righe del menù. */
-  unavailableIds: ReadonlySet<string>;
-  isFirst: boolean;
-  isLast: boolean;
-  nameError?: string;
-  descriptionError?: string;
+interface ToggleRowProps {
+  title: string;
+  hint: string;
+  /** Nome accessibile dello switch. */
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  onLabel: string;
+  offLabel: string;
   disabled: boolean;
-  onTextChange: (item: DraftItem, text: string) => void;
-  onSelect: (key: number, dish: Dish) => void;
-  onMove: (key: number, delta: -1 | 1) => void;
-  onRemove: (key: number) => void;
-  onToggleDescription: (key: number, open: boolean) => void;
-  onDescriptionChange: (key: number, text: string) => void;
 }
 
-/** Riga di un piatto: campo piatto (ricerca nel catalogo o nome libero), ordine e rimozione. */
-function DishRow({
-  item,
-  catalogDish,
-  options,
-  unavailableIds,
-  isFirst,
-  isLast,
-  nameError,
-  descriptionError,
-  disabled,
-  onTextChange,
-  onSelect,
-  onMove,
-  onRemove,
-  onToggleDescription,
-  onDescriptionChange,
-}: DishRowProps) {
-  const rowId = `item-${item.key}`;
-  const nameId = `${rowId}-name`;
-  const nameErrorId = `${rowId}-name-error`;
-  const descriptionId = `${rowId}-description`;
-  const linked = item.dish_id !== null;
-  const value = catalogDish?.name ?? item.name;
-  const label = value.trim() || "piatto senza nome";
-
+/** Riga con titolo, spiegazione e interruttore: area di tocco ampia su mobile. */
+function ToggleRow({ title, hint, label, checked, onCheckedChange, onLabel, offLabel, disabled }: ToggleRowProps) {
   return (
-    <li className="flex flex-col gap-2 border-l-[3px] border-sand bg-paper py-1 pl-3 sm:pl-4">
-      <div className="flex min-w-0 items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <label htmlFor={nameId} className="sr-only">
-            Piatto
-          </label>
-          <DishPicker
-            id={nameId}
-            value={value}
-            options={options}
-            selectedId={item.dish_id}
-            unavailableIds={unavailableIds}
-            invalid={!!nameError}
-            describedBy={nameError ? nameErrorId : undefined}
-            onChangeText={(text) => onTextChange(item, text)}
-            onSelect={(dish) => onSelect(item.key, dish)}
-          />
-          {nameError && (
-            <p id={nameErrorId} className="mt-1.5 text-[13px] text-danger">
-              {nameError}
-            </p>
-          )}
-        </div>
-        <ReorderButtons
-          label={label}
-          isFirst={isFirst}
-          isLast={isLast}
-          disabled={disabled}
-          onMove={(delta) => onMove(item.key, delta)}
-          onRemove={() => onRemove(item.key)}
-        />
+    <div className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-lg border border-field-edge bg-field px-3.5 py-2.5">
+      <div className="min-w-0">
+        <p className="text-[15px] font-medium text-ink">{title}</p>
+        <p className="text-[13px] leading-snug text-slate-dark">{hint}</p>
       </div>
-
-      {linked ? (
-        catalogDish?.description ? (
-          <p className="text-[13px] leading-snug text-slate-dark">{catalogDish.description}</p>
-        ) : null
-      ) : (
-        <div className="flex flex-col gap-2">
-          {item.showDescription && (
-            <Field
-              label="Descrizione"
-              htmlFor={descriptionId}
-              error={descriptionError}
-              hint={`Facoltativa, massimo ${DESCRIPTION_MAX} caratteri.`}
-            >
-              <Textarea
-                id={descriptionId}
-                rows={2}
-                maxLength={DESCRIPTION_MAX}
-                value={item.description}
-                onChange={(e) => onDescriptionChange(item.key, e.target.value)}
-                invalid={!!descriptionError}
-              />
-            </Field>
-          )}
-          <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onToggleDescription(item.key, !item.showDescription)}
-              disabled={disabled}
-              aria-expanded={item.showDescription}
-            >
-              {item.showDescription ? "Rimuovi descrizione" : "Aggiungi descrizione"}
-            </Button>
-          </div>
-        </div>
-      )}
-    </li>
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+        label={label}
+        onLabel={onLabel}
+        offLabel={offLabel}
+      />
+    </div>
   );
 }

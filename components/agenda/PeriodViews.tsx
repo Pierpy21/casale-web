@@ -1,9 +1,10 @@
 import { format } from "date-fns";
 import { BookingCard } from "@/components/bookings/BookingCard";
-import { EmptyState, cn } from "@/components/ui";
-import type { BookingListItem, Room } from "@/lib/types";
-import { dayCountLabel, formatIt, toISO } from "./agenda-utils";
+import { cn } from "@/components/ui";
+import type { BookingListItem, NextEventBrief, Room } from "@/lib/types";
+import { dayCountLabel, formatIt, toISO, type AgendaKindFilter } from "./agenda-utils";
 import { DaySummary } from "./DaySummary";
+import { EmptyDay } from "./NextEventHint";
 import { ReservationList } from "./ReservationList";
 
 /** Vista settimana desktop: 7 colonne con card ricche (menù per portata, allergie). */
@@ -18,7 +19,7 @@ export function WeekView({
 }) {
   return (
     <section aria-label="Calendario settimanale" className="pb-4">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 deskxl:grid-cols-4 desk2xl:grid-cols-7">
         {days.map((day) => {
           const iso = toISO(day);
           const items = byDate.get(iso) ?? [];
@@ -47,7 +48,7 @@ export function WeekView({
               </header>
 
               {items.length === 0 ? (
-                <p className="px-1 text-[13px] text-slate">Nessun banchetto</p>
+                <p className="px-1 text-[13px] text-slate">Nessun evento</p>
               ) : (
                 items.map((booking) => (
                   <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" />
@@ -65,14 +66,27 @@ export function WeekView({
  * Vista giorno desktop: eventi e appuntamenti come card ricche, in un unico elenco verticale;
  * le prenotazioni normali sotto, come lista compatta con la sala assegnabile.
  */
-export function DayView({ items, rooms, canAssignRooms }: { items: BookingListItem[]; rooms: Room[]; canAssignRooms: boolean }) {
+export function DayView({
+  items,
+  rooms,
+  canAssignRooms,
+  selected,
+  kind,
+  nextEvent = null,
+  onOpenNextEvent,
+}: {
+  items: BookingListItem[];
+  rooms: Room[];
+  canAssignRooms: boolean;
+  /** Giorno selezionato (ISO): riferimento per il riquadro "Prossimo evento". */
+  selected: string;
+  nextEvent?: NextEventBrief | null;
+  /** Filtro tipo attivo: con "prenotazioni" il giorno vuoto invita a cambiarlo. */
+  kind: AgendaKindFilter;
+  onOpenNextEvent: (iso: string) => void;
+}) {
   if (items.length === 0) {
-    return (
-      <EmptyState
-        title="Nessun banchetto"
-        description="Non ci sono eventi in questa giornata. Dalla vista mese puoi scegliere un altro giorno."
-      />
-    );
+    return <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={onOpenNextEvent} />;
   }
   const cards = items.filter((b) => b.kind !== "normale");
   const reservations = items.filter((b) => b.kind === "normale");
@@ -80,13 +94,13 @@ export function DayView({ items, rooms, canAssignRooms }: { items: BookingListIt
     <div className="flex min-w-0 flex-col gap-5">
       <DaySummary bookings={items} />
       {cards.length > 0 && (
-        <section aria-label="Banchetti della giornata" className="flex min-w-0 flex-col gap-4">
+        <section aria-label="Eventi della giornata" className="flex min-w-0 flex-col gap-4">
           {cards.map((booking) => (
             <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" />
           ))}
         </section>
       )}
-      {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} canAssign={canAssignRooms} />}
+      {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} date={selected} canAssign={canAssignRooms} />}
     </div>
   );
 }

@@ -19,8 +19,8 @@ import {
 import { createPortal } from "react-dom";
 import { cn } from "./cn";
 import { FIELD_BASE, FIELD_TEXT, borderClass } from "./Input";
+import { isDeskLayout, subscribeDeskLayout } from "@/components/shell/shell-mode";
 
-const DESKTOP_QUERY = "(min-width: 1024px)";
 const MAX_LIST_HEIGHT = 320;
 const EDGE = 8;
 const GAP = 4;
@@ -164,16 +164,10 @@ function computePlacement(rect: DOMRect): Placement {
   return { top: Math.max(EDGE, top), left, width, maxHeight };
 }
 
-function subscribeDesktop(onChange: () => void) {
-  const mq = window.matchMedia(DESKTOP_QUERY);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
-
 function useIsDesktop(): boolean {
   return useSyncExternalStore(
-    subscribeDesktop,
-    () => window.matchMedia(DESKTOP_QUERY).matches,
+    subscribeDeskLayout,
+    isDeskLayout,
     () => false,
   );
 }

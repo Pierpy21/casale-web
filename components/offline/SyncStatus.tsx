@@ -33,7 +33,7 @@ export function SyncStatus() {
   return (
     <div
       aria-live="polite"
-      className="no-print fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-4 z-20 max-w-[calc(100vw-9rem)] lg:bottom-8 lg:left-auto lg:right-28 lg:max-w-none"
+      className="no-print fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-4 z-20 max-w-[calc(100vw-9rem)] desk:bottom-8 desk:left-auto desk:right-28 desk:max-w-none"
     >
       {label && (
         <Link

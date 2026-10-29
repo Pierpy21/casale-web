@@ -26,6 +26,7 @@ export const ACTION_REGISTRY: Record<string, RegisteredAction> = {
   "bookings.updateBookingDishes": bookings.updateBookingDishes,
   "bookings.setBookingStatus": bookings.setBookingStatus,
   "bookings.assignBookingRoom": bookings.assignBookingRoom,
+  "bookings.assignBookingTable": bookings.assignBookingTable,
   "bookings.resetDishesFromMenu": bookings.resetDishesFromMenu,
   "bookings.saveBookingAllergies": bookings.saveBookingAllergies,
   "bookings.addBookingNote": bookings.addBookingNote,

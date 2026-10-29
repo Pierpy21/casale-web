@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { cn } from "@/components/ui/cn";
-import type { BookingListItem, BookingNote } from "@/lib/types";
+import type { BookingListItem, BookingNote, NextEventBrief } from "@/lib/types";
 import { AgendaKindSwitch } from "./AgendaKindSwitch";
 import {
   agendaHref,
@@ -21,6 +21,7 @@ import {
 } from "./agenda-utils";
 import { MenuChips, summarizeDay } from "./DaySummary";
 import { MobileCalendar } from "./MobileCalendar";
+import { EmptyDay, nextEventFrom } from "./NextEventHint";
 
 export interface KitchenAgendaProps {
   /** Giorno selezionato all'apertura (YYYY-MM-DD). */
@@ -36,6 +37,8 @@ export interface KitchenAgendaProps {
   notes: BookingNote[];
   canAddNote: boolean;
   currentUserId: string;
+  /** Primo evento dopo la griglia caricata (riquadro del giorno vuoto). */
+  nextEventAfterRange: NextEventBrief | null;
 }
 
 const NO_NOTES: BookingNote[] = [];
@@ -63,6 +66,7 @@ export function KitchenAgenda({
   notes,
   canAddNote,
   currentUserId,
+  nextEventAfterRange,
 }: KitchenAgendaProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -71,6 +75,7 @@ export function KitchenAgenda({
   // Il calendario conta solo gli eventi: riceve tutti i banchetti.
   const allByDate = useMemo(() => groupByDate(bookings), [bookings]);
   const notesByBooking = useMemo(() => groupNotes(notes), [notes]);
+  const nextEvent = useMemo(() => nextEventFrom(bookings, selected, nextEventAfterRange), [bookings, selected, nextEventAfterRange]);
 
   const navigate = useCallback(
     (target: string, nextKind: AgendaKindFilter = kind) => {
@@ -118,8 +123,8 @@ export function KitchenAgenda({
       aria-busy={isPending}
       className={cn("min-w-0 transition-opacity duration-200", isPending && "pointer-events-none opacity-60")}
     >
-      <div className="flex min-w-0 flex-col gap-8 xl:grid xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:items-start xl:gap-10">
-        <aside className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-6">
+      <div className="flex min-w-0 flex-col gap-8 deskxl:grid deskxl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] deskxl:items-start deskxl:gap-10">
+        <aside className="flex min-w-0 flex-col gap-5 deskxl:sticky deskxl:top-6">
           <MobileCalendar selected={selected} today={today} byDate={allByDate} onNavigate={(iso) => navigate(iso)} />
           <AgendaKindSwitch value={kind} onChange={(next) => navigate(selected, next)} />
         </aside>
@@ -138,9 +143,7 @@ export function KitchenAgenda({
           <MenuChips menus={summary.menus} size="lg" />
 
           {items.length === 0 ? (
-            <p className="rounded-[2px] border border-dashed border-sand px-6 py-10 text-center text-[15px] text-slate-dark">
-              {kind === "tutti" ? "Nessuna prenotazione in questa giornata." : "Nessun elemento di questo tipo in questa giornata."}
-            </p>
+            <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={(iso) => navigate(iso)} />
           ) : (
             <>
               {events.length > 0 && (

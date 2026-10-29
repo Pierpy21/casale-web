@@ -1,9 +1,10 @@
 import { BookingCard } from "@/components/bookings/BookingCard";
-import { EmptyState, StatusLegend } from "@/components/ui";
-import type { BookingListItem, Room } from "@/lib/types";
+import { StatusLegend } from "@/components/ui";
+import type { BookingListItem, NextEventBrief, Room } from "@/lib/types";
 import { AgendaKindSwitch } from "./AgendaKindSwitch";
 import { DaySummary } from "./DaySummary";
 import { MobileCalendar } from "./MobileCalendar";
+import { EmptyDay } from "./NextEventHint";
 import { ReservationList } from "./ReservationList";
 import { SwipeDay } from "./SwipeDay";
 import { capitalize, dayCountLabel, formatIt, shiftPeriod, toDate, type AgendaKindFilter } from "./agenda-utils";
@@ -15,13 +16,15 @@ export interface MobileAgendaProps {
   byDate: Map<string, BookingListItem[]>;
   /** Tutti i banchetti per giorno (il calendario mostra i pallini solo degli eventi). */
   calendarByDate: Map<string, BookingListItem[]>;
-  isAdmin: boolean;
   rooms: Room[];
   /** Permesso di assegnare la sala alle prenotazioni normali. */
   canAssignRooms: boolean;
   kind: AgendaKindFilter;
   onKindChange: (kind: AgendaKindFilter) => void;
   onNavigate: (iso: string) => void;
+  /** Prossimo evento dopo il giorno selezionato (null se non ce n'è). */
+  nextEvent?: NextEventBrief | null;
+  onOpenNextEvent: (iso: string) => void;
 }
 
 /** Agenda mobile (< lg): filtro per tipo, calendario mensile in alto, lista del giorno sotto. La creazione è nel pulsante + globale (layout admin). */
@@ -30,12 +33,13 @@ export function MobileAgenda({
   today,
   byDate,
   calendarByDate,
-  isAdmin,
   rooms,
   canAssignRooms,
   kind,
   onKindChange,
   onNavigate,
+  nextEvent = null,
+  onOpenNextEvent,
 }: MobileAgendaProps) {
   const selectedDate = toDate(selected);
   const items = byDate.get(selected) ?? [];
@@ -71,22 +75,13 @@ export function MobileAgenda({
           onNext={() => onNavigate(shiftPeriod(selected, "day", 1))}
         >
           {items.length === 0 ? (
-            <EmptyState
-              title="Nessun banchetto"
-              description={
-                kind !== "tutti"
-                  ? "Nessun banchetto di questo tipo in questa giornata. Cambia il filtro per vedere gli altri."
-                  : isAdmin
-                    ? "Questa giornata è libera. Puoi aggiungere una nuova prenotazione."
-                    : "Questa giornata è libera."
-              }
-            />
+            <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={onOpenNextEvent} />
           ) : (
             <div className="flex min-w-0 flex-col gap-4">
               {cards.map((booking) => (
                 <BookingCard key={booking.id} booking={booking} variant="full" dishes="collapsible" wholeCardLink />
               ))}
-              {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} canAssign={canAssignRooms} />}
+              {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} date={selected} canAssign={canAssignRooms} />}
             </div>
           )}
         </SwipeDay>

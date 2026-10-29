@@ -3,12 +3,13 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { StatusLegend, cn } from "@/components/ui";
-import type { BookingListItem, Room } from "@/lib/types";
+import type { BookingListItem, NextEventBrief, Room } from "@/lib/types";
 import { AgendaKindSwitch } from "./AgendaKindSwitch";
 import { AgendaToolbar } from "./AgendaToolbar";
 import { MobileAgenda } from "./MobileAgenda";
 import { MonthView } from "./MonthView";
 import { DayView, WeekView } from "./PeriodViews";
+import { nextEventFrom } from "./NextEventHint";
 import {
   agendaHref,
   filterBookings,
@@ -39,6 +40,8 @@ export interface AgendaBoardProps {
   rooms: Room[];
   /** `canAssignRoom(profile, "normale")`: senza, le sale sono in sola lettura. */
   canAssignRooms: boolean;
+  /** Primo evento oltre la griglia caricata (null se non c'è). */
+  nextEventAfterRange: NextEventBrief | null;
 }
 
 /**
@@ -56,6 +59,7 @@ export function AgendaBoard({
   isAdmin,
   rooms,
   canAssignRooms,
+  nextEventAfterRange,
 }: AgendaBoardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -67,6 +71,9 @@ export function AgendaBoard({
   // Vista mese desktop, settimana, giorno e liste (byDate): pill filtrate dal filtro tipo.
   const byDate = useMemo(() => groupByDate(filterBookings(bookings, kind)), [bookings, kind]);
   const allByDate = useMemo(() => groupByDate(bookings), [bookings]);
+
+  // Prossimo evento dopo il giorno selezionato (riquadro del giorno vuoto, per tutti i ruoli).
+  const nextEvent = useMemo(() => nextEventFrom(bookings, selected, nextEventAfterRange), [bookings, selected, nextEventAfterRange]);
 
   const navigate = useCallback(
     (target: string, nextView: AgendaView, nextKind: AgendaKindFilter = kind) => {
@@ -92,7 +99,7 @@ export function AgendaBoard({
       aria-busy={isPending}
       className={cn("transition-opacity duration-200", isPending && "pointer-events-none opacity-60")}
     >
-      <div className="hidden lg:block">
+      <div className="hidden desk:block">
         <AgendaToolbar
           view={view}
           selected={selected}
@@ -122,7 +129,15 @@ export function AgendaBoard({
         )}
         {view === "week" && <WeekView days={weekDates(selected)} today={today} byDate={byDate} />}
         {view === "day" && (
-          <DayView items={byDate.get(selected) ?? []} rooms={rooms} canAssignRooms={canAssignRooms} />
+          <DayView
+            items={byDate.get(selected) ?? []}
+            rooms={rooms}
+            canAssignRooms={canAssignRooms}
+            selected={selected}
+            kind={kind}
+            nextEvent={nextEvent}
+            onOpenNextEvent={(iso) => navigate(iso, "day")}
+          />
         )}
         {view !== "day" && (
           <div className="mt-5 flex justify-start">
@@ -131,18 +146,19 @@ export function AgendaBoard({
         )}
       </div>
 
-      <div className="lg:hidden">
+      <div className="desk:hidden">
         <MobileAgenda
           selected={selected}
           today={today}
           byDate={byDate}
           calendarByDate={allByDate}
-          isAdmin={isAdmin}
           rooms={rooms}
           canAssignRooms={canAssignRooms}
           kind={kind}
           onKindChange={(next) => navigate(selected, view, next)}
           onNavigate={(iso) => navigate(iso, view)}
+          nextEvent={nextEvent}
+          onOpenNextEvent={(iso) => navigate(iso, view)}
         />
       </div>
     </div>
