@@ -19,7 +19,7 @@ export function WeekView({
 }) {
   return (
     <section aria-label="Calendario settimanale" className="pb-4">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 deskxl:grid-cols-4 desk2xl:grid-cols-7">
         {days.map((day) => {
           const iso = toISO(day);
           const items = byDate.get(iso) ?? [];
@@ -48,7 +48,7 @@ export function WeekView({
               </header>
 
               {items.length === 0 ? (
-                <p className="px-1 text-[13px] text-slate">Nessun banchetto</p>
+                <p className="px-1 text-[13px] text-slate">Nessun evento</p>
               ) : (
                 items.map((booking) => (
                   <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" />
@@ -94,7 +94,7 @@ export function DayView({
     <div className="flex min-w-0 flex-col gap-5">
       <DaySummary bookings={items} />
       {cards.length > 0 && (
-        <section aria-label="Banchetti della giornata" className="flex min-w-0 flex-col gap-4">
+        <section aria-label="Eventi della giornata" className="flex min-w-0 flex-col gap-4">
           {cards.map((booking) => (
             <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" />
           ))}

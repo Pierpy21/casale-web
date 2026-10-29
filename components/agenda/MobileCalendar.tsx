@@ -73,7 +73,7 @@ export function MobileCalendar({ selected, today, byDate, onNavigate }: MobileCa
                 type="button"
                 onClick={() => onNavigate(iso)}
                 aria-current={isSelected ? "date" : undefined}
-                aria-label={`${formatIt(day, "EEEE d MMMM")}${count > 0 ? `, ${count} ${count === 1 ? "banchetto" : "banchetti"}` : ""}`}
+                aria-label={`${formatIt(day, "EEEE d MMMM")}${count > 0 ? `, ${count} ${count === 1 ? "evento" : "eventi"}` : ""}`}
                 className="flex h-12 flex-col items-center gap-0.5 pt-0.5"
               >
                 <span

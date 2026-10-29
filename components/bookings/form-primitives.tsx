@@ -624,7 +624,7 @@ export function BookingFormHeader({
     // Stretto: una colonna. Da @lg: titolo | indietro, poi data | invio. Da @5xl: tutto su una riga.
     <header className="@container min-w-0 border-b border-sand pb-5">
       <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 @lg:grid-cols-[minmax(0,1fr)_auto] @lg:items-end @5xl:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-        <h1 className="min-w-0 text-3xl leading-tight wrap-anywhere lg:text-4xl">{title}</h1>
+        <h1 className="min-w-0 text-3xl leading-tight wrap-anywhere desk:text-4xl">{title}</h1>
         <ButtonLink
           href={backHref}
           variant="ghost"

@@ -68,7 +68,7 @@ export function OfflineBanner() {
     <div
       role="status"
       aria-live="polite"
-      className="no-print sticky top-[calc(env(safe-area-inset-top)+4rem)] z-20 flex items-center gap-3 border-b border-warning/40 bg-warning/15 px-4 py-2.5 text-[13px] leading-snug text-ink lg:top-0 lg:px-8"
+      className="no-print sticky top-[calc(env(safe-area-inset-top)+4rem)] z-20 flex items-center gap-3 border-b border-warning/40 bg-warning/15 px-4 py-2.5 text-[13px] leading-snug text-ink desk:top-0 desk:px-8"
     >
       <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-warning" />
       {online ? (

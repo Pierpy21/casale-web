@@ -19,7 +19,7 @@ export interface InventoryGroupGridProps {
 /** Griglia di bottoni quadrati, uno per categoria o fornitore: usata solo su tablet. */
 export function InventoryGroupGrid({ groups, onSelect }: InventoryGroupGridProps) {
   return (
-    <ul role="list" className="grid grid-cols-3 gap-3 lg:grid-cols-4">
+    <ul role="list" className="grid grid-cols-3 gap-3 desk:grid-cols-4">
       {groups.map((group) => {
         const percent = group.total > 0 ? Math.min(100, Math.round((group.filled / group.total) * 100)) : 0;
         const hasFilled = group.filled > 0;

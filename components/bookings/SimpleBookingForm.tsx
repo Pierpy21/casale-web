@@ -77,6 +77,8 @@ interface SimpleValues {
   children: number;
   kids_menus: number;
   room_id: string | null;
+  /** Tavolo come testo del campo (vuoto = nessun tavolo). Solo prenotazioni normali. */
+  table_number: string;
   notes: string;
   allergies: AllergyRow[];
 }
@@ -92,6 +94,7 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
       children: 0,
       kids_menus: 0,
       room_id: null,
+      table_number: "",
       notes: "",
       allergies: [],
     };
@@ -105,9 +108,16 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
     children: booking.children,
     kids_menus: booking.kids_menus,
     room_id: booking.room_id,
+    table_number: booking.table_number ? String(booking.table_number) : "",
     notes: booking.notes ?? "",
     allergies: allergyRowsFrom(booking),
   };
+}
+
+/** Tavolo digitato → numero 1-9999, null se vuoto o non valido. */
+function parseTable(raw: string): number | null {
+  const n = Number(raw.trim());
+  return raw.trim() !== "" && Number.isInteger(n) && n >= 1 && n <= 9999 ? n : null;
 }
 
 /** Stati scelgibili a mano: l'appuntamento ha Attesa/Confermato/Annullato; la prenotazione normale è sempre confermata, annullabile solo in modifica dall'admin. */
@@ -201,6 +211,9 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       if (covers < 1) add("adults", "Indicare almeno un coperto");
       if (values.kids_menus > values.children) add("kids_menus", "I menù bambini non possono superare i bambini");
     }
+    if (!isAppointment && values.table_number.trim() !== "" && parseTable(values.table_number) === null) {
+      add("table_number", "Numero del tavolo non valido: usa un numero da 1 a 9999.");
+    }
     Object.assign(local, validateAllergies(values.allergies));
 
     setErrors(local);
@@ -224,6 +237,8 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       event_time: values.event_time || null,
       // Le prenotazioni normali scelgono la sala; per l'appuntamento resta quella salvata (di norma nessuna).
       room_id: isAppointment ? (booking?.room_id ?? null) : values.room_id,
+      // Tavolo solo per le prenotazioni normali; l'appuntamento non lo invia (resta com'è).
+      ...(isAppointment ? {} : { table_number: parseTable(values.table_number) }),
       adults: isAppointment ? (booking?.adults ?? 0) : values.adults,
       children: isAppointment ? (booking?.children ?? 0) : values.children,
       kids_menus: isAppointment ? (booking?.kids_menus ?? 0) : values.kids_menus,
@@ -400,7 +415,7 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
             {first(errors.kids_menus) && <p className="text-[13px] text-danger">{first(errors.kids_menus)}</p>}
           </FormCard>
 
-          <FormCard label="Sala (facoltativa)">
+          <FormCard label="Sala e tavolo">
             <div role="radiogroup" aria-label="Sala" className="flex flex-wrap gap-2">
               <ChoiceChip name="room_id" selected={values.room_id === null} onSelect={() => change({ room_id: null })}>
                 Da assegnare
@@ -412,6 +427,39 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
               ))}
             </div>
             {!hasActiveRooms && <CatalogHint>Nessuna sala attiva.</CatalogHint>}
+            {/* Tavolo: riga compatta (etichetta a sinistra, numero a destra) come i contatori dei coperti. */}
+            <div className="flex min-w-0 flex-col gap-2 border-t border-sand pt-4">
+              <div className="flex min-w-0 items-center justify-between gap-4">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <label htmlFor="table-number" className="text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark">
+                    Tavolo
+                  </label>
+                  <span id="table-number-hint" className="text-[13px] text-slate">
+                    Numero del tavolo in sala
+                  </span>
+                </div>
+                <div className="w-24 shrink-0">
+                  <Input
+                    id="table-number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    autoComplete="off"
+                    placeholder="N°"
+                    invalid={!!errors.table_number}
+                    aria-describedby={errors.table_number ? "table-number-hint table-number-error" : "table-number-hint"}
+                    value={values.table_number}
+                    onChange={(e) => change({ table_number: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                    className="text-center tabular-nums"
+                  />
+                </div>
+              </div>
+              {first(errors.table_number) && (
+                <p id="table-number-error" className="text-[13px] text-danger">
+                  {first(errors.table_number)}
+                </p>
+              )}
+            </div>
             {warnings.map((warning) => (
               <Alert key={warning} tone="warning">
                 {warning}

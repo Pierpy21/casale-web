@@ -99,7 +99,7 @@ export function AgendaBoard({
       aria-busy={isPending}
       className={cn("transition-opacity duration-200", isPending && "pointer-events-none opacity-60")}
     >
-      <div className="hidden lg:block">
+      <div className="hidden desk:block">
         <AgendaToolbar
           view={view}
           selected={selected}
@@ -146,7 +146,7 @@ export function AgendaBoard({
         )}
       </div>
 
-      <div className="lg:hidden">
+      <div className="desk:hidden">
         <MobileAgenda
           selected={selected}
           today={today}

@@ -48,7 +48,7 @@ export default async function InventoryReportPage({ params }: { params: Promise<
           </span>
         </div>
 
-        <h1 className="text-3xl leading-tight wrap-anywhere sm:text-4xl lg:text-5xl">
+        <h1 className="text-3xl leading-tight wrap-anywhere sm:text-4xl desk:text-5xl">
           {capitalize(formatIt(toDate(report.report_date), "EEEE d MMMM yyyy"))}
         </h1>
         <p className="text-[14px] text-slate-dark">

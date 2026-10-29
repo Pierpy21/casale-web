@@ -16,7 +16,7 @@ export function AgendaKindSwitch({ value, onChange, className }: AgendaKindSwitc
     <div
       role="group"
       aria-label="Filtra per tipo"
-      className={cn("grid w-full grid-cols-3 gap-1 rounded-lg border border-petrol/40 bg-cream/60 p-1 lg:inline-flex lg:w-auto", className)}
+      className={cn("grid w-full grid-cols-3 gap-1 rounded-lg border border-petrol/40 bg-cream/60 p-1 desk:inline-flex desk:w-auto desk:self-start", className)}
     >
       {AGENDA_KIND_OPTIONS.map((option) => {
         const active = option.value === value;
@@ -27,7 +27,7 @@ export function AgendaKindSwitch({ value, onChange, className }: AgendaKindSwitc
             aria-pressed={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "min-h-11 min-w-0 rounded-md px-1 text-[10px] font-medium uppercase tracking-[0.04em] transition-colors duration-200 min-[400px]:px-2 min-[400px]:text-[11px] min-[400px]:tracking-[0.08em] lg:min-h-0 lg:px-4 lg:py-2 lg:text-[12px] lg:tracking-[0.14em]",
+              "min-h-11 min-w-0 rounded-md px-1 text-[10px] font-medium uppercase tracking-[0.04em] transition-colors duration-200 min-[400px]:px-2 min-[400px]:text-[11px] min-[400px]:tracking-[0.08em] desk:min-h-0 desk:px-4 desk:py-2 desk:text-[12px] desk:tracking-[0.14em]",
               active ? "bg-petrol text-paper shadow-sm shadow-ink/10" : "text-petrol hover:bg-paper",
             )}
           >

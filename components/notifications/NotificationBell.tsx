@@ -133,14 +133,14 @@ function NotificationPanel({ titleId, variant, onClose }: NotificationPanelProps
   // Portal nel body: il pannello sta sopra la barra di navigazione mobile e l'header sticky.
   return createPortal(
     <>
-      <div aria-hidden="true" onClick={onClose} className="fixed inset-0 z-40 bg-ink/50 lg:bg-transparent" />
+      <div aria-hidden="true" onClick={onClose} className="fixed inset-0 z-40 bg-ink/50 desk:bg-transparent" />
       <div
         role="dialog"
         aria-labelledby={titleId}
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-[2px] border-t border-sand bg-paper pb-[env(safe-area-inset-bottom)] text-ink shadow-2xl shadow-ink/30",
-          "lg:inset-x-auto lg:bottom-6 lg:max-h-[min(70vh,40rem)] lg:w-[24rem] lg:rounded-[2px] lg:border lg:pb-0",
-          variant === "sidebar" ? "lg:left-[17.5rem]" : "lg:left-auto lg:right-6",
+          "desk:inset-x-auto desk:bottom-6 desk:max-h-[min(70vh,40rem)] desk:w-[24rem] desk:rounded-[2px] desk:border desk:pb-0",
+          variant === "sidebar" ? "desk:left-[17.5rem]" : "desk:left-auto desk:right-6",
         )}
       >
         <header className="flex items-center justify-between gap-3 border-b border-sand px-5 py-4">

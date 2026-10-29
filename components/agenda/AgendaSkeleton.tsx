@@ -6,7 +6,7 @@ export function AgendaSkeleton() {
     <div role="status" aria-live="polite" className="flex flex-col gap-6">
       <span className="sr-only">Caricamento agenda in corso</span>
 
-      <div className="hidden flex-col gap-6 lg:flex">
+      <div className="hidden flex-col gap-6 desk:flex">
         <div className="flex items-center justify-between gap-4 border-b border-sand pb-5">
           <div className="flex items-center gap-3">
             <Skeleton className="h-9 w-20" />
@@ -22,7 +22,7 @@ export function AgendaSkeleton() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-6 lg:hidden">
+      <div className="flex flex-col gap-6 desk:hidden">
         <div className="flex items-center justify-between gap-2">
           <Skeleton className="h-9 w-44" />
           <Skeleton className="h-9 w-40" />

@@ -297,7 +297,7 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
           return (
             <li
               key={booking.id}
-              className="flex min-w-0 flex-col gap-2.5 px-4 py-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-6"
+              className="flex min-w-0 flex-col gap-2.5 px-4 py-3 desk:grid desk:grid-cols-[minmax(0,1fr)_auto] desk:items-center desk:gap-6"
             >
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
@@ -419,7 +419,7 @@ function RoomChip({ selected, onSelect, children }: { selected: boolean; onSelec
       aria-pressed={selected}
       onClick={onSelect}
       className={cn(
-        "min-h-11 rounded-lg lg:min-h-9 border px-3 py-1.5 text-[13px] leading-snug transition-colors duration-150",
+        "min-h-11 rounded-lg desk:min-h-9 border px-3 py-1.5 text-[13px] leading-snug transition-colors duration-150",
         selected ? "border-petrol bg-petrol text-paper" : "border-field-edge bg-field text-ink hover:border-field-edge-hover hover:bg-cream/60",
       )}
     >

@@ -270,7 +270,7 @@ export default async function BookingDetailPage({
             {time ? ` · ore ${time}` : ""}
           </p>
           <div className="flex min-w-0 items-start justify-between gap-3">
-            <h1 className="min-w-0 flex-1 text-3xl leading-tight wrap-anywhere sm:text-4xl lg:text-5xl">{bookingTitle(booking)}</h1>
+            <h1 className="min-w-0 flex-1 text-3xl leading-tight wrap-anywhere sm:text-4xl desk:text-5xl">{bookingTitle(booking)}</h1>
             {financeVisible && (
               <PreventivoMenu
                 bookingId={booking.id}

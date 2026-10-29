@@ -6,7 +6,7 @@ import { BOOKING_KIND_LABELS, STATUS_COLORS, STATUS_LABELS } from "@/lib/types";
 import { bookingTitle, formatCovers, formatTime } from "@/components/bookings/format";
 import { MenuBadge } from "@/components/menu/MenuBadge";
 import { StatusDot, cn } from "@/components/ui";
-import { formatIt, toISO } from "./agenda-utils";
+import { dayCountLabel, formatIt, toISO } from "./agenda-utils";
 
 /** Pill visibili per cella: oltre, "+N altri" apre il giorno. Altezza cella fissa = 10rem. */
 const MAX_PILLS = 2;
@@ -145,7 +145,7 @@ export function MonthView({ monthDate, days, today, byDate, isAdmin, onOpenDay }
                 <button
                   type="button"
                   onClick={() => onOpenDay(iso)}
-                  aria-label={`Apri ${label}, ${items.length} ${items.length === 1 ? "banchetto" : "banchetti"}`}
+                  aria-label={`Apri ${label}, ${dayCountLabel(items)}`}
                   className="rounded-[2px] transition-colors hover:bg-cream"
                 >
                   {dayNumber}

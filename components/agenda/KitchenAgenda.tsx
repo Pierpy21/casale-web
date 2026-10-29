@@ -123,8 +123,8 @@ export function KitchenAgenda({
       aria-busy={isPending}
       className={cn("min-w-0 transition-opacity duration-200", isPending && "pointer-events-none opacity-60")}
     >
-      <div className="flex min-w-0 flex-col gap-8 xl:grid xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:items-start xl:gap-10">
-        <aside className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-6">
+      <div className="flex min-w-0 flex-col gap-8 deskxl:grid deskxl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] deskxl:items-start deskxl:gap-10">
+        <aside className="flex min-w-0 flex-col gap-5 deskxl:sticky deskxl:top-6">
           <MobileCalendar selected={selected} today={today} byDate={allByDate} onNavigate={(iso) => navigate(iso)} />
           <AgendaKindSwitch value={kind} onChange={(next) => navigate(selected, next)} />
         </aside>

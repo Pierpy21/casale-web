@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { isDeskLayout } from "@/components/shell/shell-mode";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
@@ -17,8 +18,9 @@ const SHOW_DELAY_IOS_MS = 1500;
 
 type Mode = "android" | "ios";
 
+/** Layout da telefono (anche sala e cucina su tablet): stessa regola della variante CSS desk:. */
 function isMobileViewport(): boolean {
-  return window.matchMedia("(max-width: 1023px)").matches;
+  return !isDeskLayout();
 }
 
 function isDismissed(): boolean {
@@ -111,7 +113,7 @@ export function InstallPrompt() {
       }}
       style={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }}
       className={cn(
-        "no-print fixed inset-x-3 z-40 mx-auto max-w-md rounded-btn border border-sand bg-paper p-5 text-ink shadow-2xl shadow-ink/30 outline-none lg:hidden",
+        "no-print fixed inset-x-3 z-40 mx-auto max-w-md rounded-btn border border-sand bg-paper p-5 text-ink shadow-2xl shadow-ink/30 outline-none desk:hidden",
         "transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none",
         shown ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
       )}

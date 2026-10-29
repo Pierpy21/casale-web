@@ -38,10 +38,10 @@ export function filterBookings(bookings: BookingListItem[], filter: AgendaKindFi
   return bookings.filter((b) => b.kind !== "evento");
 }
 
-/** Conteggio di un giorno: solo gli eventi (banchetti), con singolare/plurale. Le prenotazioni non si contano. */
+/** Conteggio di un giorno: solo gli eventi, con singolare/plurale. Le prenotazioni non si contano. */
 export function dayCountLabel(items: BookingListItem[]): string {
   const events = items.filter((b) => b.kind === "evento").length;
-  return events > 0 ? `${events} ${events === 1 ? "banchetto" : "banchetti"}` : "Nessun banchetto";
+  return events > 0 ? `${events} ${events === 1 ? "evento" : "eventi"}` : "Nessun evento";
 }
 
 /** Intervallo di date in formato ISO (YYYY-MM-DD), estremi inclusi. */

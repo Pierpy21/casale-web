@@ -28,7 +28,7 @@ export function AgendaToolbar({ view, selected, today, title, isAdmin, kind, onN
     "grid size-10 place-items-center rounded-btn text-petrol transition-colors duration-200 hover:bg-cream";
 
   return (
-    <div className="mb-6 flex flex-col gap-4 border-b border-sand pb-5 xl:flex-row xl:items-center xl:justify-between">
+    <div className="mb-6 flex flex-col gap-4 border-b border-sand pb-5 deskxl:flex-row deskxl:items-center deskxl:justify-between">
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -45,7 +45,7 @@ export function AgendaToolbar({ view, selected, today, title, isAdmin, kind, onN
             <ChevronRight aria-hidden="true" className="size-5" />
           </AgendaNavLink>
         </div>
-        <h1 className="text-2xl capitalize lg:text-3xl">{title}</h1>
+        <h1 className="text-2xl capitalize desk:text-3xl">{title}</h1>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

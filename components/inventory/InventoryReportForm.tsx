@@ -312,7 +312,7 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
 
       {/* top = altezza dell'header mobile (0.75rem + campanella 2.5rem + 0.75rem) meno 1px: la barra passa appena sotto
           l'header (z-30), così con pixel frazionari non resta una giunzione che sfarfalla durante lo scroll. */}
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-10 -mx-4 flex flex-col gap-2 bg-paper px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-10 lg:top-0 lg:px-10">
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-10 -mx-4 flex flex-col gap-2 bg-paper px-4 py-2 sm:-mx-6 sm:px-6 desk:-mx-10 desk:top-0 desk:px-10 optouch:-mx-8 optouch:px-8">
         <div className="relative">
           <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-dark" />
           <Input
@@ -442,7 +442,7 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
       <div
         className={cn(
           "sticky bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-20 -mx-4 flex flex-col gap-3 border-t border-sand bg-paper/95 px-4 py-3 shadow-[0_-10px_24px_-18px_rgba(28,43,45,0.45)] backdrop-blur",
-          "sm:-mx-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:bottom-0 lg:-mx-10 lg:px-10",
+          "sm:-mx-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 desk:bottom-0 desk:-mx-10 desk:px-10 optouch:-mx-8 optouch:px-8",
         )}
       >
         <p role="status" aria-live="polite" className="text-[15px] tabular-nums text-slate-dark">

@@ -398,7 +398,7 @@ export function EventForm({
 
       {formError && <Alert tone="danger">{formError}</Alert>}
 
-      <div className={cn("grid min-w-0 gap-6", !isEdit && "xl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] xl:items-start")}>
+      <div className={cn("grid min-w-0 gap-6", !isEdit && "deskxl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] deskxl:items-start")}>
         <div className="flex min-w-0 flex-col gap-6">
           <FormCard>
             <ClientSection
@@ -636,7 +636,7 @@ export function EventForm({
         </div>
 
         {!isEdit && (
-          <div className="min-w-0 xl:sticky xl:top-6">
+          <div className="min-w-0 deskxl:sticky deskxl:top-6">
             <QuotePanel
               enabled={createQuote}
               onEnabledChange={setCreateQuote}

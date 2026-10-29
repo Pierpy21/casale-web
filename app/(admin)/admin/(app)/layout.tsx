@@ -3,6 +3,7 @@ import { canCreateAnyBooking, canUseInventory, isAdmin } from "@/lib/permissions
 import { BottomNav } from "@/components/shell/NavLinks";
 import { MobileHeader, Sidebar } from "@/components/shell/Sidebar";
 import { getNavLinks } from "@/components/shell/nav";
+import { OPERATOR_SHELL } from "@/components/shell/shell-mode";
 import { CreateBookingFab } from "@/components/bookings/CreateBookingFab";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { OfflineBanner } from "@/components/pwa/OfflineBanner";
@@ -50,7 +51,11 @@ export default async function AppLayout({
       <SwOfflineProvider profileId={profile.id} warmUrls={warmUrls} />
       <OfflineProvider profileId={profile.id}>
         <MenuColorsProvider colors={menuColors}>
-          <div className="min-h-dvh bg-paper lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
+          {/* data-shell: sala e cucina su tablet restano sul layout da telefono (varianti desk:/optouch: in globals.css). */}
+          <div
+            data-shell={isAdmin(profile) ? undefined : OPERATOR_SHELL}
+            className="min-h-dvh bg-paper desk:grid desk:grid-cols-[17rem_minmax(0,1fr)]"
+          >
             <a
               href="#contenuto"
               className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:bg-paper focus:px-4 focus:py-2 focus:text-petrol"
@@ -61,7 +66,10 @@ export default async function AppLayout({
             <Sidebar profile={profile} links={links} />
             <MobileHeader />
 
-            <main id="contenuto" className="min-w-0 clip-x px-4 pb-32 pt-6 sm:px-6 lg:px-10 lg:pb-14 lg:pt-10">
+            <main
+              id="contenuto"
+              className="min-w-0 clip-x px-4 pb-32 pt-6 sm:px-6 desk:px-10 desk:pb-14 desk:pt-10 optouch:mx-auto optouch:w-full optouch:max-w-[56rem] optouch:px-8 optouch:pt-8"
+            >
               <OfflineBanner />
               {children}
             </main>
