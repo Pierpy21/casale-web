@@ -8,11 +8,13 @@ export interface StatProps {
   hint?: ReactNode;
   /** Evidenzia il valore (es. prenotazioni in attesa). */
   highlight?: boolean;
+  /** Colore del valore (default `text-ink`), es. `text-mustard` per i coperti degli eventi. */
+  valueClassName?: string;
   className?: string;
 }
 
 /** Indicatore compatto: etichetta maiuscoletto bronzo, numero in serif tabulare. Usato in dashboard e riepilogo giornata. */
-export function Stat({ label, value, hint, highlight = false, className }: StatProps) {
+export function Stat({ label, value, hint, highlight = false, valueClassName, className }: StatProps) {
   return (
     <div
       className={cn(
@@ -24,7 +26,7 @@ export function Stat({ label, value, hint, highlight = false, className }: StatP
       <p className="break-words text-[10px] font-medium uppercase leading-snug tracking-[0.12em] text-bronze sm:text-[11px] sm:tracking-[0.14em]">
         {label}
       </p>
-      <p className="font-serif text-2xl leading-none tabular-nums text-ink sm:text-3xl">{value}</p>
+      <p className={cn("font-serif text-2xl leading-none tabular-nums sm:text-3xl", valueClassName ?? "text-ink")}>{value}</p>
       {hint !== undefined && hint !== null && hint !== false && (
         <p className="break-words text-[11px] leading-snug text-slate-dark sm:text-[12px]">{hint}</p>
       )}

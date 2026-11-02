@@ -23,9 +23,35 @@ function coversLabel(covers: number): string {
   return `${covers} ${covers === 1 ? "coperto" : "coperti"}`;
 }
 
+interface CoversColumnProps {
+  /** Etichetta estesa (cella larga) e abbreviata (cella stretta). */
+  full: string;
+  short: string;
+  covers: number;
+  /** Colore del numero: eventi = mustard, prenotazioni = petrol. */
+  tone: string;
+}
+
 /**
- * Griglia mensile lun-dom, desktop. Ogni cella mostra solo i coperti totali del giorno (prenotazioni attive).
- * Un giorno vuoto crea un evento (admin); un giorno con prenotazioni apre la vista giorno, e il "+" crea un altro evento.
+ * Una colonna della cella: coperti in serif sopra, etichetta piccola sotto.
+ * Con zero coperti la colonna resta vuota, così le posizioni sono fisse in tutto il mese.
+ */
+function CoversColumn({ full, short, covers, tone }: CoversColumnProps) {
+  if (covers === 0) return <div />;
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-1 text-center leading-none">
+      <span className={cn("font-serif text-[20px] tabular-nums", tone)}>{covers}</span>
+      <span className="block max-w-full truncate text-[10px] font-medium uppercase tracking-[0.06em] text-slate-dark">
+        <span className="hidden @min-[8rem]:inline">{full}</span>
+        <span className="@min-[8rem]:hidden">{short}</span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Griglia mensile lun-dom, desktop. Ogni cella mostra i coperti del giorno divisi tra eventi e prenotazioni normali
+ * (solo le voci non zero). Un giorno vuoto crea un evento (admin); un giorno con prenotazioni apre la vista giorno, e il "+" crea un altro evento.
  */
 export function MonthView({ monthDate, days, today, byDate, isAdmin, onOpenDay }: MonthViewProps) {
   const weekdayLabels = days.slice(0, 7).map((day) => formatIt(day, "EEE"));
@@ -48,9 +74,13 @@ export function MonthView({ monthDate, days, today, byDate, isAdmin, onOpenDay }
           const inMonth = isSameMonth(day, monthDate);
           const isToday = iso === today;
           const label = capitalize(formatIt(day, "EEEE d MMMM"));
-          const covers = summarizeDay(items).covers;
+          const { eventCovers, alCartaCovers } = summarizeDay(items);
+          const summary = [
+            eventCovers > 0 && `eventi ${coversLabel(eventCovers)}`,
+            alCartaCovers > 0 && `prenotazioni ${coversLabel(alCartaCovers)}`,
+          ].filter(Boolean);
 
-          // @container: l'etichetta "coperti" / "cop." dipende dalla larghezza reale della cella.
+          // @container: le etichette estese / abbreviate dipendono dalla larghezza reale della cella.
           const cellClass = cn(
             "@container flex h-[6rem] min-w-0 flex-col gap-1.5 overflow-hidden border-b border-r border-sand p-1.5 text-left transition-colors duration-200",
             inMonth ? "bg-paper" : "bg-cream/60",
@@ -98,7 +128,7 @@ export function MonthView({ monthDate, days, today, byDate, isAdmin, onOpenDay }
               <button
                 type="button"
                 onClick={() => onOpenDay(iso)}
-                aria-label={`${label}: ${coversLabel(covers)}`}
+                aria-label={`${label}: ${summary.length > 0 ? summary.join(", ") : coversLabel(0)}`}
                 className="absolute inset-0 transition-colors hover:bg-cream/70"
               />
               <div className="pointer-events-none relative flex items-start justify-between">
@@ -114,13 +144,10 @@ export function MonthView({ monthDate, days, today, byDate, isAdmin, onOpenDay }
                 )}
               </div>
 
-              {covers > 0 && (
-                <div className="pointer-events-none flex flex-1 flex-col items-center justify-center text-center">
-                  <span className="font-serif text-[26px] leading-none tabular-nums text-petrol">{covers}</span>
-                  <span aria-hidden="true" className="mt-1 text-[11px] text-slate-dark">
-                    <span className="hidden @min-[7rem]:inline">coperti</span>
-                    <span className="@min-[7rem]:hidden">cop.</span>
-                  </span>
+              {(eventCovers > 0 || alCartaCovers > 0) && (
+                <div className="pointer-events-none grid flex-1 grid-cols-2 items-end">
+                  <CoversColumn full="Eventi" short="Ev." covers={eventCovers} tone="text-mustard" />
+                  <CoversColumn full="Prenot." short="Pr." covers={alCartaCovers} tone="text-petrol" />
                 </div>
               )}
             </div>

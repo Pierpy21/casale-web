@@ -4,11 +4,11 @@ import { BOOKING_KIND_LABELS, type BookingKind } from "@/lib/types";
 
 /**
  * Tipo di prenotazione: icona + colore + etichetta, leggibili anche in bianco e nero (l'icona è diversa per tipo).
- * evento = pieno petrol; prenotazione = contorno bronzo; appuntamento = grigio tratteggiato.
+ * evento = pieno senape; prenotazione = contorno petrol (stessi colori dei coperti); appuntamento = grigio tratteggiato.
  */
 const KIND_STYLE: Record<BookingKind, { Icon: LucideIcon; className: string }> = {
-  evento: { Icon: PartyPopper, className: "border-petrol bg-petrol text-paper" },
-  normale: { Icon: Armchair, className: "border-bronze bg-paper text-bronze" },
+  evento: { Icon: PartyPopper, className: "border-mustard bg-mustard text-paper" },
+  normale: { Icon: Armchair, className: "border-petrol bg-paper text-petrol" },
   appuntamento: { Icon: CalendarClock, className: "border-dashed border-slate bg-cream text-slate-dark" },
 };
 

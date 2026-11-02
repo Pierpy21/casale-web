@@ -36,6 +36,8 @@
   --color-slate-dark: #4a5558;
   --color-bronze: #8b6b4a;
   --color-olive: #6b6955;
+  /* Giallo senape scuro per i coperti degli eventi (testo): 4.67:1 su --color-cream, 5.11:1 su --color-paper (WCAG AA). */
+  --color-mustard: #856410;
   --color-sand: #d5d5b7;
   --color-cream: #edeedd;
   --color-paper: #f7f7f4;
