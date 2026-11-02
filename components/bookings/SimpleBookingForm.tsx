@@ -16,6 +16,7 @@ import {
   type RoomBookingSlot,
 } from "@/lib/types";
 import { CountStepper } from "./CountStepper";
+import { bookingPersonName } from "./format";
 import {
   allergyPayload,
   allergyRowsFrom,
@@ -24,16 +25,19 @@ import {
   encodeWarnings,
   eventTypeState,
   first,
+  guestPayload,
   mapServerErrors,
   newClientPayload,
   resolveEventType,
   roomWarnings,
   timeInputValue,
   validateAllergies,
+  validateGuest,
   validateNewClient,
   type AllergyRow,
   type Errors,
   type EventTypeState,
+  type GuestDraft,
   type NewClientDraft,
 } from "./booking-form-model";
 import {
@@ -43,6 +47,7 @@ import {
   ChoiceChip,
   ClientSection,
   FormCard,
+  GuestFields,
   SubmitBar,
   focusFirstInvalid,
   newAllergyRow,
@@ -145,9 +150,17 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
   const isEdit = mode === "edit";
   const isAppointment = kind === "appuntamento";
 
+  const isNormal = kind === "normale";
+
   const [values, setValues] = useState<SimpleValues>(() => initialValues(booking, initialDate));
   const [clientId, setClientId] = useState<string | null>(booking?.client_id ?? null);
   const [newClient, setNewClient] = useState<NewClientDraft>(prefill ?? { full_name: "", phone: "", email: "" });
+  // Prenotazione normale: nome e cellulare dell'ospite (in modifica quelli salvati; in creazione quelli della scheda cliente, se c'è).
+  const [guest, setGuest] = useState<GuestDraft>(() =>
+    isNormal && booking
+      ? { name: booking.guest_name ?? "", phone: booking.guest_phone ?? "" }
+      : { name: prefill?.full_name ?? "", phone: prefill?.phone ?? "" },
+  );
   const [linkedClient, setLinkedClient] = useState<ClientSuggestion | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -161,6 +174,10 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
     // Modificare nome, cellulare o email di un cliente scelto dai suggerimenti lo scollega: torna cliente nuovo.
     if (linkedClient && ("full_name" in changes || "phone" in changes || "email" in changes)) setLinkedClient(null);
     setNewClient((c) => ({ ...c, ...changes }));
+  };
+  const changeGuest = (changes: Partial<GuestDraft>) => {
+    setErrors({});
+    setGuest((g) => ({ ...g, ...changes }));
   };
   const clientLink: ClientLink = {
     linked: linkedClient,
@@ -200,7 +217,9 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       (local[key] ??= []).push(message);
     };
 
-    if (isEdit) {
+    if (isNormal) {
+      Object.assign(local, validateGuest(guest));
+    } else if (isEdit) {
       if (!clientId) add("client_id", "Seleziona un cliente");
     } else {
       Object.assign(local, validateNewClient(newClient));
@@ -223,13 +242,18 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       return;
     }
 
-    const payload = {
-      kind,
-      ...(isEdit
+    // Normale: l'ospite sulla prenotazione, nessun cliente di rubrica. Appuntamento: cliente di rubrica.
+    const personPayload = isNormal
+      ? guestPayload(guest)
+      : isEdit
         ? { client_id: clientId }
         : isAdmin && linkedClient
           ? { client_id: linkedClient.id }
-          : { new_client: newClientPayload(newClient) }),
+          : { new_client: newClientPayload(newClient) };
+
+    const payload = {
+      kind,
+      ...personPayload,
       event_type: isAppointment ? eventType : null,
       event_date: eventDate,
       event_time: values.event_time || null,
@@ -255,7 +279,11 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       focusFirstInvalid(formRef.current);
     };
 
-    const who = isEdit && booking ? `${booking.client.first_name} ${booking.client.last_name}`.trim() : newClient.full_name.trim();
+    const who = isNormal
+      ? guest.name.trim()
+      : isEdit && booking
+        ? bookingPersonName(booking)
+        : newClient.full_name.trim();
 
     startTransition(async () => {
       if (isEdit && booking) {
@@ -315,23 +343,29 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
 
       {formError && <Alert tone="danger">{formError}</Alert>}
 
-      <FormCard>
-        <ClientSection
-          mode={mode}
-          clients={clients}
-          currentClient={booking?.client}
-          clientId={clientId}
-          onClientIdChange={(id) => {
-            setErrors({});
-            setClientId(id);
-          }}
-          newClient={newClient}
-          onNewClientChange={changeNewClient}
-          clientLink={clientLink}
-          errors={errors}
-          disabled={pending}
-        />
-      </FormCard>
+      {isNormal ? (
+        <FormCard label="Ospite">
+          <GuestFields value={guest} errors={errors} onChange={changeGuest} disabled={pending} />
+        </FormCard>
+      ) : (
+        <FormCard>
+          <ClientSection
+            mode={mode}
+            clients={clients}
+            currentClient={booking?.client ?? undefined}
+            clientId={clientId}
+            onClientIdChange={(id) => {
+              setErrors({});
+              setClientId(id);
+            }}
+            newClient={newClient}
+            onNewClientChange={changeNewClient}
+            clientLink={clientLink}
+            errors={errors}
+            disabled={pending}
+          />
+        </FormCard>
+      )}
 
       <FormCard label={isAppointment ? "Appuntamento" : "Prenotazione"}>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">

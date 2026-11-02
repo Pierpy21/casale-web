@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import type PocketBase from "pocketbase";
-import { ClientResponseError } from "pocketbase";
 import { z } from "zod";
 import { ClientInput, type ClientInputType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId } from "@/lib/action-utils";
@@ -150,18 +149,15 @@ export async function deleteClient(id: string, opts?: MutationOptions): Promise<
     const conflict = await checkConflictById(auth.db, "clients", id, opts);
     if (conflict) return conflict;
 
-    // Restrict: il cliente con prenotazioni non si elimina (PocketBase non blocca la relazione da solo).
+    // Restrict: il cliente con prenotazioni non si elimina. Vale solo per evento e appuntamento (le normali non hanno cliente).
+    // Nota: bookings.client non è più obbligatorio (1793000016), quindi PocketBase non blocca la delete: questa
+    // pre-verifica è l'unica protezione. Una prenotazione comparsa nel frattempo perderebbe il collegamento.
     const bookings = await countWhere(auth.db, "bookings", auth.db.filter("client = {:id}", { id }));
     if (bookings > 0) return fail("Impossibile eliminare: il cliente ha prenotazioni collegate.");
 
     try {
       await auth.db.collection("clients").delete(id);
     } catch (err) {
-      // Backstop: bookings.client e' required senza cascade, quindi PocketBase rifiuta la delete
-      // se nel frattempo e' comparsa una prenotazione (race con la pre-verifica).
-      if (err instanceof ClientResponseError && err.status === 400) {
-        return fail("Impossibile eliminare: il cliente ha prenotazioni collegate.");
-      }
       return dbFail(err);
     }
 

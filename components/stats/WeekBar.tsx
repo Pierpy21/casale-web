@@ -9,7 +9,7 @@ export interface WeekBarProps {
 }
 
 /**
- * Barra della settimana con numeri espliciti: coperti eventi (petrol) e prenotazioni (bronzo),
+ * Barra della settimana con numeri espliciti: coperti eventi (mustard) e prenotazioni (petrol),
  * quota sul totale del periodo e confronto con la media settimanale.
  * Usa solo elementi inline/block (span) perché può stare dentro un pulsante.
  * La barra è decorativa (aria-hidden): i valori sono scritti accanto.
@@ -25,22 +25,22 @@ export function WeekBar({ week, scale, className }: WeekBarProps) {
     <span className={cn("flex min-w-0 flex-col gap-2", className)}>
       <span aria-hidden="true" className="flex h-2.5 w-full overflow-hidden rounded-full bg-cream">
         <span className="flex h-full overflow-hidden rounded-full transition-[width] duration-500 ease-out" style={{ width: `${width}%` }}>
-          <span className="h-full bg-petrol" style={{ width: `${eventShare}%` }} />
-          <span className="h-full flex-1 bg-bronze" />
+          <span className="h-full bg-mustard" style={{ width: `${eventShare}%` }} />
+          <span className="h-full flex-1 bg-petrol" />
         </span>
       </span>
 
       <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-[12px] leading-snug tabular-nums text-ink">
         <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-petrol" />
+          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-mustard" />
           <span>
-            Eventi <strong className="font-medium">{formatNumber(week.event_covers)}</strong>
+            Eventi <strong className="font-medium text-mustard">{formatNumber(week.event_covers)}</strong>
           </span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-bronze" />
+          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-petrol" />
           <span>
-            Prenotazioni <strong className="font-medium">{formatNumber(week.normal_covers)}</strong>
+            Prenotazioni <strong className="font-medium text-petrol">{formatNumber(week.normal_covers)}</strong>
           </span>
         </span>
       </span>

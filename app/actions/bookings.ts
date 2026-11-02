@@ -1,5 +1,6 @@
 "use server";
 
+import type PocketBase from "pocketbase";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { BookingAllergiesInput, BookingInput, BookingNoteBody, CoversInput, DishesInput, type DishInputType } from "@/lib/validation";
@@ -7,6 +8,7 @@ import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } fr
 import { createQuote } from "@/lib/rpc/quotes";
 import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canSeeAppointments, isAdmin } from "@/lib/permissions";
 import { fetchOne } from "@/lib/pocketbase/queries";
+import { nn, type PbRecord } from "@/lib/pocketbase/helpers";
 import { loadBookingBrief, notifyBookingDeleted, notifyBookingEvent } from "@/lib/notify";
 import { checkConflict, withMutation } from "@/lib/mutations";
 import type { MutationOptions } from "@/lib/offline/contract";
@@ -39,15 +41,38 @@ function kindOf(record: Record<string, unknown> | null): BookingKind {
   return k === "normale" || k === "appuntamento" ? k : "evento";
 }
 
+/**
+ * Prenotazione normale senza nome dell'ospite: arriva dal vecchio client (coda offline) con un cliente di rubrica.
+ * Il nome e il cellulare si prendono dal cliente, se esiste ancora; in modifica, altrimenti, restano quelli salvati.
+ * Il "cliente nuovo" è gestito dalla validazione (legacyNormalGuest). Ritorna il payload da validare.
+ */
+async function withLegacyGuest(db: PocketBase, raw: unknown, previous: PbRecord | null): Promise<unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const o = raw as Record<string, unknown>;
+  if (o.kind !== "normale") return raw;
+  if (typeof o.guest_name === "string" && o.guest_name.trim() !== "") return raw;
+  if (o.new_client) return raw;
+
+  if (typeof o.client_id === "string" && isRecordId(o.client_id)) {
+    const client = await fetchOne(db, "clients", o.client_id);
+    if (client) {
+      const name = [client.first_name, client.last_name].map((v) => String(v ?? "").trim()).filter(Boolean).join(" ");
+      return { ...o, guest_name: name, guest_phone: o.guest_phone ?? String(client.phone ?? "") };
+    }
+  }
+  if (previous && kindOf(previous) === "normale") {
+    return { ...o, guest_name: nn(previous.guest_name) ?? "", guest_phone: o.guest_phone ?? nn(previous.guest_phone) ?? "" };
+  }
+  return raw;
+}
+
 type CreatedBooking = { id: string; quote_id: string | null; warnings: string[] };
 
 /**
- * Crea una prenotazione di qualunque tipo (admin) o una prenotazione normale (sala).
- * Il cliente: rubrica (client_id, solo admin) oppure nuovo cliente (new_client), riusato se il telefono esiste gia'.
- */
-/**
- * Crea una prenotazione. `dishes` (solo eventi, facoltativo): piatti personalizzati nel form di creazione,
- * salvati al posto della copia del menù prima del preventivo.
+ * Crea una prenotazione. Evento e appuntamento: cliente dalla rubrica (client_id, solo admin) oppure nuovo cliente
+ * (new_client, con cellulare obbligatorio; riusato se il telefono esiste gia'). Prenotazione normale: ospite
+ * (guest_name, guest_phone) sulla prenotazione, nessun cliente di rubrica.
+ * `dishes` (solo eventi, facoltativo): piatti personalizzati nel form di creazione, salvati al posto della copia del menù prima del preventivo.
  */
 export async function createBooking(
   input: unknown,
@@ -58,7 +83,7 @@ export async function createBooking(
   if (!auth.ok) return auth;
 
   return withMutation(auth.db, opts, "bookings.createBooking", auth.profile.id, async (): Promise<ActionResult<CreatedBooking>> => {
-    const parsed = BookingInput.safeParse(input);
+    const parsed = BookingInput.safeParse(await withLegacyGuest(auth.db, input, null));
     if (!parsed.success) return invalidInput(parsed.error);
 
     if (!canCreateBooking(auth.profile, parsed.data.kind)) {
@@ -132,12 +157,12 @@ export async function updateBooking(id: string, input: unknown, opts?: MutationO
   if (!auth.ok) return auth;
 
   return withMutation(auth.db, opts, "bookings.updateBooking", auth.profile.id, async (): Promise<ActionResult> => {
-    const parsed = BookingInput.safeParse(input);
-    if (!parsed.success) return invalidInput(parsed.error);
-
-    // Stato precedente, per scegliere il tipo di notifica (cambio stato / annullamento / modifica generica).
+    // Stato precedente: serve a scegliere il tipo di notifica e a completare i dati dell'ospite (vedi withLegacyGuest).
     const previous = await fetchOne(auth.db, "bookings", id);
     if (!previous) return fail("Prenotazione non trovata.");
+    const parsed = BookingInput.safeParse(await withLegacyGuest(auth.db, input, previous));
+    if (!parsed.success) return invalidInput(parsed.error);
+
     const conflict = await checkConflict(auth.db, opts, previous);
     if (conflict) return conflict;
 

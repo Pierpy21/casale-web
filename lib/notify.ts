@@ -1,8 +1,9 @@
 import "server-only";
 import webpush from "web-push";
 import { getAdminPb } from "@/lib/pocketbase/admin";
-import { chunk, dayEndPb, dayStartPb, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
+import { chunk, dayEndPb, dayStartPb, nn, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
 import { fetchOne, listAll, listByParents } from "@/lib/pocketbase/queries";
+import { bookingPersonName } from "@/components/bookings/format";
 import { buildBookingNotice, buildReminderNotice, type BookingBrief } from "@/lib/notify-text";
 import type { BookingKind, BookingStatus, NotificationType, Role } from "@/lib/types";
 
@@ -159,7 +160,12 @@ function toBrief(r: PbRecord, allergyCount: number): BookingBrief {
     event_time: r.event_time ? String(r.event_time) : null,
     event_date: toDateOnly(r.event_date),
     status: r.status as BookingStatus,
-    client_name: client ? `${client.first_name} ${client.last_name ?? ""}`.trim() : "",
+    // Nome della persona: l'ospite per le prenotazioni normali, il cliente di rubrica per gli altri tipi.
+    client_name: bookingPersonName({
+      kind: String(r.kind || "evento"),
+      guest_name: nn(r.guest_name),
+      client: client ? { first_name: nn(client.first_name), last_name: nn(client.last_name) } : null,
+    }),
     room_name: room ? String(room.name) : null,
     menu_name: menu ? String(menu.name) : null,
     adults: Number(r.adults ?? 0),

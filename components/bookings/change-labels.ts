@@ -7,6 +7,8 @@ const FIELD_LABELS: Record<string, string> = {
   event_date: "Data evento",
   event_time: "Ora",
   client_id: "Cliente",
+  guest_name: "Nome ospite",
+  guest_phone: "Cellulare ospite",
   kind: "Tipo prenotazione",
   event_type: "Tipo evento",
   room_id: "Sala",

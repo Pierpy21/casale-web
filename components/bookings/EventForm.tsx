@@ -20,6 +20,7 @@ import {
 } from "@/lib/types";
 import { formatEUR } from "@/lib/quote-utils";
 import { CountStepper } from "./CountStepper";
+import { bookingPersonName } from "./format";
 import {
   allergyPayload,
   allergyRowsFrom,
@@ -337,7 +338,7 @@ export function EventForm({
       focusFirstInvalid(formRef.current);
     };
 
-    const who = isEdit && booking ? `${booking.client.first_name} ${booking.client.last_name}`.trim() : newClient.full_name.trim();
+    const who = isEdit && booking ? bookingPersonName(booking) : newClient.full_name.trim();
 
     startTransition(async () => {
       if (isEdit && booking) {
@@ -401,7 +402,7 @@ export function EventForm({
             <ClientSection
               mode={mode}
               clients={clients}
-              currentClient={booking?.client}
+              currentClient={booking?.client ?? undefined}
               clientId={clientId}
               onClientIdChange={(id) => {
                 setErrors({});

@@ -148,7 +148,8 @@ export function ClientForm({ mode, client }: ClientFormProps) {
           label="Telefono"
           htmlFor="phone"
           error={fieldErrors.phone}
-          hint="Facoltativo. Numero per contatti e conferme."
+          required
+          hint="Obbligatorio: identifica il cliente nelle prenotazioni ed eventi."
           className="sm:col-span-2"
         >
           <Input

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { bookingTitle, clientFullName, formatCovers, totalCovers } from "@/components/bookings/format";
+import { bookingPersonName, formatCovers, totalCovers } from "@/components/bookings/format";
 import { MenuBadge } from "@/components/menu/MenuBadge";
 import { useMenuColor } from "@/components/menu/MenuColorsProvider";
 import { Badge, EmptyState, StatusDot } from "@/components/ui";
@@ -70,7 +70,7 @@ export function RoomDayView({ rooms, selectedDay, bookings }: RoomDayViewProps) 
               <li key={booking.id}>
                 <Link
                   href={`/admin/prenotazioni/${booking.id}`}
-                  aria-label={`${booking.menu?.name ?? "Menù da definire"}, ${bookingTitle(booking)}, stato ${STATUS_LABELS[booking.status]}`}
+                  aria-label={`${booking.menu?.name ?? "Menù da definire"}, ${bookingPersonName(booking)}, stato ${STATUS_LABELS[booking.status]}`}
                   className="flex flex-col gap-1.5 rounded-btn border border-dashed border-slate/50 bg-paper px-4 py-3 hover:bg-cream"
                 >
                   <span className="flex items-start gap-2">
@@ -82,7 +82,7 @@ export function RoomDayView({ rooms, selectedDay, bookings }: RoomDayViewProps) 
                     />
                   </span>
                   <span className="break-words text-[13px] text-slate-dark">
-                    {bookingTitle(booking)} · {formatCovers(booking)}
+                    {bookingPersonName(booking)} · {formatCovers(booking)}
                   </span>
                 </Link>
               </li>
@@ -97,7 +97,7 @@ export function RoomDayView({ rooms, selectedDay, bookings }: RoomDayViewProps) 
 function BookingBlock({ booking, capacity }: { booking: BookingListItem; capacity: number }) {
   const covers = totalCovers(booking);
   const menuName = booking.menu?.name ?? null;
-  const title = bookingTitle(booking);
+  const title = bookingPersonName(booking);
   // Il blocco prende il colore del menù (stesso colore di card e calendario).
   const color = useMenuColor(booking.menu?.id ?? null);
   return (
@@ -119,7 +119,7 @@ function BookingBlock({ booking, capacity }: { booking: BookingListItem; capacit
         {covers}/{capacity} coperti · {formatCovers(booking)}
       </span>
       <span className="break-words text-[13px]">
-        {clientFullName(booking)}
+        {bookingPersonName(booking)}
       </span>
     </Link>
   );

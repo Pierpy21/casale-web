@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
-import { bookingTitle, clientFullName, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
+import { bookingPersonName, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
 import { Badge, EmptyState, PageHeader, type BadgeTone } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { requireAdmin } from "@/lib/auth";
@@ -80,8 +80,8 @@ export default async function DaConfermarePage() {
                             <Badge tone={pending.tone}>{pending.label}</Badge>
                             {time && <span className="font-serif text-lg tabular-nums">{time}</span>}
                           </div>
-                          <p className="min-w-0 break-words font-serif text-xl leading-tight text-ink">{bookingTitle(booking)}</p>
-                          <p className="min-w-0 break-words text-[14px] text-slate-dark">{clientFullName(booking)}</p>
+                          <p className="min-w-0 break-words font-serif text-xl leading-tight text-ink">{bookingPersonName(booking)}</p>
+                          <p className="min-w-0 break-words text-[14px] text-slate-dark">{bookingPersonName(booking)}</p>
                         </div>
                         <div className="flex min-w-0 flex-col gap-1 text-[14px] text-ink sm:items-end sm:text-right">
                           <span className="tabular-nums">

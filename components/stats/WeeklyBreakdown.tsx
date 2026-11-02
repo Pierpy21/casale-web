@@ -35,11 +35,11 @@ function WeekLegend({ average }: { average: number }) {
     <div className="flex min-w-0 flex-col gap-2 rounded-btn bg-cream/60 px-3 py-2.5 text-[12px] leading-snug text-ink">
       <ul aria-label="Legenda" className="flex min-w-0 flex-wrap gap-x-4 gap-y-2">
         <li className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-petrol" />
+          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-mustard" />
           Coperti eventi
         </li>
         <li className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-bronze" />
+          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-petrol" />
           Coperti prenotazioni
         </li>
       </ul>

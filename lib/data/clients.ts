@@ -33,10 +33,11 @@ export async function getClients(search?: string): Promise<ClientWithStats[]> {
   // Prenotazioni non annullate dei clienti in elenco (una sola query, filtrata in memoria).
   const ids = new Set(clients.map((c) => c.id));
   // La sala non vede gli appuntamenti: esclusi anche dal conteggio e dalla prossima data.
+  // Le prenotazioni normali non hanno cliente di rubrica: escluse esplicitamente, così il conteggio resta coerente.
   const seeAppointments = canSeeAppointments(me);
   const bookingFilter = seeAppointments
-    ? db.filter("status != {:s}", { s: "annullato" })
-    : db.filter("status != {:s} && kind != {:ka}", { s: "annullato", ka: "appuntamento" });
+    ? db.filter("status != {:s} && kind != {:kn}", { s: "annullato", kn: "normale" })
+    : db.filter("status != {:s} && kind != {:ka} && kind != {:kn}", { s: "annullato", ka: "appuntamento", kn: "normale" });
   const bookings = await listAll(db, "bookings", bookingFilter, {
     fields: "id,client,event_date",
   });
@@ -79,14 +80,18 @@ export async function getClient(id: string): Promise<Client | null> {
   return record ? mapClient(record) : null;
 }
 
+/**
+ * Storico di un cliente: solo eventi e appuntamenti (le prenotazioni normali non appartengono alla rubrica).
+ * Gli appuntamenti non escono per la sala.
+ */
 export async function getClientBookings(clientId: string): Promise<BookingListItem[]> {
   if (!isRecordId(clientId)) return [];
   const me = await getCurrentProfile();
   if (!me) return [];
   const db = await getAdminPb();
   const filter = canSeeAppointments(me)
-    ? db.filter("client = {:id}", { id: clientId })
-    : db.filter("client = {:id} && kind != {:ka}", { id: clientId, ka: "appuntamento" });
+    ? db.filter("client = {:id} && kind != {:kn}", { id: clientId, kn: "normale" })
+    : db.filter("client = {:id} && kind != {:ka} && kind != {:kn}", { id: clientId, ka: "appuntamento", kn: "normale" });
   const records = await listAll(db, "bookings", filter, {
     expand: BOOKING_LIST_EXPAND,
   });

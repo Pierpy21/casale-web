@@ -49,21 +49,23 @@ export interface MenuItem { id: string; menu_id: string; course: Course; name: s
 export interface Menu { id: string; name: string; season: string | null; price_per_person: number; is_kids: boolean; active: boolean; sort: number; items: MenuItem[]; }
 export interface BookingDish { id: string; booking_id: string; course: Course; name: string; sort: number; }
 export interface BookingAllergy { id: string; booking_id: string; subject_name: string | null; condition: string; notes: string | null; }
+// Prenotazione normale: client_id null, ospite in guest_name / guest_phone. Evento e appuntamento: client_id, guest_* null.
+// Nome e cellulare da mostrare: bookingPersonName / bookingPhone (components/bookings/format.ts).
 export interface Booking {
-  id: string; client_id: string; event_date: string; event_time: string | null;
+  id: string; client_id: string | null; guest_name: string | null; guest_phone: string | null; event_date: string; event_time: string | null;
   room_id: string | null; adults: number; children: number; kids_menus: number;
   menu_id: string | null; kids_menu_id: string | null; setup_colors: string[]; setup_notes: string | null;
   status: BookingStatus; notes: string | null; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string;
 }
 export interface BookingListItem extends Booking {
-  client: Pick<Client, "id" | "first_name" | "last_name" | "phone">;
+  client: Pick<Client, "id" | "first_name" | "last_name" | "phone"> | null;  // null per le prenotazioni normali
   room: Pick<Room, "id" | "name" | "capacity"> | null;
   menu: Pick<Menu, "id" | "name" | "price_per_person"> | null;
   dishes: BookingDish[];            // per mostrare il menù a colpo d'occhio
   allergies: BookingAllergy[];
 }
 export interface BookingDetail extends Booking {
-  client: Client; room: Room | null; menu: Menu | null; kids_menu: Menu | null;
+  client: Client | null; room: Room | null; menu: Menu | null; kids_menu: Menu | null;  // client null per le normali
   dishes: BookingDish[]; allergies: BookingAllergy[];
 }
 export interface BookingChange { id: number; booking_id: string; changed_by: string | null; changed_by_name: string; table_name: string; field: string; old_value: string | null; new_value: string | null; created_at: string; }
@@ -87,10 +89,10 @@ export const STATUS_LABELS: Record<BookingStatus, string> = { opzione: "Opzione"
 Inoltre in `src/lib/quote-utils.ts` (puro, usabile client e server): `export function computeQuoteTotals(q: Pick<Quote,"lines"|"discount"|"vat_rate">): QuoteTotals` e `export function formatEUR(n: number): string`.
 
 ## 5. `src/lib/validation.ts` (Zod) — esportare schema + `z.infer` type
-- `ClientInput`: first_name, last_name (trim, min 1), phone (trim, min 6, regex `^[+0-9 ()-]+$`), email (email o "" → null), tax_code (opz., 16 alfanumerici uppercase o "" → null), vat_number (opz., 11 cifre, ammesso prefisso IT, o "" → null), notes (opz.).
+- `ClientInput`: first_name (obbligatorio), last_name (opz.), phone (**obbligatorio**: trim, 6-30 caratteri, regex `^[+0-9 ()-]+$`, almeno 6 cifre), email (email o "" → null), tax_code (opz., 16 alfanumerici uppercase o "" → null), vat_number (opz., 11 cifre, ammesso prefisso IT, o "" → null), notes (opz.).
 - `AllergyInput`: { subject_name?: string|null, condition: string min 1, notes?: string|null }
 - `DishInput`: { course: Course, name: string min 1, sort: int >= 0 }
-- `BookingInput`: client_id uuid, event_date `YYYY-MM-DD`, event_time? `HH:MM` o null, room_id uuid|null, adults int>=0, children int>=0, kids_menus int>=0 (refine: kids_menus <= children; adults+children >= 1), menu_id uuid|null, kids_menu_id uuid|null, setup_colors: array di SETUP_COLORS, setup_notes?, status BookingStatus (default "opzione"), notes?, allergies: AllergyInput[], dishes?: DishInput[] (se assente e menu_id presente, il backend copia i piatti dal menù).
+- `BookingInput` (preprocess `legacyNormalGuest`: un payload normale con `new_client` in coda offline diventa l'ospite): per `kind: "normale"` richiede `guest_name` (trim, max 200), `guest_phone?` (formato se compilato), ignora `client_id`/`new_client`; per evento e appuntamento richiede `client_id` XOR `new_client` (con cellulare obbligatorio). Campi: client_id uuid, event_date `YYYY-MM-DD`, event_time? `HH:MM` o null, room_id uuid|null, adults int>=0, children int>=0, kids_menus int>=0 (refine: kids_menus <= children; adults+children >= 1), menu_id uuid|null, kids_menu_id uuid|null, setup_colors: array di SETUP_COLORS, setup_notes?, status BookingStatus (default "opzione"), notes?, allergies: AllergyInput[], dishes?: DishInput[] (se assente e menu_id presente, il backend copia i piatti dal menù).
 - `CoversInput`: { adults, children, kids_menus } con le stesse regole.
 - `OperatorInput`: full_name min 2, email, password min 8, role "sala"|"cucina", is_chef boolean (forzato false se role ≠ "cucina").
 - `OperatorUpdateInput`: full_name, role "sala"|"cucina", is_chef, active.

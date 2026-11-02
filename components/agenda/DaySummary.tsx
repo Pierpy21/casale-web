@@ -144,7 +144,16 @@ export function DaySummary({ bookings, menuSize = "md", className }: DaySummaryP
           value={summary.covers}
           hint={`${summary.bookingsCount} ${summary.bookingsCount === 1 ? "servizio" : "servizi"}`}
         />
-        <Stat label="Di cui alla carta" value={summary.alCartaCovers} hint={`Eventi ${summary.eventCovers}`} />
+        <Stat
+          label="Di cui alla carta"
+          value={summary.alCartaCovers}
+          valueClassName="text-petrol"
+          hint={
+            <>
+              Eventi <span className="font-medium text-mustard">{summary.eventCovers}</span>
+            </>
+          }
+        />
         <Stat label="Adulti / bambini" value={`${summary.adults} / ${summary.children}`} />
       </div>
       <MenuChips menus={summary.menus} size={menuSize} />

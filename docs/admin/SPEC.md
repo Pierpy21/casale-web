@@ -68,7 +68,10 @@ Fonte brand e dati: https://casale-web.vercel.app/ (estratti il 2026-10-24).
 
 - Agenda: a colpo d'occhio banchetti per giorno con coperti, sala e **menù**.
 - Prenotazione: cliente; adulti + bambini + n. menù bambini; data (e ora) evento; sala + allestimento (colori a scelta multipla + testo descrizione); allergie/patologie con nome del soggetto opzionale; menù scelto (copia piatti modificabile per evento).
-- Cliente: nome, cognome, telefono **obbligatori**; email, codice fiscale, P.IVA opzionali.
+- Tipi di prenotazione:
+  - **evento** e **appuntamento**: collegati a un cliente di rubrica (`bookings.client`).
+  - **normale** (tavolo): NESSUN collegamento alla rubrica. Nome dell'ospite obbligatorio e cellulare facoltativo, scritti sulla prenotazione (`guest_name`, `guest_phone`). Le prenotazioni normali non compaiono in /clienti e non vengono deduplicate.
+- Cliente di rubrica (evento e appuntamento): nome e cellulare **obbligatori** (il cellulare identifica il cliente e fa il riuso per telefono); cognome, email, codice fiscale, P.IVA opzionali. Lo storico del cliente mostra solo eventi e appuntamenti.
 - Ruoli:
   - `admin` — unico (Peppe Moschetto): tutto. Dashboard desktop completa + agenda mobile rapida.
   - `sala` — lettura di tutto, può modificare **solo i coperti** (adulti, bambini, menù bambini).
@@ -91,12 +94,12 @@ Fonte brand e dati: https://casale-web.vercel.app/ (estratti il 2026-10-24).
 
 ```
 profiles(id uuid pk = auth.users.id, full_name text, role 'admin'|'sala'|'cucina', is_chef bool, active bool, created_at)
-clients(id uuid, first_name text!, last_name text!, phone text!, email text?, tax_code text?, vat_number text?, notes text?, created_at, updated_at)
+clients(id uuid, first_name text!, last_name text?, phone text (obbligatorio per validazione in evento/appuntamento), email text?, tax_code text?, vat_number text?, notes text?, created_at, updated_at)
 rooms(id uuid, name text unique, capacity int, sort int, active bool)
 menus(id uuid, name text, season text, price_per_person numeric(10,2), is_kids bool, active bool, sort int)
 menu_items(id uuid, menu_id fk, course course_type, name text, sort int)
   course_type = 'antipasto'|'primo'|'secondo'|'contorno'|'dolce'|'bevande'
-bookings(id uuid, client_id fk, event_date date!, event_time time?, room_id fk,
+bookings(id uuid, client_id fk? (solo evento/appuntamento), guest_name text? (ospite, solo normale, obbligatorio), guest_phone text? (solo normale), event_date date!, event_time time?, room_id fk,
          adults int>=0, children int>=0, kids_menus int>=0 (<= children), menu_id fk?, kids_menu_id fk?,
          setup_colors text[], setup_notes text?, status 'opzione'|'confermato'|'annullato', notes text?,
          created_by, updated_by, created_at, updated_at)

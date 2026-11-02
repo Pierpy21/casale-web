@@ -17,8 +17,8 @@ import {
 import { BookingNotes } from "./BookingNotes";
 import { KindBadge } from "./KindBadge";
 import {
-  bookingTitle,
-  clientFullName,
+  bookingPersonName,
+  bookingPhone,
   formatCovers,
   formatTime,
   groupDishes,
@@ -97,7 +97,7 @@ export function BookingCard({
   const time = formatTime(b.event_time);
   const dateLabel = showDate ? formatIt(toDate(b.event_date), "EEE d MMM") : null;
   const allergyCount = b.allergies.length;
-  const title = bookingTitle(b);
+  const title = bookingPersonName(b);
   const menuName = b.menu?.name ?? null;
   const isEvent = b.kind === "evento";
   const covers = totalCovers(b);
@@ -215,8 +215,8 @@ export function BookingCard({
               {nameLine}
             </>
           )}
-          {!isKitchen && b.client.phone && (
-            <p className="break-words wrap-anywhere text-[14px] text-slate-dark">{b.client.phone}</p>
+          {!isKitchen && bookingPhone(b) && (
+            <p className="break-words wrap-anywhere text-[14px] text-slate-dark">{bookingPhone(b)}</p>
           )}
         </div>
 
@@ -298,7 +298,7 @@ export function BookingCard({
             )}
 
             <dl className="flex flex-col gap-4 text-[14px] text-ink">
-              <KitchenField label="Cliente">{clientFullName(b)}</KitchenField>
+              <KitchenField label="Cliente">{bookingPersonName(b)}</KitchenField>
               <KitchenField label="Sala">{b.room?.name ?? "Da assegnare"}</KitchenField>
               {isEvent && (b.setup_colors.length > 0 || b.setup_notes) && (
                 <KitchenField label="Allestimento">

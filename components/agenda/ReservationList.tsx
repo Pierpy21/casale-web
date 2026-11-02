@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type ReactNode } from "react";
-import { assignBookingRoom, assignBookingTable } from "@/app/actions/bookings";
+import { X } from "lucide-react";
+import { assignBookingRoom, assignBookingTable, deleteBooking } from "@/app/actions/bookings";
 import { ReservationSheetButton } from "@/components/agenda/ReservationSheetButton";
-import { clientFullName, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
-import { Select } from "@/components/ui";
+import { bookingPersonName, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
+import { Button, Modal, Select } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { FIELD_BASE, FIELD_TEXT, borderClass } from "@/components/ui/Input";
-import { submitMutation, updatedAtOf } from "@/lib/offline/submit";
+import { isBrowserOnline } from "@/lib/offline/network";
+import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import type { BookingListItem, Room } from "@/lib/types";
 
 /** Sopra questo numero di sale il selettore diventa una tendina: i chip andrebbero su troppe righe. */
@@ -22,6 +25,8 @@ export interface ReservationListProps {
   date: string;
   /** Permesso `canAssignRoom(profile, "normale")`: senza, sala e tavolo sono in sola lettura e il foglio è nascosto. */
   canAssign: boolean;
+  /** Permesso di eliminare (admin, come `deleteBooking`): senza, la riga non mostra la X. */
+  canDeleteBookings: boolean;
 }
 
 /** Assegnazione mostrata subito dopo il tap; vale solo finché la sala salvata è quella di partenza. */
@@ -43,18 +48,26 @@ function byTimeThenName(a: BookingListItem, b: BookingListItem): number {
   const ta = a.event_time ?? "99:99";
   const tb = b.event_time ?? "99:99";
   if (ta !== tb) return ta < tb ? -1 : 1;
-  return clientFullName(a).localeCompare(clientFullName(b), "it");
+  return bookingPersonName(a).localeCompare(bookingPersonName(b), "it");
 }
 
 /**
  * Prenotazioni normali del giorno come lista compatta: ora · cliente · coperti · note, e a destra la sala e il tavolo.
  * Tap sulla sala = assegnazione istantanea; tavolo salvato su blur o Invio. Entrambi ottimistici, con rollback e messaggio.
+ * La X elimina la prenotazione dopo conferma: riga tolta subito, ripristinata se il salvataggio fallisce.
  */
-export function ReservationList({ bookings, rooms, date, canAssign }: ReservationListProps) {
+export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBookings }: ReservationListProps) {
+  const router = useRouter();
   const [overrides, setOverrides] = useState<Record<string, RoomOverride>>({});
   const [tableOverrides, setTableOverrides] = useState<Record<string, TableOverride>>({});
   /** Testo del campo Tavolo mentre si modifica (prima del salvataggio). */
   const [tableDrafts, setTableDrafts] = useState<Record<string, string>>({});
+  /** Prenotazioni eliminate ma non ancora riallineate dal server (o in coda offline). */
+  const [removedIds, setRemovedIds] = useState<Set<string>>(() => new Set());
+  /** Prenotazione in attesa di conferma nella finestra "Eliminare la prenotazione?". */
+  const [askDelete, setAskDelete] = useState<BookingListItem | null>(null);
+  /** Eliminazione in corso: disabilita le X e i pulsanti della finestra. */
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const inFlight = useRef(new Set<string>());
@@ -63,7 +76,7 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
   const pendingDraft = useRef(new Map<string, string>());
 
   const activeRooms = rooms.filter((room) => room.active).sort((a, b) => a.sort - b.sort);
-  const sorted = [...bookings].sort(byTimeThenName);
+  const sorted = [...bookings].sort(byTimeThenName).filter((booking) => !removedIds.has(booking.id));
 
   const roomIdOf = (booking: BookingListItem): string | null => {
     const override = overrides[booking.id];
@@ -78,7 +91,7 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
   const assign = (booking: BookingListItem, roomId: string | null) => {
     if (roomIdOf(booking) === roomId || inFlight.current.has(booking.id)) return;
     const id = booking.id;
-    const label = clientFullName(booking);
+    const label = bookingPersonName(booking);
     inFlight.current.add(id);
     setMessage(null);
     setOverrides((prev) => ({ ...prev, [id]: { base: booking.room_id, roomId } }));
@@ -133,7 +146,7 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
   /** Salva il tavolo (null = nessun tavolo), ottimistico. A fine invio applica l'ultima bozza digitata nel frattempo. */
   const saveTable = (booking: BookingListItem, next: number | null, expectedUpdated: string | undefined) => {
     const id = booking.id;
-    const label = clientFullName(booking);
+    const label = bookingPersonName(booking);
     tableInFlight.current.add(id);
     setMessage(null);
     setTableOverrides((prev) => ({ ...prev, [id]: { base: booking.table_number, value: next } }));
@@ -182,7 +195,7 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
       if (draft !== undefined) pendingDraft.current.set(id, draft);
       return;
     }
-    const label = clientFullName(booking);
+    const label = bookingPersonName(booking);
     const current = tableOf(booking);
     const parsed = parseTableInput(draft ?? (current === null ? "" : String(current)));
     removeDraft(id);
@@ -192,6 +205,37 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
     }
     if (parsed.value === current) return;
     saveTable(booking, parsed.value, updatedAtOf(booking));
+  };
+
+  /** Eliminazione confermata: riga tolta subito; se il salvataggio fallisce torna visibile con il messaggio. */
+  const removeBooking = (booking: BookingListItem) => {
+    const id = booking.id;
+    const label = bookingPersonName(booking);
+    setMessage(null);
+    setDeletingId(id);
+    setRemovedIds((prev) => new Set(prev).add(id));
+
+    startTransition(async () => {
+      const result = await submitMutation("bookings.deleteBooking", deleteBooking, [id], {
+        label: `Elimina prenotazione · ${label}`,
+        entity: { type: "booking", id },
+        expectedUpdated: updatedAtOf(booking),
+      });
+      setDeletingId(null);
+      setAskDelete(null);
+      if (!result.ok) {
+        // Rollback: la riga torna visibile.
+        setRemovedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        setMessage(`Prenotazione non eliminata: ${label}. ${result.error}`);
+        return;
+      }
+      // Online si riallinea ai dati del server; offline la riga resta tolta finché la coda non parte.
+      if (isBrowserOnline() && !isQueued(result)) router.refresh();
+    });
   };
 
   return (
@@ -222,10 +266,23 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
           // Sala attuale disattivata: resta visibile in sola lettura, ma non è tra le scelte proposte.
           const inactiveCurrent = currentInfo && !currentInfo.active ? currentInfo : null;
           const options = activeRooms;
-          const title = clientFullName(booking);
+          const title = bookingPersonName(booking);
           const notes = booking.notes?.trim();
           const table = tableOf(booking);
           const tableText = booking.id in tableDrafts ? tableDrafts[booking.id] : table === null ? "" : String(table);
+          const time = formatTime(booking.event_time);
+          // X in fondo alla riga (dopo Sala e Tavolo): allineata al campo, 44px di area di tocco.
+          const deleteControl = canDeleteBookings ? (
+            <button
+              type="button"
+              aria-label={time ? `Elimina prenotazione di ${title} delle ${time}` : `Elimina prenotazione di ${title}`}
+              disabled={deletingId !== null}
+              onClick={() => setAskDelete(booking)}
+              className="inline-flex size-11 shrink-0 items-center justify-center self-end rounded-lg text-slate-dark transition-colors duration-150 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <X aria-hidden="true" className="size-5" />
+            </button>
+          ) : null;
 
           return (
             <li
@@ -234,7 +291,7 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
             >
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                  <span className="shrink-0 text-[15px] font-medium tabular-nums text-ink">{formatTime(booking.event_time) ?? "—"}</span>
+                  <span className="shrink-0 text-[15px] font-medium tabular-nums text-ink">{time ?? "—"}</span>
                   <Link
                     href={`/admin/prenotazioni/${booking.id}`}
                     className="min-w-0 break-words font-serif text-[16px] leading-snug text-petrol hover:underline"
@@ -330,22 +387,67 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
                         className={cn(FIELD_BASE, FIELD_TEXT, borderClass(false), "text-center tabular-nums")}
                       />
                     </div>
+                    {deleteControl}
                   </div>
                 </div>
               ) : (
-                <p className="flex flex-wrap gap-x-4 text-[13px] text-slate-dark">
-                  <span>
-                    Sala: <span className="text-ink">{currentName ?? "Da assegnare"}</span>
-                  </span>
-                  <span>
-                    Tavolo: <span className="text-ink tabular-nums">{table ?? "Da assegnare"}</span>
-                  </span>
-                </p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <p className="flex min-w-0 flex-wrap gap-x-4 text-[13px] text-slate-dark">
+                    <span>
+                      Sala: <span className="text-ink">{currentName ?? "Da assegnare"}</span>
+                    </span>
+                    <span>
+                      Tavolo: <span className="text-ink tabular-nums">{table ?? "Da assegnare"}</span>
+                    </span>
+                  </p>
+                  {deleteControl}
+                </div>
               )}
             </li>
           );
         })}
       </ul>
+
+      <Modal
+        open={askDelete !== null}
+        onClose={() => {
+          if (deletingId === null) setAskDelete(null);
+        }}
+        title="Eliminare la prenotazione?"
+        footer={
+          askDelete && (
+            // Sotto il breakpoint sm i pulsanti occupano tutta la larghezza, uno sotto l'altro.
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+              <Button variant="ghost" className="w-full sm:w-auto" disabled={deletingId !== null} onClick={() => setAskDelete(null)}>
+                Annulla
+              </Button>
+              <Button
+                variant="danger"
+                className="w-full sm:w-auto"
+                disabled={deletingId !== null}
+                aria-busy={deletingId !== null || undefined}
+                onClick={() => removeBooking(askDelete)}
+              >
+                {deletingId !== null ? "Eliminazione…" : "Elimina"}
+              </Button>
+            </div>
+          )
+        }
+      >
+        {askDelete && (
+          <div className="flex flex-col gap-3">
+            <p className="text-[15px] leading-relaxed text-slate-dark">
+              Prenotazione di <span className="font-medium text-ink">{bookingPersonName(askDelete)}</span>
+            </p>
+            <p className="text-[13px] text-slate-dark tabular-nums">
+              {formatTime(askDelete.event_time) ?? "—"} · {totalCovers(askDelete)} {totalCovers(askDelete) === 1 ? "coperto" : "coperti"}
+            </p>
+            <p className="text-[15px] leading-relaxed text-slate-dark">
+              L’operazione non può essere annullata. Eventuali preventivi e acconti collegati vengono eliminati insieme.
+            </p>
+          </div>
+        )}
+      </Modal>
     </section>
   );
 }

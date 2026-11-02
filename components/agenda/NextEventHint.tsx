@@ -1,6 +1,6 @@
 import { differenceInCalendarDays } from "date-fns";
 import { ArrowRight } from "lucide-react";
-import { bookingTitle, formatTime } from "@/components/bookings/format";
+import { bookingPersonName, formatTime } from "@/components/bookings/format";
 import { EmptyState, cn } from "@/components/ui";
 import type { BookingListItem, NextEventBrief } from "@/lib/types";
 import { capitalize, formatIt, toDate, type AgendaKindFilter } from "./agenda-utils";
@@ -63,7 +63,7 @@ export function nextEventFrom(bookings: BookingListItem[], selected: string, aft
     .filter((b) => b.kind === "evento" && b.status !== "annullato" && b.event_date > selected)
     .sort((a, b) => a.event_date.localeCompare(b.event_date) || (a.event_time ?? "99:99").localeCompare(b.event_time ?? "99:99"))[0];
   if (!first) return afterRange;
-  return { id: first.id, event_date: first.event_date, event_time: first.event_time, title: bookingTitle(first) };
+  return { id: first.id, event_date: first.event_date, event_time: first.event_time, title: bookingPersonName(first) };
 }
 
 /**

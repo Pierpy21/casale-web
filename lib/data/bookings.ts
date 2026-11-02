@@ -30,13 +30,14 @@ import {
   type StatsKind,
   type WeekStats,
 } from "@/lib/types";
-import { groupDishes } from "@/components/bookings/format";
+import { bookingPersonName, bookingPhone, groupDishes } from "@/components/bookings/format";
 import { getBookingNotesFor } from "./notes";
 import {
   BOOKING_DETAIL_EXPAND,
   BOOKING_LIST_EXPAND,
   bookingDetail,
   bookingListItems,
+  bookingPersonOf,
   sortBookingRecords,
 } from "./shared";
 
@@ -69,13 +70,17 @@ function zeroMenuPrices<T extends WithMenus>(item: T): T {
   };
 }
 
-/** La cucina non riceve mai il telefono del cliente: il campo resta presente, vuoto. */
-/** La cucina non riceve dati di contatto del cliente: telefono ed email azzerati (se presenti). */
-function hideKitchenPhone<T extends { client: { phone: string; email?: string | null } }>(item: T, me: Profile): T {
+/**
+ * La cucina non riceve dati di contatto: telefono ed email del cliente, e il cellulare dell'ospite, azzerati.
+ * Il nome resta (serve in cucina). Il campo resta presente con valore vuoto o null.
+ */
+function hideKitchenPhone<T extends { client: { phone: string; email?: string | null } | null; guest_phone: string | null }>(
+  item: T,
+  me: Profile,
+): T {
   if (me.role !== "cucina") return item;
-  const client = { ...item.client, phone: "" };
-  if ("email" in client) client.email = null;
-  return { ...item, client };
+  const client = item.client ? { ...item.client, phone: "", email: null } : null;
+  return { ...item, client, guest_phone: null };
 }
 
 /** Prenotazioni con sala assegnata nell'intervallo (esclusi gli annullati), select minima. */
@@ -93,12 +98,11 @@ export async function getRoomBookingSlots(from: string, to: string): Promise<Roo
     { expand: "client" },
   );
   return sortBookingRecords(records).map((r) => {
-    const client = r.expand?.client as PbRecord | undefined;
     return {
       id: r.id,
       event_date: toDateOnly(r.event_date),
       room_id: String(r.room ?? ""),
-      client_name: client ? `${client.first_name} ${client.last_name ?? ""}`.trim() : "",
+      client_name: bookingPersonName(bookingPersonOf(r)),
       adults: num(r.adults),
       children: num(r.children),
     };
@@ -156,11 +160,9 @@ export async function getReservationSheet(date: string): Promise<ReservationShee
   );
 
   const roomOf = (r: PbRecord): PbRecord | undefined => r.expand?.room as PbRecord | undefined;
-  const clientOf = (r: PbRecord): PbRecord | undefined => r.expand?.client as PbRecord | undefined;
-  const nameOf = (r: PbRecord): string => {
-    const client = clientOf(r);
-    return [client?.first_name, client?.last_name].map((v) => String(v ?? "").trim()).filter(Boolean).join(" ");
-  };
+  // Ospite della prenotazione normale (nome e cellulare sulla prenotazione; il cliente è solo ripiego).
+  const personOf = (r: PbRecord) => bookingPersonOf(r);
+  const nameOf = (r: PbRecord): string => bookingPersonName(personOf(r));
 
   const sorted = [...records].sort((a, b) => {
     const ra = roomOf(a);
@@ -189,7 +191,7 @@ export async function getReservationSheet(date: string): Promise<ReservationShee
       room: room?.name ? String(room.name) : null,
       table: tableOf(r),
       time: r.event_time ? String(r.event_time).slice(0, 5) : null,
-      phone: nn(clientOf(r)?.phone)?.trim() || null,
+      phone: bookingPhone(personOf(r)),
     };
   });
   return { date, rows };
@@ -227,7 +229,7 @@ export async function getEventSheet(date: string): Promise<EventSheet | null> {
 
     return {
       time: b.event_time ? b.event_time.slice(0, 5) : null,
-      client_name: `${b.client.first_name} ${b.client.last_name}`.trim(),
+      client_name: bookingPersonName(b),
       room: b.room?.name ?? null,
       adults: b.adults,
       children: b.children,
@@ -283,14 +285,12 @@ export async function getNextEventAfter(date: string): Promise<NextEventBrief | 
     });
     const r = sortBookingRecords(page.items as unknown as PbRecord[])[0];
     if (!r) return null;
-    const client = r.expand?.client as PbRecord | undefined;
-    const clientName = client ? `${client.first_name} ${client.last_name}`.trim() : "";
     return {
       id: r.id,
       event_date: toDateOnly(r.event_date),
       event_time: nn(r.event_time),
-      // Stessa regola di bookingTitle (components/bookings/format.ts): nome del cliente.
-      title: clientName || "Evento",
+      // Stessa regola del titolo in agenda (bookingPersonName, components/bookings/format.ts): nome del cliente.
+      title: bookingPersonName(bookingPersonOf(r)) || "Evento",
     };
   } catch {
     return null;
@@ -457,17 +457,21 @@ export async function getActivityLog(limit = 100): Promise<ActivityEntry[]> {
   const changes = (page.items as unknown as PbRecord[]).map(mapChange);
 
   const bookingIds = [...new Set(changes.map((c) => c.booking_id).filter((id): id is string => Boolean(id)))];
-  const bookings = await listByParents(db, "bookings", "id", bookingIds, { fields: "id,kind,event_date,client" });
+  const bookings = await listByParents(db, "bookings", "id", bookingIds, {
+    fields: "id,kind,event_date,client,guest_name",
+  });
   const clientIds = [...new Set(bookings.map((b) => String(b.client ?? "")).filter(Boolean))];
   const clients = await listByParents(db, "clients", "id", clientIds, { fields: "id,first_name,last_name" });
-  const clientNames = new Map(clients.map((c) => [c.id, `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim()]));
+  const clientById = new Map(clients.map((c) => [c.id, c]));
 
+  // Nome della persona: l'ospite per le prenotazioni normali, il cliente di rubrica per gli altri tipi.
   const info = new Map<string, { date: string; kind: BookingKind; client: string | null }>();
   for (const b of bookings) {
+    const clientRecord = clientById.get(String(b.client ?? "")) ?? null;
     info.set(b.id, {
       date: toDateOnly(b.event_date),
       kind: (nn(b.kind) ?? "evento") as BookingKind,
-      client: clientNames.get(String(b.client ?? "")) || null,
+      client: bookingPersonName(bookingPersonOf(b, clientRecord)) || null,
     });
   }
 

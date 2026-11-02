@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { formatIt, toDate } from "@/components/agenda/agenda-utils";
-import { bookingTitle } from "@/components/bookings/format";
+import { bookingPersonName } from "@/components/bookings/format";
 import { QuoteEditor } from "@/components/quotes/QuoteEditor";
 import { QuotePrintStyles } from "@/components/quotes/QuotePrintStyles";
 import { ButtonLink, PageHeader } from "@/components/ui";
@@ -31,7 +31,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       <PageHeader
         eyebrow="Preventivo"
         title={`Preventivo n. ${quote.number}`}
-        description={`${bookingTitle(quote.booking)} · ${formatIt(toDate(quote.booking.event_date), "EEEE d MMMM yyyy")}`}
+        description={`${bookingPersonName(quote.booking)} ·${formatIt(toDate(quote.booking.event_date), "EEEE d MMMM yyyy")}`}
         actions={
           <ButtonLink href={`/admin/prenotazioni/${quote.booking_id}`} variant="ghost" size="md" className="no-print">
             Torna alla prenotazione
