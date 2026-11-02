@@ -44,6 +44,92 @@ export function compareInventoryProducts(a: InventoryProduct, b: InventoryProduc
   );
 }
 
+/**
+ * Colori di una categoria nella Giacenza (tablet): classi Tailwind complete, così il compilatore le trova.
+ * Tinte chiare e terrose, in armonia con il brand (petrol, bronze, olive, slate, sand); il colore pieno
+ * (accent) è solo decorativo, il testo resta ink su tinta chiara o bianco su pieno (≥ 4.5:1).
+ */
+export interface InventoryCategoryColor {
+  /** Sfondo tenue della tessera e della pillola. */
+  tint: string;
+  /** Sfondo in hover (tessera e pillola). */
+  tintHover: string;
+  /** Bordo leggero della tessera e della pillola. */
+  edge: string;
+  /** Colore pieno: striscia laterale, pallino e barra di avanzamento. */
+  accent: string;
+  /** Pillola attiva: sfondo pieno (il testo è bianco). */
+  solid: string;
+}
+
+/** Colore per categoria: carne rossa e uova, latticini burro, verdure salvia, surgelati ghiaccio, altro oliva. */
+export const INVENTORY_CATEGORY_COLORS: Record<InventoryCategory, InventoryCategoryColor> = {
+  // Verdure e frutta: verde salvia.
+  ortofrutta: {
+    tint: "bg-[#e4ecdb]",
+    tintHover: "hover:bg-[#d8e3cb]",
+    edge: "border-[#b5c7a6]",
+    accent: "bg-[#4f6b45]",
+    solid: "border-[#4f6b45] bg-[#4f6b45]",
+  },
+  // Latticini: crema e burro (ocra scura per il contrasto).
+  latticini: {
+    tint: "bg-[#f7f0d7]",
+    tintHover: "hover:bg-[#f1e6c3]",
+    edge: "border-[#dccb94]",
+    accent: "bg-[#7d6219]",
+    solid: "border-[#7d6219] bg-[#7d6219]",
+  },
+  // Salumi: rosa antico, vinaccia spenta.
+  salumi: {
+    tint: "bg-[#f1e2e4]",
+    tintHover: "hover:bg-[#e9d4d8]",
+    edge: "border-[#d7b5bb]",
+    accent: "bg-[#7d3f4a]",
+    solid: "border-[#7d3f4a] bg-[#7d3f4a]",
+  },
+  // Carne e uova: terracotta e mattone.
+  carne_uova: {
+    tint: "bg-[#f4e1d7]",
+    tintHover: "hover:bg-[#ecd3c4]",
+    edge: "border-[#dcb19c]",
+    accent: "bg-[#9a4a32]",
+    solid: "border-[#9a4a32] bg-[#9a4a32]",
+  },
+  // Dispensa: bronzo del brand.
+  dispensa: {
+    tint: "bg-[#efe6d6]",
+    tintHover: "hover:bg-[#e6dac4]",
+    edge: "border-[#cdb897]",
+    accent: "bg-[#8b6b4a]",
+    solid: "border-[#8b6b4a] bg-[#8b6b4a]",
+  },
+  // Surgelati: azzurro ghiaccio e petrolio chiaro.
+  surgelati: {
+    tint: "bg-[#e1edf0]",
+    tintHover: "hover:bg-[#d3e4e9]",
+    edge: "border-[#adc9d0]",
+    accent: "bg-[#3d6b78]",
+    solid: "border-[#3d6b78] bg-[#3d6b78]",
+  },
+  // Non food: grigio ardesia.
+  non_food: {
+    tint: "bg-[#e8ebeb]",
+    tintHover: "hover:bg-[#dbe0e1]",
+    edge: "border-[#bfc8ca]",
+    accent: "bg-[#5a6668]",
+    solid: "border-[#5a6668] bg-[#5a6668]",
+  },
+  // Altro: oliva neutro.
+  altro: {
+    tint: "bg-[#ecebe0]",
+    tintHover: "hover:bg-[#e2e1d1]",
+    edge: "border-[#c9c8ad]",
+    accent: "bg-[#6b6955]",
+    solid: "border-[#6b6955] bg-[#6b6955]",
+  },
+};
+
 export interface InventoryGroup<K extends string, T> {
   key: K;
   label: string;

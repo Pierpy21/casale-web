@@ -5,7 +5,7 @@ import { EmptyState, cn } from "@/components/ui";
 import type { BookingListItem, NextEventBrief } from "@/lib/types";
 import { capitalize, formatIt, toDate, type AgendaKindFilter } from "./agenda-utils";
 
-const BOX = "flex w-72 max-w-full items-center justify-between gap-4 rounded-xl border border-sand bg-cream/60 px-4 py-3 text-left min-h-[44px]";
+const BOX = "flex w-72 max-w-full flex-col items-center justify-center gap-2 rounded-xl border border-sand bg-cream/60 px-4 py-3 text-center min-h-[44px]";
 
 /**
  * Riquadro "Prossimo evento" per il giorno vuoto (admin). Cliccabile: porta a quel giorno.
@@ -23,7 +23,7 @@ export function NextEventHint({
 }) {
   if (!nextEvent) {
     return (
-      <div className={cn(BOX, "justify-center text-center")}>
+      <div className={BOX}>
         <p className="text-[14px] text-slate">Nessun evento in programma</p>
       </div>
     );
@@ -44,13 +44,13 @@ export function NextEventHint({
         "transition-colors duration-200 hover:bg-sand/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
       )}
     >
-      <span className="flex min-w-0 flex-col gap-1">
+      <span className="flex w-full min-w-0 flex-col items-center gap-1">
         <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">Prossimo evento</span>
         <span className="text-[14px] text-ink tabular-nums">
           {capitalize(formatIt(date, "EEEE d MMMM"))} · {relative}
           {time ? ` · ore ${time}` : ""}
         </span>
-        <span className="truncate font-serif text-lg text-ink">{nextEvent.title}</span>
+        <span className="block w-full truncate font-serif text-lg text-ink">{nextEvent.title}</span>
       </span>
       <ArrowRight aria-hidden="true" className="size-5 shrink-0 text-petrol" />
     </button>
@@ -82,7 +82,13 @@ export function EmptyDay({
   onOpen: (iso: string) => void;
 }) {
   if (kind === "prenotazioni") {
-    return <EmptyState title="Niente da vedere qui" description="Cambia il filtro per vedere anche gli eventi." />;
+    return <EmptyState variant="plain" title="Niente da vedere qui" description="Cambia il filtro per vedere anche gli eventi." />;
   }
-  return <EmptyState title="Niente da vedere qui" action={<NextEventHint nextEvent={nextEvent} selected={selected} onOpen={onOpen} />} />;
+  return (
+    <EmptyState
+      variant="plain"
+      title="Niente da vedere qui"
+      action={<NextEventHint nextEvent={nextEvent} selected={selected} onOpen={onOpen} />}
+    />
+  );
 }
