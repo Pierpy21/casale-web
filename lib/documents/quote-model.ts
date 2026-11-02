@@ -54,7 +54,6 @@ export interface QuoteDocumentModel {
     vatNumber: string | null;
   };
   event: {
-    name: string | null;
     dateLong: string;
     time: string | null;
     room: string;
@@ -172,7 +171,6 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
       vatNumber: orNull(b.client.vat_number),
     },
     event: {
-      name: orNull(b.event_name),
       dateLong: formatDateLong(b.event_date),
       time: b.event_time ? b.event_time.slice(0, 5) : null,
       room: b.room?.name ?? "Da definire",

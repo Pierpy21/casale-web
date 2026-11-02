@@ -104,8 +104,8 @@ export function BookingCard({
   const roomLine = [b.room?.name ?? "Sala da assegnare", covers > 0 ? formatCovers(b) : null].filter(Boolean).join(" · ");
 
   if (variant === "compact" && !kitchen) {
-    // Senza menù (prenotazioni, appuntamenti) la testata è il titolo; il cliente va sotto, se diverso.
-    const subline = isEvent ? title : b.event_name?.trim() ? clientFullName(b) : null;
+    // Senza menù (prenotazioni, appuntamenti) la testata è il titolo (il cliente); negli eventi il cliente va sotto il menù.
+    const subline = isEvent ? title : null;
     return (
       <Link
         href={href}
@@ -215,11 +215,8 @@ export function BookingCard({
               {nameLine}
             </>
           )}
-          {b.event_name && (
-            <p className="break-words wrap-anywhere text-[14px] text-slate-dark">
-              {clientFullName(b)}
-              {!isKitchen && b.client.phone ? ` · ${b.client.phone}` : null}
-            </p>
+          {!isKitchen && b.client.phone && (
+            <p className="break-words wrap-anywhere text-[14px] text-slate-dark">{b.client.phone}</p>
           )}
         </div>
 
@@ -302,7 +299,6 @@ export function BookingCard({
 
             <dl className="flex flex-col gap-4 text-[14px] text-ink">
               <KitchenField label="Cliente">{clientFullName(b)}</KitchenField>
-              {b.event_name && <KitchenField label="Evento">{b.event_name}</KitchenField>}
               <KitchenField label="Sala">{b.room?.name ?? "Da assegnare"}</KitchenField>
               {isEvent && (b.setup_colors.length > 0 || b.setup_notes) && (
                 <KitchenField label="Allestimento">

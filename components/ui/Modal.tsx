@@ -28,10 +28,12 @@ export interface ModalProps {
    * l'area che scorre con `min-h-0 flex-1 overflow-y-auto` e resta in colonna fino al fondo della finestra.
    */
   bare?: boolean;
+  /** Comandi nell'intestazione, prima della X di chiusura (es. zoom di un'anteprima). */
+  headerActions?: ReactNode;
 }
 
 /** Dialog nativo (focus trap, Esc, inert del resto della pagina gestiti dal browser). */
-export function Modal({ open, onClose, title, children, footer, size = "md", bare = false }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, size = "md", bare = false, headerActions }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -57,9 +59,12 @@ export function Modal({ open, onClose, title, children, footer, size = "md", bar
         <h2 id={titleId} className="text-2xl">
           {title}
         </h2>
-        <Button variant="ghost" size="sm" aria-label="Chiudi" onClick={onClose} className="-mr-2">
-          <X aria-hidden="true" className="size-4" />
-        </Button>
+        <div className="-mr-2 flex shrink-0 items-center gap-1">
+          {headerActions}
+          <Button variant="ghost" size="sm" aria-label="Chiudi" onClick={onClose}>
+            <X aria-hidden="true" className="size-4" />
+          </Button>
+        </div>
       </div>
       <div className={bare ? "flex min-h-0 flex-1 flex-col" : "min-h-0 flex-1 overflow-y-auto px-6 py-5"}>{children}</div>
       {footer && (

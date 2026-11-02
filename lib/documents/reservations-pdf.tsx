@@ -10,7 +10,12 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import type { ReservationSheet } from "@/lib/types";
-import { buildReservationSheetView, type ReservationPdfRow, type ReservationSheetView } from "@/lib/documents/reservations-view";
+import {
+  SHEET_ISSUER,
+  buildReservationSheetView,
+  type ReservationPdfRow,
+  type ReservationSheetView,
+} from "@/lib/documents/reservations-view";
 
 // Foglio prenotazioni del giorno in PDF: stessa impostazione tipografica del preventivo e del report di giacenza.
 // Una tabella: Nome | Sala | Tavolo | Orario | Cellulare. I valori mancanti diventano "—".
@@ -114,10 +119,13 @@ function ReservationsDocument({ view, logo }: { view: ReservationSheetView; logo
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <Text style={styles.issuerName}>Casale del Notaio</Text>
-            <Text style={styles.issuerTagline}>Del gusto il Teatro.</Text>
-            <Text style={styles.issuerText}>Via Nicolosi 67, 95032 Belpasso (CT)</Text>
-            <Text style={styles.issuerText}>+39 340 109 0100 · info@casaledelnotaio.it</Text>
+            <Text style={styles.issuerName}>{SHEET_ISSUER.name}</Text>
+            <Text style={styles.issuerTagline}>{SHEET_ISSUER.tagline}</Text>
+            {SHEET_ISSUER.lines.map((line) => (
+              <Text key={line} style={styles.issuerText}>
+                {line}
+              </Text>
+            ))}
           </View>
           {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image non supporta la prop alt */}
           <Image src={logo} style={styles.logo} />
@@ -141,7 +149,7 @@ function ReservationsDocument({ view, logo }: { view: ReservationSheetView; logo
         )}
 
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>Casale del Notaio · Via Nicolosi 67, Belpasso (CT)</Text>
+          <Text style={styles.footerText}>{SHEET_ISSUER.footer}</Text>
           <Text
             style={styles.footerText}
             render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}

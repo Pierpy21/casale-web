@@ -9,7 +9,6 @@ export interface BookingBrief {
   id: string;
   kind: BookingKind;
   event_type: string | null;
-  event_name: string | null;
   event_time: string | null;
   event_date: string; // YYYY-MM-DD
   status: BookingStatus;
@@ -59,7 +58,7 @@ export function buildBookingNotice(
   switch (type) {
     case "booking_created":
       if (b.kind === "appuntamento") {
-        title = `Nuovo appuntamento · ${b.event_name ?? "senza titolo"}`;
+        title = `Nuovo appuntamento · ${b.client_name || "senza titolo"}`;
       } else if (b.kind === "normale") {
         title = b.event_time ? `Nuova prenotazione · ${b.event_time.slice(0, 5)}` : "Nuova prenotazione";
       } else {

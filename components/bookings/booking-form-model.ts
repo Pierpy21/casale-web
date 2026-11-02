@@ -174,7 +174,7 @@ export function roomWarnings(input: {
     (b) => b.room_id === room.id && b.event_date === input.eventDate && b.id !== input.bookingId,
   );
   if (clashes.length > 0) {
-    const names = clashes.map((b) => b.event_name?.trim() || b.client_name).join(", ");
+    const names = clashes.map((b) => b.client_name).join(", ");
     warnings.push(`${room.name} è già assegnata in questa data a: ${names}. Ogni sala è riservata a un singolo evento.`);
   }
 

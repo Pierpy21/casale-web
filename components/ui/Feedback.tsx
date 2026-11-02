@@ -1,19 +1,29 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 
+export type EmptyStateVariant = "dashed" | "plain";
+
+/** Bordo del contenitore: "dashed" (default) o "plain" senza bordo visibile. */
+const EMPTY_STATE_BORDER: Record<EmptyStateVariant, string> = {
+  dashed: "border-dashed border-slate/40",
+  plain: "border-transparent",
+};
+
 export interface EmptyStateProps {
   title: string;
   description?: string;
   action?: ReactNode;
   icon?: ReactNode;
+  variant?: EmptyStateVariant;
   className?: string;
 }
 
-export function EmptyState({ title, description, action, icon, className }: EmptyStateProps) {
+export function EmptyState({ title, description, action, icon, variant = "dashed", className }: EmptyStateProps) {
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-3 rounded-[2px] border border-dashed border-slate/40 bg-paper px-6 py-12 text-center",
+        "flex flex-col items-center gap-3 rounded-[2px] border bg-paper px-6 py-12 text-center",
+        EMPTY_STATE_BORDER[variant],
         className,
       )}
     >

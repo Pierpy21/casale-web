@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Printer } from "lucide-react";
-import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import { assignBookingRoom, assignBookingTable } from "@/app/actions/bookings";
+import { ReservationSheetButton } from "@/components/agenda/ReservationSheetButton";
 import { clientFullName, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
 import { Select } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
-import { DocumentDownload } from "@/components/ui/DocumentDownload";
 import { FIELD_BASE, FIELD_TEXT, borderClass } from "@/components/ui/Input";
 import { submitMutation, updatedAtOf } from "@/lib/offline/submit";
-import { DOCX_MIME } from "@/lib/quote-utils";
 import type { BookingListItem, Room } from "@/lib/types";
 
 /** Sopra questo numero di sale il selettore diventa una tendina: i chip andrebbero su troppe righe. */
@@ -57,16 +55,12 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
   const [tableOverrides, setTableOverrides] = useState<Record<string, TableOverride>>({});
   /** Testo del campo Tavolo mentre si modifica (prima del salvataggio). */
   const [tableDrafts, setTableDrafts] = useState<Record<string, string>>({});
-  const [menuOpen, setMenuOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const inFlight = useRef(new Set<string>());
   const tableInFlight = useRef(new Set<string>());
   /** Bozza digitata mentre il salvataggio del tavolo della stessa riga è in volo: applicata a fine invio. */
   const pendingDraft = useRef(new Map<string, string>());
-  const menuId = useId();
-  const menuWrapRef = useRef<HTMLDivElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const activeRooms = rooms.filter((room) => room.active).sort((a, b) => a.sort - b.sort);
   const sorted = [...bookings].sort(byTimeThenName);
@@ -108,28 +102,6 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
       }
     });
   };
-
-  // Chiusura del foglio: clic/tocco fuori o Escape (il focus torna al pulsante). Listener solo mentre è aperto.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointer = (event: Event) => {
-      if (!menuWrapRef.current?.contains(event.target as Node)) setMenuOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-        menuButtonRef.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("touchstart", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("touchstart", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menuOpen]);
 
   const removeDraft = (id: string) => {
     setTableDrafts((prev) => {
@@ -222,8 +194,6 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
     saveTable(booking, parsed.value, updatedAtOf(booking));
   };
 
-  const documentDate = encodeURIComponent(date);
-
   return (
     <section aria-labelledby="prenotazioni-titolo" className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-b border-sand pb-2">
@@ -234,44 +204,7 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
           <span className="text-[13px] text-slate-dark tabular-nums">
             {sorted.length} {sorted.length === 1 ? "prenotazione" : "prenotazioni"}
           </span>
-          {canAssign && (
-            <div ref={menuWrapRef} className="relative">
-              <button
-                ref={menuButtonRef}
-                type="button"
-                aria-haspopup="true"
-                aria-expanded={menuOpen}
-                aria-controls={menuOpen ? menuId : undefined}
-                onClick={() => setMenuOpen((open) => !open)}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-field-edge bg-field px-2.5 py-1.5 text-[13px] leading-snug text-ink transition-colors duration-150 hover:border-field-edge-hover hover:bg-cream/60"
-              >
-                <Printer aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.75} />
-                Foglio prenotazioni
-              </button>
-              {menuOpen && (
-                <div id={menuId} className="absolute right-0 z-10 mt-1.5 flex min-w-36 flex-col gap-0.5 rounded-lg border border-field-edge bg-paper p-1.5 shadow-md">
-                  <DocumentDownload
-                    href={`/api/reservations/pdf?date=${documentDate}`}
-                    fileName={`prenotazioni-${date}.pdf`}
-                    mimeType="application/pdf"
-                    onActivate={() => setMenuOpen(false)}
-                    className="rounded-md px-3 py-2 text-[14px] text-ink transition-colors duration-150 hover:bg-cream/60"
-                  >
-                    PDF
-                  </DocumentDownload>
-                  <DocumentDownload
-                    href={`/api/reservations/docx?date=${documentDate}`}
-                    fileName={`prenotazioni-${date}.docx`}
-                    mimeType={DOCX_MIME}
-                    onActivate={() => setMenuOpen(false)}
-                    className="rounded-md px-3 py-2 text-[14px] text-ink transition-colors duration-150 hover:bg-cream/60"
-                  >
-                    Word
-                  </DocumentDownload>
-                </div>
-              )}
-            </div>
-          )}
+          {canAssign && <ReservationSheetButton date={date} />}
         </div>
       </div>
 
@@ -322,76 +255,81 @@ export function ReservationList({ bookings, rooms, date, canAssign }: Reservatio
               </div>
 
               {canAssign ? (
-                <div className="flex min-w-0 items-start gap-3">
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    {inactiveCurrent && (
-                      <p className="text-[13px] text-slate-dark">
-                        Sala attuale: <span className="text-ink">{inactiveCurrent.name} (non attiva)</span>
-                      </p>
-                    )}
-                    {options.length > CHIP_LIMIT ? (
-                      <div className="flex min-w-0 items-center gap-2 text-[13px] text-slate-dark">
-                        <span className="shrink-0">Sala</span>
-                        <Select
-                          aria-label={`Sala per ${title}`}
-                          value={currentId ?? ""}
-                          onChange={(e) => assign(booking, e.target.value === "" ? null : e.target.value)}
-                          wrapperClassName="w-56 min-w-0 max-w-full"
-                        >
-                          <option value="">Nessuna</option>
-                          {inactiveCurrent && (
-                            <option value={inactiveCurrent.id} disabled>
-                              {inactiveCurrent.name} (non attiva)
-                            </option>
-                          )}
-                          {options.map((room) => (
-                            <option key={room.id} value={room.id}>
-                              {room.name}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                    ) : (
-                      <div role="group" aria-label={`Sala per ${title}`} className="flex min-w-0 flex-col gap-1.5">
-                        <span aria-hidden="true" className="text-[10px] font-medium uppercase tracking-[0.12em] text-bronze">
-                          Sala
-                        </span>
-                        <div className="flex min-w-0 flex-wrap gap-1.5">
-                          <RoomChip selected={currentId === null} onSelect={() => assign(booking, null)}>
-                            Nessuna
-                          </RoomChip>
-                          {options.map((room) => (
-                            <RoomChip key={room.id} selected={currentId === room.id} onSelect={() => assign(booking, room.id)}>
-                              {room.name}
-                            </RoomChip>
-                          ))}
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  {inactiveCurrent && (
+                    <p className="text-[13px] text-slate-dark">
+                      Sala attuale: <span className="text-ink">{inactiveCurrent.name} (non attiva)</span>
+                    </p>
+                  )}
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      {options.length > CHIP_LIMIT ? (
+                        <div className="flex min-w-0 flex-col gap-1.5">
+                          <span aria-hidden="true" className="text-[10px] font-medium uppercase tracking-[0.12em] text-bronze">
+                            Sala
+                          </span>
+                          <Select
+                            aria-label={`Sala per ${title}`}
+                            value={currentId ?? ""}
+                            onChange={(e) => assign(booking, e.target.value === "" ? null : e.target.value)}
+                            wrapperClassName="w-full min-w-0 max-w-48"
+                            className="h-11! py-0!"
+                          >
+                            <option value="">Nessuna</option>
+                            {inactiveCurrent && (
+                              <option value={inactiveCurrent.id} disabled>
+                                {inactiveCurrent.name} (non attiva)
+                              </option>
+                            )}
+                            {options.map((room) => (
+                              <option key={room.id} value={room.id}>
+                                {room.name}
+                              </option>
+                            ))}
+                          </Select>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      ) : (
+                        <div role="group" aria-label={`Sala per ${title}`} className="flex min-w-0 flex-col gap-1.5">
+                          <span aria-hidden="true" className="text-[10px] font-medium uppercase tracking-[0.12em] text-bronze">
+                            Sala
+                          </span>
+                          <div className="flex min-w-0 flex-wrap gap-1.5">
+                            <RoomChip selected={currentId === null} onSelect={() => assign(booking, null)}>
+                              Nessuna
+                            </RoomChip>
+                            {options.map((room) => (
+                              <RoomChip key={room.id} selected={currentId === room.id} onSelect={() => assign(booking, room.id)}>
+                                {room.name}
+                              </RoomChip>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="flex w-20 shrink-0 flex-col gap-1.5">
-                    <span aria-hidden="true" className="text-[10px] font-medium uppercase tracking-[0.12em] text-bronze">
-                      Tavolo
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      maxLength={TABLE_MAX_DIGITS}
-                      placeholder="N°"
-                      aria-label={`Tavolo per ${title}`}
-                      value={tableText}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, "").slice(0, TABLE_MAX_DIGITS);
-                        setTableDrafts((prev) => ({ ...prev, [booking.id]: digits }));
-                      }}
-                      onBlur={() => commitTable(booking)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") e.currentTarget.blur();
-                      }}
-                      className={cn(FIELD_BASE, FIELD_TEXT, borderClass(false), "text-center tabular-nums")}
-                    />
+                    <div className="flex w-20 shrink-0 flex-col gap-1.5">
+                      <span aria-hidden="true" className="text-[10px] font-medium uppercase tracking-[0.12em] text-bronze">
+                        Tavolo
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        maxLength={TABLE_MAX_DIGITS}
+                        placeholder="N°"
+                        aria-label={`Tavolo per ${title}`}
+                        value={tableText}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, "").slice(0, TABLE_MAX_DIGITS);
+                          setTableDrafts((prev) => ({ ...prev, [booking.id]: digits }));
+                        }}
+                        onBlur={() => commitTable(booking)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                        }}
+                        className={cn(FIELD_BASE, FIELD_TEXT, borderClass(false), "text-center tabular-nums")}
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (

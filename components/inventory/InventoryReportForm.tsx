@@ -1,11 +1,11 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent, type KeyboardEvent } from "react";
 import { createInventoryProduct, submitInventoryReport } from "@/app/actions/inventory";
 import { Alert, Button, Field, Input, cn } from "@/components/ui";
-import { compareInventoryProducts } from "@/lib/inventory-utils";
+import { compareInventoryProducts, INVENTORY_CATEGORY_COLORS } from "@/lib/inventory-utils";
 import { isQueued, submitMutation } from "@/lib/offline/submit";
 import {
   INVENTORY_CATEGORIES,
@@ -25,6 +25,7 @@ import {
   type InventoryDraftCount,
 } from "./inventory-draft";
 import { normalizeSearchText } from "./inventory-search";
+import { InventoryGroupChips } from "./InventoryGroupChips";
 import { InventoryGroupGrid } from "./InventoryGroupGrid";
 import { useIsTablet } from "./use-is-tablet";
 
@@ -143,11 +144,11 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
 
   // Griglia/gruppo solo su tablet e senza ricerca; con una ricerca attiva si torna alla lista filtrata.
   const tileMode = isTablet && !searching;
-  const activeIndex = groups.findIndex((g) => g.key === activeKey);
-  const activeGroup = activeIndex >= 0 ? groups[activeIndex] : undefined;
-  const prevGroup = activeIndex > 0 ? groups[activeIndex - 1] : undefined;
-  const nextGroup = activeIndex >= 0 && activeIndex < groups.length - 1 ? groups[activeIndex + 1] : undefined;
-  const tiles = groups.map((g) => ({ key: g.key, label: g.label, total: g.all.length, filled: g.filled }));
+  const activeGroup = groups.find((g) => g.key === activeKey);
+  // Colore per categoria (cucina); per fornitore (admin) nessun colore: resta il look neutro.
+  const colorOf = (g: Group) => (g.category ? INVENTORY_CATEGORY_COLORS[g.category] : undefined);
+  const tiles = groups.map((g) => ({ key: g.key, label: g.label, total: g.all.length, filled: g.filled, color: colorOf(g) }));
+  const activeColor = activeGroup ? colorOf(activeGroup) : undefined;
   const backLabel = groupBy === "supplier" ? "Tutti i fornitori" : "Tutte le categorie";
 
   const isOpen = (key: string) => searching || openGroups.has(key);
@@ -364,12 +365,19 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
 
         {tileMode && activeGroup && (
           <section aria-labelledby="inventory-group-title" className="flex min-w-0 flex-col gap-4">
-            <Button variant="outline" size="md" onClick={() => selectGroup(null)} disabled={pending} className="min-h-11 max-w-full self-start">
-              <ChevronLeft aria-hidden="true" className="size-4 shrink-0" />
-              <span className="truncate">{backLabel}</span>
-            </Button>
+            {/* Pillole degli altri gruppi: "Tutte" torna alla griglia, la pillola attiva resta visibile e centrata. */}
+            <InventoryGroupChips
+              groups={tiles}
+              activeKey={activeGroup.key}
+              allLabel={backLabel}
+              onShowAll={() => selectGroup(null)}
+              onSelect={(key) => selectGroup(key)}
+              disabled={pending}
+            />
 
-            <div className="flex min-w-0 flex-col gap-1 border-b border-sand pb-3">
+            <div className={cn("relative flex min-w-0 flex-col gap-1 border-b border-sand pb-3", activeColor && "pl-4")}>
+              {/* Striscia del colore della categoria, accanto a titolo e conteggio. */}
+              {activeColor && <span aria-hidden="true" className={cn("absolute inset-y-1 left-0 w-1.5 rounded-full", activeColor.accent)} />}
               <h2 id="inventory-group-title" ref={groupTitleRef} tabIndex={-1} className="wrap-anywhere font-serif text-3xl leading-tight text-ink outline-none">
                 {activeGroup.label}
               </h2>
@@ -395,27 +403,6 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
               onCreate={createProduct}
               disabled={pending}
             />
-
-            {(prevGroup || nextGroup) && (
-              <nav aria-label="Altri gruppi" className="grid grid-cols-2 gap-3">
-                {prevGroup ? (
-                  <Button variant="outline" size="md" onClick={() => selectGroup(prevGroup.key)} disabled={pending} className="min-h-11 min-w-0">
-                    <ChevronLeft aria-hidden="true" className="size-4 shrink-0" />
-                    <span className="truncate">{prevGroup.label}</span>
-                  </Button>
-                ) : (
-                  <span />
-                )}
-                {nextGroup ? (
-                  <Button variant="outline" size="md" onClick={() => selectGroup(nextGroup.key)} disabled={pending} className="min-h-11 min-w-0">
-                    <span className="truncate">{nextGroup.label}</span>
-                    <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
-                  </Button>
-                ) : (
-                  <span />
-                )}
-              </nav>
-            )}
           </section>
         )}
 

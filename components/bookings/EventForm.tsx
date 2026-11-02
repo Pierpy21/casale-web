@@ -82,7 +82,6 @@ export interface EventFormProps {
 
 interface EventValues {
   event_date: string;
-  event_name: string;
   eventType: EventTypeState;
   event_time: string;
   status: BookingStatus;
@@ -102,7 +101,6 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
   if (!booking) {
     return {
       event_date: initialDate,
-      event_name: "",
       eventType: { choice: "", custom: "" },
       event_time: "",
       status: "opzione",
@@ -120,7 +118,6 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
   }
   return {
     event_date: booking.event_date,
-    event_name: booking.event_name ?? "",
     eventType: eventTypeState(booking.event_type),
     event_time: timeInputValue(booking.event_time),
     status: booking.status,
@@ -289,7 +286,6 @@ export function EventForm({
       Object.assign(local, validateNewClient(newClient));
     }
     if (!values.event_date) add("event_date", "Data obbligatoria");
-    if (!values.event_name.trim()) add("event_name", "Inserisci il nome dell’evento");
     if (!eventType) add("event_type", "Scegli il tipo di evento");
     if (covers < 1) add("adults", "Indicare almeno un coperto");
     if (values.kids_menus > values.children) add("kids_menus", "I menù bambini non possono superare i bambini");
@@ -316,7 +312,6 @@ export function EventForm({
         : isAdmin && linkedClient
           ? { client_id: linkedClient.id }
           : { new_client: newClientPayload(newClient) }),
-      event_name: values.event_name.trim(),
       event_type: eventType,
       event_date: values.event_date,
       event_time: values.event_time || null,
@@ -420,19 +415,6 @@ export function EventForm({
 
           <FormCard label="Evento">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <Field label="Nome evento" htmlFor="event-name" required error={first(errors.event_name)} className="sm:col-span-2">
-                <Input
-                  id="event-name"
-                  autoComplete="off"
-                  invalid={!!errors.event_name}
-                  aria-describedby={describedBy("event-name", !!errors.event_name, false)}
-                  value={values.event_name}
-                  onChange={(e) => change({ event_name: e.target.value })}
-                  placeholder="es. Matrimonio Rossi"
-                  maxLength={200}
-                />
-              </Field>
-
               <Field label="Tipo evento" htmlFor="event-type" required error={first(errors.event_type)}>
                 <Select
                   id="event-type"

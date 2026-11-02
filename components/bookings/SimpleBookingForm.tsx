@@ -230,8 +230,6 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
         : isAdmin && linkedClient
           ? { client_id: linkedClient.id }
           : { new_client: newClientPayload(newClient) }),
-      // Gli appuntamenti non hanno più un titolo: in agenda compare il cliente. In modifica resta quello già salvato.
-      event_name: isAppointment ? (booking?.event_name ?? null) : null,
       event_type: isAppointment ? eventType : null,
       event_date: values.event_date,
       event_time: values.event_time || null,

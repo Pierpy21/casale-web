@@ -96,7 +96,7 @@ rooms(id uuid, name text unique, capacity int, sort int, active bool)
 menus(id uuid, name text, season text, price_per_person numeric(10,2), is_kids bool, active bool, sort int)
 menu_items(id uuid, menu_id fk, course course_type, name text, sort int)
   course_type = 'antipasto'|'primo'|'secondo'|'contorno'|'dolce'|'bevande'
-bookings(id uuid, client_id fk, event_name text?, event_date date!, event_time time?, room_id fk,
+bookings(id uuid, client_id fk, event_date date!, event_time time?, room_id fk,
          adults int>=0, children int>=0, kids_menus int>=0 (<= children), menu_id fk?, kids_menu_id fk?,
          setup_colors text[], setup_notes text?, status 'opzione'|'confermato'|'annullato', notes text?,
          created_by, updated_by, created_at, updated_at)
