@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 type SearchParams = Promise<{ q?: string }>;
 
 function fullName(c: Pick<ClientWithStats, "first_name" | "last_name">): string {
-  return `${c.first_name} ${c.last_name}`;
+  return `${c.first_name} ${c.last_name ?? ""}`.trim();
 }
 
 function taxIds(c: Pick<ClientWithStats, "tax_code" | "vat_number">): string {
@@ -117,7 +117,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                         {fullName(c)}
                       </Link>
                     </th>
-                    <td className="px-4 py-3 tabular-nums text-slate-dark">{c.phone}</td>
+                    <td className="px-4 py-3 tabular-nums text-slate-dark">{c.phone || "—"}</td>
                     <td className="px-4 py-3 text-slate-dark">{c.email ?? "—"}</td>
                     <td className="px-4 py-3 font-mono text-[13px] text-slate-dark">{taxIds(c)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{c.bookings_count}</td>
@@ -136,7 +136,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                   className="flex flex-col gap-2 border border-sand bg-paper p-4 transition-colors duration-200 hover:border-petrol/60 hover:bg-cream/40"
                 >
                   <span className="font-serif text-xl leading-tight text-ink">{fullName(c)}</span>
-                  <span className="text-[14px] tabular-nums text-slate-dark">{c.phone}</span>
+                  {c.phone && <span className="text-[14px] tabular-nums text-slate-dark">{c.phone}</span>}
                   {c.email && <span className="truncate text-[14px] text-slate-dark">{c.email}</span>}
                   <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 border-t border-sand pt-2 text-[12px] font-medium uppercase tracking-[0.12em] text-bronze">
                     <span>

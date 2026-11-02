@@ -130,10 +130,17 @@ async function planClient(db: PocketBase, input: BookingInputType, batch: Batch)
   }
   const wanted = input.new_client;
   if (!wanted) throw new UserFacingError("Indica il cliente");
+  // Il riuso per telefono vale solo se il telefono ha cifre: senza telefono ogni cliente nuovo è distinto
+  // (altrimenti si aggancherebbe a un cliente qualunque che non ha il telefono).
   const phoneDigits = normalizePhone(wanted.phone);
-  const clients = await listAll(db, "clients", "", { fields: "id,phone" });
-  const match = clients.find((c) => normalizePhone(String(c.phone ?? "")) === phoneDigits);
-  if (match) return match.id;
+  if (phoneDigits) {
+    const clients = await listAll(db, "clients", "", { fields: "id,phone" });
+    const match = clients.find((c) => {
+      const digits = normalizePhone(String(c.phone ?? ""));
+      return digits !== "" && digits === phoneDigits;
+    });
+    if (match) return match.id;
+  }
 
   const clientId = generateRecordId();
   batch.collection("clients").create({
@@ -521,7 +528,7 @@ export async function deleteBookingRecord(db: PocketBase, id: string, actor: Act
   ]);
   const clientId = nn(booking.client);
   const client = clientId ? await fetchOne(db, "clients", clientId) : null;
-  const clientName = client ? `${client.first_name} ${client.last_name}` : "cliente sconosciuto";
+  const clientName = client ? `${client.first_name} ${client.last_name ?? ""}`.trim() : "cliente sconosciuto";
   const label = `Prenotazione del ${toDateOnly(booking.event_date)} — ${clientName}`;
   const linked = [
     quotes.length > 0 ? `${quotes.length} ${quotes.length === 1 ? "preventivo" : "preventivi"}` : null,

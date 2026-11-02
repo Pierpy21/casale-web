@@ -1,16 +1,18 @@
 "use client";
 
 import { addDays, endOfWeek } from "date-fns";
-import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { getWeekOccupancy } from "@/app/actions/dashboard";
 import { capitalize, formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
+import { SwipeDay } from "@/components/agenda/SwipeDay";
 import { DayBookingsDisclosure } from "@/components/dashboard/DayBookingsDisclosure";
+import { DaySelector } from "@/components/dashboard/DaySelector";
 import { RoomDayView } from "@/components/dashboard/RoomDayView";
 import { RoomOccupancyMatrix } from "@/components/dashboard/RoomOccupancyMatrix";
+import { SelectedDayHeading } from "@/components/dashboard/SelectedDayHeading";
 import { WeekNav } from "@/components/dashboard/WeekNav";
 import { resolveWeekStart, weekLabel, weekRange } from "@/components/dashboard/week";
-import { StatusLegend } from "@/components/ui";
+import { PageHeader, StatusLegend } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import type { BookingListItem, Room } from "@/lib/types";
 
@@ -29,8 +31,8 @@ export interface WeekOccupancyProps {
   initialDays: string[];
   initialBookings: BookingListItem[];
   initialSelectedDay: string;
-  /** Prenotazioni normali di oggi (per la tendina su desktop, indipendente dalla settimana mostrata). */
-  todayNormalBookings: BookingListItem[];
+  /** Sezioni successive della dashboard (indicatori, prossimi eventi, eliminazioni), già renderizzate dal server. */
+  children?: ReactNode;
 }
 
 /** Sostituisce il solo parametro di query senza navigazione Next, senza scroll. */
@@ -47,6 +49,10 @@ function daysOf(weekStart: string): string[] {
   return weekRange(resolveWeekStart(weekStart, weekStart)).days;
 }
 
+/**
+ * Intestazione della dashboard e sezione "Occupazione sale" (settimana, giorno selezionato, sale).
+ * Possiede lo stato di settimana e giorno: per questo il titolo e le prenotazioni del giorno stanno qui.
+ */
 export function WeekOccupancy({
   rooms,
   todayIso,
@@ -55,7 +61,7 @@ export function WeekOccupancy({
   initialDays,
   initialBookings,
   initialSelectedDay,
-  todayNormalBookings,
+  children,
 }: WeekOccupancyProps) {
   const [data, setData] = useState<WeekData>({
     weekStart: initialWeekStart,
@@ -94,9 +100,11 @@ export function WeekOccupancy({
     };
   }, [requestedWeek, cache]);
 
-  function goToWeek(target: string) {
+  /** Cambia settimana; `preferredDay` (se appartiene alla settimana) diventa il giorno selezionato. */
+  function goToWeek(target: string, preferredDay?: string) {
     const days = daysOf(target);
-    const nextDay = days.includes(todayIso) ? todayIso : days[0];
+    let nextDay = days.includes(todayIso) ? todayIso : days[0];
+    if (preferredDay && days.includes(preferredDay)) nextDay = preferredDay;
     latestRequest.current = target;
     setRequestedWeek(target);
     setSelectedDay(nextDay);
@@ -139,81 +147,92 @@ export function WeekOccupancy({
   const requestedEnd = endOfWeek(requestedStart, { weekStartsOn: 1 });
   const isCurrentWeek = requestedWeek === currentWeekIso;
 
-  // La matrice e la vista giorno mostrano solo gli eventi; le prenotazioni normali stanno nella tendina.
+  /** Swipe orizzontale: sposta il giorno selezionato di uno, cambiando settimana quando si esce dal bordo. */
+  function shiftDay(delta: number) {
+    const target = toISO(addDays(toDate(selectedDay), delta));
+    if (daysOf(requestedWeek).includes(target)) selectDay(target);
+    else goToWeek(toISO(addDays(requestedStart, delta * 7)), target);
+  }
+
+  // La matrice e la vista giorno mostrano solo gli eventi; le prenotazioni normali stanno nella tendina del giorno.
   const eventBookings = data.bookings.filter((b) => b.kind === "evento");
   const selectedNormalBookings = data.bookings.filter((b) => b.kind === "normale" && b.event_date === selectedDay);
+  const selectedDayShort = capitalize(formatIt(toDate(selectedDay), "EEE d MMMM"));
   const selectedDayLabel = capitalize(formatIt(toDate(selectedDay), "EEEE d MMMM"));
-  const todayLabel = `Oggi · ${formatIt(toDate(todayIso), "d MMMM")}`;
 
   return (
-    <section aria-labelledby="sale-settimana" className="flex min-w-0 flex-col gap-5">
-      <div className="flex flex-col gap-4 border-b border-sand pb-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-1">
-          <p aria-live="polite" className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
-            {weekLabel(requestedStart, toDate(currentWeekIso))}
-          </p>
-          <h2 id="sale-settimana" className="text-2xl">
-            Occupazione sale
-          </h2>
-          <p aria-live="polite" className="flex items-center gap-2 text-[13px] text-slate-dark">
-            <span>
-              {formatIt(requestedStart, "d MMMM")} – {formatIt(requestedEnd, "d MMMM yyyy")}
-            </span>
-            <span
-              aria-hidden="true"
-              className={cn(
-                "inline-block size-1.5 rounded-full bg-bronze transition-opacity duration-200",
-                isPending ? "animate-pulse opacity-100" : "opacity-0",
-              )}
-            />
-          </p>
-        </div>
-        <WeekNav
-          onPrev={() => goToWeek(toISO(addDays(requestedStart, -7)))}
-          onNext={() => goToWeek(toISO(addDays(requestedStart, 7)))}
-          onToday={() => goToWeek(currentWeekIso)}
-          isCurrentWeek={isCurrentWeek}
-        />
-      </div>
+    <>
+      <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
 
-      {error && (
-        <p role="alert" className="rounded-btn border border-warning/60 bg-warning/10 px-4 py-2 text-[13px] text-ink">
-          {error}
-        </p>
-      )}
-
-      <StatusLegend />
-
-      <div className={cn("flex min-w-0 flex-col transition-opacity duration-200", isPending && "opacity-60")}>
-        <div className="hidden min-w-0 lg:block">
-          <RoomOccupancyMatrix rooms={rooms} days={data.days} bookings={eventBookings} />
-        </div>
-
-        <div className="min-w-0 lg:hidden">
-          <RoomDayView
-            rooms={rooms}
-            days={data.days}
-            selectedDay={selectedDay}
-            todayIso={todayIso}
-            bookings={eventBookings}
-            onSelectDay={selectDay}
+      <section aria-labelledby="sale-settimana" className="flex min-w-0 flex-col gap-5">
+        <div className="flex flex-col gap-4 border-b border-sand pb-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p aria-live="polite" className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+              {weekLabel(requestedStart, toDate(currentWeekIso))}
+            </p>
+            <h2 id="sale-settimana" className="text-2xl">
+              Occupazione sale
+            </h2>
+            <p aria-live="polite" className="flex items-center gap-2 text-[13px] text-slate-dark">
+              <span>
+                {formatIt(requestedStart, "d MMMM")} – {formatIt(requestedEnd, "d MMMM yyyy")}
+              </span>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "inline-block size-1.5 rounded-full bg-bronze transition-opacity duration-200",
+                  isPending ? "animate-pulse opacity-100" : "opacity-0",
+                )}
+              />
+            </p>
+          </div>
+          <WeekNav
+            onPrev={() => goToWeek(toISO(addDays(requestedStart, -7)))}
+            onNext={() => goToWeek(toISO(addDays(requestedStart, 7)))}
+            onToday={() => goToWeek(currentWeekIso)}
+            isCurrentWeek={isCurrentWeek}
           />
         </div>
-      </div>
 
-      <div className="min-w-0 lg:hidden">
-        <DayBookingsDisclosure dayLabel={selectedDayLabel} bookings={selectedNormalBookings} />
-      </div>
-      <div className="hidden min-w-0 lg:block">
-        <DayBookingsDisclosure dayLabel={todayLabel} bookings={todayNormalBookings} />
-      </div>
+        {error && (
+          <p role="alert" className="rounded-btn border border-warning/60 bg-warning/10 px-4 py-2 text-[13px] text-ink">
+            {error}
+          </p>
+        )}
 
-      <p className="text-[13px] text-slate-dark">
-        Le sale piene sono occupate: coperti sulla capienza. Tocca o clicca per aprire la prenotazione.{" "}
-        <Link href="/admin/catalogo" className="font-medium text-petrol underline-offset-2 hover:underline">
-          Gestisci sale e menù
-        </Link>
-      </p>
-    </section>
+        <StatusLegend />
+
+        {/* Swipe orizzontale sull'area: cambia giorno (e settimana al bordo). Le matrici scorribili con il dito non lo attivano. */}
+        <div className={cn("flex min-w-0 flex-col transition-opacity duration-200", isPending && "opacity-60")}>
+          <SwipeDay onPrev={() => shiftDay(-1)} onNext={() => shiftDay(1)}>
+            <div className="flex min-w-0 flex-col gap-5">
+              <div className="desk:hidden">
+                <DaySelector
+                  days={data.days}
+                  selectedDay={selectedDay}
+                  todayIso={todayIso}
+                  bookings={eventBookings}
+                  onSelectDay={selectDay}
+                />
+              </div>
+
+              <SelectedDayHeading selectedDay={selectedDay} todayIso={todayIso} rooms={rooms} bookings={eventBookings} />
+
+              <div className="hidden min-w-0 desk:block">
+                <RoomOccupancyMatrix rooms={rooms} days={data.days} bookings={eventBookings} />
+              </div>
+
+              <div className="min-w-0 desk:hidden">
+                <RoomDayView rooms={rooms} selectedDay={selectedDay} bookings={eventBookings} />
+              </div>
+            </div>
+          </SwipeDay>
+        </div>
+      </section>
+
+      <DayBookingsDisclosure dayLabel={selectedDayLabel} bookings={selectedNormalBookings} className="min-w-0" />
+
+      {children}
+    </>
   );
 }

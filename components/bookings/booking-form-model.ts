@@ -102,10 +102,13 @@ export function validateAllergies(rows: AllergyRow[]): Errors {
 // Cliente nuovo
 // ---------------------------------------------------------------------------
 
+/** Unico campo obbligatorio del cliente nella prenotazione: il nome. Cellulare ed email sono facoltativi (formato controllato dal server). */
 export function validateNewClient(c: NewClientDraft): Errors {
   const errors: Errors = {};
   if (!c.full_name.trim()) errors["new_client.full_name"] = ["Inserisci il nome del cliente"];
-  if (c.phone.trim().length < 6) errors["new_client.phone"] = ["Telefono obbligatorio (minimo 6 caratteri)"];
+  // Formato solo se il cellulare è compilato (vuoto = nessun cellulare).
+  const phone = c.phone.trim();
+  if (phone && phone.length < 6) errors["new_client.phone"] = ["Telefono troppo corto (minimo 6 caratteri)"];
   return errors;
 }
 

@@ -88,8 +88,8 @@ export async function searchClients(query: string): Promise<ActionResult<ClientS
 function clientFields(data: ClientInputType) {
   return {
     first_name: data.first_name,
-    last_name: data.last_name,
-    phone: data.phone,
+    last_name: data.last_name ?? "",
+    phone: data.phone ?? "",
     email: data.email ?? "",
     tax_code: data.tax_code ?? "",
     vat_number: data.vat_number ?? "",

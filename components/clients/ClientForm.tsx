@@ -133,13 +133,12 @@ export function ClientForm({ mode, client }: ClientFormProps) {
           />
         </Field>
 
-        <Field label="Cognome" htmlFor="last_name" required error={fieldErrors.last_name}>
+        <Field label="Cognome" htmlFor="last_name" error={fieldErrors.last_name}>
           <Input
             id="last_name"
             name="last_name"
             defaultValue={client?.last_name ?? ""}
             autoComplete="family-name"
-            required
             invalid={!!fieldErrors.last_name}
             aria-describedby={describedBy("last_name")}
           />
@@ -148,9 +147,8 @@ export function ClientForm({ mode, client }: ClientFormProps) {
         <Field
           label="Telefono"
           htmlFor="phone"
-          required
           error={fieldErrors.phone}
-          hint="Numero per contatti e conferme."
+          hint="Facoltativo. Numero per contatti e conferme."
           className="sm:col-span-2"
         >
           <Input
@@ -161,7 +159,6 @@ export function ClientForm({ mode, client }: ClientFormProps) {
             defaultValue={client?.phone ?? ""}
             autoComplete="tel"
             placeholder="+39 340 000 0000"
-            required
             invalid={!!fieldErrors.phone}
             aria-describedby={describedBy("phone")}
           />

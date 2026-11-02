@@ -400,7 +400,7 @@ export function NewClientFields({
         )}
         {link?.linked && <ClientLinkChip client={link.linked} onClear={link.onClear} disabled={disabled} />}
       </Field>
-      <Field label="Cellulare" htmlFor="client-phone" required error={phoneError} hint="Es. +39 340 1234567">
+      <Field label="Cellulare" htmlFor="client-phone" error={phoneError} hint="Facoltativo · es. +39 340 1234567">
         <Input
           id="client-phone"
           type="tel"
@@ -495,7 +495,7 @@ export function ClientPicker({
                     <span className="wrap-anywhere font-medium text-ink">
                       {c.first_name} {c.last_name}
                     </span>
-                    <span className="text-[13px] text-slate-dark">{c.phone}</span>
+                    {c.phone && <span className="text-[13px] text-slate-dark">{c.phone}</span>}
                   </span>
                   {active && <Check aria-hidden="true" className="size-5 shrink-0 text-petrol" />}
                 </button>
@@ -569,7 +569,7 @@ export function ClientSection({
             <p className="wrap-anywhere font-medium text-ink">
               {selected.first_name} {selected.last_name}
             </p>
-            <p className="text-[14px] text-slate-dark">{selected.phone}</p>
+            {selected.phone && <p className="text-[14px] text-slate-dark">{selected.phone}</p>}
           </div>
           <Button variant="outline" size="sm" onClick={() => setPicking(true)} disabled={disabled}>
             Cambia cliente

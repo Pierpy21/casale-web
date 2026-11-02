@@ -22,15 +22,16 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
   if (!client) notFound();
 
   const bookings = await getClientBookings(client.id);
-  const name = `${client.first_name} ${client.last_name}`;
+  const name = `${client.first_name} ${client.last_name}`.trim();
   const newBookingHref = `/admin/prenotazioni/nuova?client=${client.id}`;
+  const contact = [client.phone ? `Telefono ${client.phone}` : null, client.email].filter(Boolean).join(" · ");
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow="Scheda cliente"
         title={name}
-        description={`Telefono ${client.phone}${client.email ? ` · ${client.email}` : ""}`}
+        description={contact || undefined}
         actions={
           <>
             <ButtonLink href="/admin/clienti" variant="ghost" size="sm">

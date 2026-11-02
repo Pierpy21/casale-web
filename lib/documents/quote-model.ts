@@ -48,7 +48,8 @@ export interface QuoteDocumentModel {
   };
   client: {
     fullName: string;
-    phone: string;
+    /** Cellulare facoltativo: null se non indicato (la riga non si stampa). */
+    phone: string | null;
     email: string | null;
     taxCode: string | null;
     vatNumber: string | null;
@@ -164,8 +165,8 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
       validUntil: q.valid_until ? formatDateShort(q.valid_until) : null,
     },
     client: {
-      fullName: `${b.client.first_name} ${b.client.last_name}`.trim(),
-      phone: b.client.phone,
+      fullName: `${b.client.first_name} ${b.client.last_name ?? ""}`.trim(),
+      phone: orNull(b.client.phone),
       email: orNull(b.client.email),
       taxCode: orNull(b.client.tax_code),
       vatNumber: orNull(b.client.vat_number),

@@ -255,6 +255,8 @@ export function EventForm({
   const cancelHref = isEdit && booking
     ? `/admin/prenotazioni/${booking.id}`
     : `/admin/agenda?date=${values.event_date || initialDate}&view=day`;
+  /** Data di ripiego se il campo data viene svuotato: quella dell'evento (in modifica) o quella iniziale. */
+  const dateFallback = booking?.event_date ?? initialDate;
 
   const toggleColor = (color: string) =>
     change({
@@ -285,9 +287,9 @@ export function EventForm({
     } else {
       Object.assign(local, validateNewClient(newClient));
     }
-    if (!values.event_date) add("event_date", "Data obbligatoria");
-    if (!eventType) add("event_type", "Scegli il tipo di evento");
-    if (covers < 1) add("adults", "Indicare almeno un coperto");
+    // Data: se il campo è stato svuotato si usa la data iniziale (l'evento ha sempre una data).
+    const eventDate = values.event_date || dateFallback;
+    if (!values.event_date) setValues((v) => ({ ...v, event_date: eventDate }));
     if (values.kids_menus > values.children) add("kids_menus", "I menù bambini non possono superare i bambini");
     Object.assign(local, validateAllergies(values.allergies));
 
@@ -313,7 +315,7 @@ export function EventForm({
           ? { client_id: linkedClient.id }
           : { new_client: newClientPayload(newClient) }),
       event_type: eventType,
-      event_date: values.event_date,
+      event_date: eventDate,
       event_time: values.event_time || null,
       room_id: values.room_id,
       adults: values.adults,
@@ -335,7 +337,7 @@ export function EventForm({
       focusFirstInvalid(formRef.current);
     };
 
-    const who = isEdit && booking ? `${booking.client.first_name} ${booking.client.last_name}` : newClient.full_name.trim();
+    const who = isEdit && booking ? `${booking.client.first_name} ${booking.client.last_name}`.trim() : newClient.full_name.trim();
 
     startTransition(async () => {
       if (isEdit && booking) {
@@ -363,7 +365,7 @@ export function EventForm({
       }
       // Offline: l'evento non ha ancora un id reale, quindi si torna all'agenda (in cache).
       if (isQueued(result)) {
-        router.push(`/admin/agenda?date=${values.event_date}&view=day`);
+        router.push(`/admin/agenda?date=${eventDate}&view=day`);
         return;
       }
       // Con preventivo creato si apre il preventivo; altrimenti la prenotazione (con eventuali avvisi).
@@ -415,7 +417,7 @@ export function EventForm({
 
           <FormCard label="Evento">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <Field label="Tipo evento" htmlFor="event-type" required error={first(errors.event_type)}>
+              <Field label="Tipo evento" htmlFor="event-type" error={first(errors.event_type)}>
                 <Select
                   id="event-type"
                   invalid={!!errors.event_type}

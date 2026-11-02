@@ -24,8 +24,14 @@ export function RoomOccupancyMatrix({ rooms, days, bookings }: RoomOccupancyMatr
     if (booking.room_id) byCell.set(`${booking.room_id}|${booking.event_date}`, booking);
   }
 
+  // Scroll orizzontale con il dito: touch-action dichiarato qui (il wrapper di SwipeDay ha solo pan-y) e tabIndex per la tastiera.
   return (
-    <div className="overflow-x-auto rounded-[2px] border border-sand bg-paper">
+    <div
+      role="region"
+      aria-label="Matrice delle sale, scorribile in orizzontale"
+      tabIndex={0}
+      className="min-w-0 touch-pan-x touch-pan-y overscroll-x-contain overflow-x-auto rounded-[2px] border border-sand bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol"
+    >
       <table className="w-full min-w-[860px] border-collapse text-[13px]">
         <caption className="sr-only">Occupazione delle sale nei giorni della settimana</caption>
         <thead>

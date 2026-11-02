@@ -7,7 +7,6 @@ import {
   INVENTORY_SUPPLIERS,
   PAYMENT_METHODS,
   SETUP_COLORS,
-  type BookingKind,
 } from "./types";
 
 // ---------------------------------------------------------------------
@@ -116,15 +115,23 @@ const finalTotalSchema = z.preprocess(
 // ---------------------------------------------------------------------
 // Cliente
 // ---------------------------------------------------------------------
-export const ClientInput = z.object({
-  first_name: z.string().trim().min(1, "Nome obbligatorio").max(MAX_TEXT, "Nome troppo lungo"),
-  last_name: z.string().trim().min(1, "Cognome obbligatorio").max(MAX_TEXT, "Cognome troppo lungo"),
-  phone: z
+/** Cellulare facoltativo: vuoto → null; se compilato deve avere formato e lunghezza validi. */
+const optPhone = z.preprocess(
+  emptyToNull,
+  z
     .string()
-    .trim()
-    .min(6, "Telefono obbligatorio (minimo 6 caratteri)")
+    .min(6, "Telefono troppo corto (minimo 6 caratteri)")
     .max(MAX_PHONE, "Telefono troppo lungo")
-    .regex(/^[+0-9 ()-]+$/, "Formato telefono non valido"),
+    .regex(/^[+0-9 ()-]+$/, "Formato telefono non valido")
+    .nullable(),
+);
+
+export const ClientInput = z.object({
+  /** Il nome è l'unico campo obbligatorio del cliente. */
+  first_name: z.string().trim().min(1, "Nome obbligatorio").max(MAX_TEXT, "Nome troppo lungo"),
+  /** Cognome facoltativo (vuoto → null). */
+  last_name: z.preprocess(emptyToNull, z.string().max(MAX_TEXT, "Cognome troppo lungo").nullable()),
+  phone: optPhone,
   email: z.preprocess(emptyToNull, z.email({ message: "Email non valida" }).nullable()),
   tax_code: z.preprocess(
     normalizeCode,
@@ -188,9 +195,11 @@ const coversShape = {
 /** Input del superRefine: i campi sono già numerici (intMin0) ma il tipo di input di preprocess li rende opzionali. */
 type Covers = { adults?: number; children?: number; kids_menus?: number };
 
-/** Regole coperti. `requireGuest` = false per gli appuntamenti (0 ospiti consentiti). */
-function checkCovers(v: Covers, ctx: z.RefinementCtx, requireGuest = true): void {
-  const adults = v.adults ?? 0;
+/**
+ * Regole coperti: nessun minimo di ospiti (0 adulti e 0 bambini sono consentiti per ogni tipo di prenotazione).
+ * Resta solo la coerenza: i menù bambini non possono superare i bambini.
+ */
+function checkCovers(v: Covers, ctx: z.RefinementCtx): void {
   const children = v.children ?? 0;
   const kidsMenus = v.kids_menus ?? 0;
   if (kidsMenus > children) {
@@ -200,22 +209,10 @@ function checkCovers(v: Covers, ctx: z.RefinementCtx, requireGuest = true): void
       path: ["kids_menus"],
     });
   }
-  if (requireGuest && adults + children < 1) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Indicare almeno un coperto",
-      path: ["adults"],
-    });
-  }
 }
 
 export const CoversInput = z.object(coversShape).superRefine((v, ctx) => checkCovers(v, ctx));
 export type CoversInputType = z.infer<typeof CoversInput>;
-
-/** Coperti validi per il tipo di prenotazione (appuntamenti: 0 consentiti). */
-export function coversInputFor(kind: BookingKind) {
-  return z.object(coversShape).superRefine((v, ctx) => checkCovers(v, ctx, kind !== "appuntamento"));
-}
 
 // ---------------------------------------------------------------------
 // Prenotazione
@@ -223,7 +220,7 @@ export function coversInputFor(kind: BookingKind) {
 /** Cliente nuovo inserito dentro la prenotazione (riusato se il telefono esiste gia'). */
 /**
  * Accetta "full_name" (campo unico del form) oppure first_name/last_name. Output: nome = prima parola,
- * cognome = il resto (vuoto se assente: il cognome non e' obbligatorio per i clienti creati al volo).
+ * cognome = il resto (vuoto se assente). Unico campo obbligatorio: il nome. Cellulare facoltativo (output "" se assente).
  */
 export const NewClientInput = z
   .object({
@@ -241,7 +238,7 @@ export const NewClientInput = z
   .transform((v) => {
     const source = v.full_name && v.full_name.length > 0 ? v.full_name : [v.first_name, v.last_name].filter(Boolean).join(" ");
     const [first = "", ...rest] = source.trim().split(/\s+/);
-    return { first_name: first, last_name: rest.join(" "), phone: v.phone, email: v.email ?? null };
+    return { first_name: first, last_name: rest.join(" "), phone: v.phone ?? "", email: v.email ?? null };
   });
 export type NewClientInputType = z.output<typeof NewClientInput>;
 
@@ -296,21 +293,18 @@ export const BookingInput = z
       issue("new_client", "Scegli un cliente esistente oppure inserisci un nuovo cliente, non entrambi");
     }
 
+    // Di tutti i tipi solo il nome del cliente è obbligatorio: tipo evento, ora e coperti sono facoltativi.
     if (v.kind === "evento") {
-      if (!v.event_type) issue("event_type", "Tipo evento obbligatorio");
       // Il menù è facoltativo: senza menù l'evento non ha copia piatti e il preventivo automatico ha 0 righe.
       checkCovers(v, ctx);
     } else if (v.kind === "normale") {
-      if (!v.event_time) issue("event_time", "Ora obbligatoria");
       if (v.menu_id || v.kids_menu_id) issue("menu_id", "Le prenotazioni normali non hanno menù");
       if (v.status === "opzione") issue("status", "Le prenotazioni normali non hanno lo stato Attesa");
       checkCovers(v, ctx);
     } else {
-      // appuntamento: incontro con il cliente, niente coperti obbligatori, niente menù.
-      if (!v.event_type) issue("event_type", "Tipo obbligatorio");
-      if (!v.event_time) issue("event_time", "Ora obbligatoria");
+      // appuntamento: incontro con il cliente, niente menù.
       if (v.menu_id || v.kids_menu_id) issue("menu_id", "Gli appuntamenti non hanno menù");
-      checkCovers(v, ctx, false);
+      checkCovers(v, ctx);
     }
   })
   .transform((v) => ({
@@ -562,7 +556,8 @@ export type QuoteInputType = z.infer<typeof QuoteInput>;
 
 /** Bozza di preventivo proposta insieme alla prenotazione evento (createBooking con create_quote). */
 export const QuoteDraftInput = z.object({
-  lines: z.array(QuoteLineInput).min(1, "Almeno una riga").max(MAX_ITEMS, "Troppe righe (massimo 60)"),
+  /** Righe facoltative: un evento senza menù e senza voci crea un preventivo vuoto (come quello automatico). */
+  lines: z.array(QuoteLineInput).max(MAX_ITEMS, "Troppe righe (massimo 60)"),
   discount: z.preprocess(toNumber, z.number(numberError("Sconto non valido")).min(0, "Lo sconto non può essere negativo").transform(round2)).default(0),
   vat_rate: z.preprocess(toNumber, z.number(numberError("IVA non valida")).min(0, "IVA non valida").max(100, "IVA non valida").transform(round2)).default(10),
   /** Prezzo finale concordato (IVA inclusa): se presente sostituisce il totale calcolato (lo sconto non si applica). */

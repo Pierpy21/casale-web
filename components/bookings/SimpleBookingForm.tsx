@@ -188,6 +188,8 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
   const cancelHref = isEdit && booking
     ? `/admin/prenotazioni/${booking.id}`
     : `/admin/agenda?date=${values.event_date || initialDate}&view=day`;
+  /** Data di ripiego se il campo data viene svuotato: quella della prenotazione (in modifica) o quella iniziale. */
+  const dateFallback = booking?.event_date ?? initialDate;
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -203,16 +205,14 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
     } else {
       Object.assign(local, validateNewClient(newClient));
     }
-    if (!values.event_date) add("event_date", "Data obbligatoria");
-    if (!values.event_time) add("event_time", "Indica l’ora");
-    if (isAppointment) {
-      if (!eventType) add("event_type", "Scegli il tipo");
-    } else {
-      if (covers < 1) add("adults", "Indicare almeno un coperto");
-      if (values.kids_menus > values.children) add("kids_menus", "I menù bambini non possono superare i bambini");
-    }
+    // Data: se il campo è stato svuotato si usa la data iniziale (la prenotazione ha sempre una data).
+    const eventDate = values.event_date || dateFallback;
+    if (!values.event_date) setValues((v) => ({ ...v, event_date: eventDate }));
     if (!isAppointment && values.table_number.trim() !== "" && parseTable(values.table_number) === null) {
       add("table_number", "Numero del tavolo non valido: usa un numero da 1 a 9999.");
+    }
+    if (!isAppointment && values.kids_menus > values.children) {
+      add("kids_menus", "I menù bambini non possono superare i bambini");
     }
     Object.assign(local, validateAllergies(values.allergies));
 
@@ -231,7 +231,7 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
           ? { client_id: linkedClient.id }
           : { new_client: newClientPayload(newClient) }),
       event_type: isAppointment ? eventType : null,
-      event_date: values.event_date,
+      event_date: eventDate,
       event_time: values.event_time || null,
       // Le prenotazioni normali scelgono la sala; per l'appuntamento resta quella salvata (di norma nessuna).
       room_id: isAppointment ? (booking?.room_id ?? null) : values.room_id,
@@ -255,7 +255,7 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       focusFirstInvalid(formRef.current);
     };
 
-    const who = isEdit && booking ? `${booking.client.first_name} ${booking.client.last_name}` : newClient.full_name.trim();
+    const who = isEdit && booking ? `${booking.client.first_name} ${booking.client.last_name}`.trim() : newClient.full_name.trim();
 
     startTransition(async () => {
       if (isEdit && booking) {
@@ -283,7 +283,7 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       }
       // Offline: la prenotazione non ha ancora un id reale, quindi si torna all'agenda (in cache).
       if (isQueued(result)) {
-        router.push(`/admin/agenda?date=${values.event_date}&view=day`);
+        router.push(`/admin/agenda?date=${eventDate}&view=day`);
         return;
       }
       const { id, warnings: serverWarnings } = result.data;
@@ -335,19 +335,19 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
 
       <FormCard label={isAppointment ? "Appuntamento" : "Prenotazione"}>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field label="Ora" htmlFor="booking-time" required error={first(errors.event_time)}>
+          <Field label="Ora" htmlFor="booking-time" error={first(errors.event_time)} hint="Facoltativa">
             <Input
               id="booking-time"
               type="time"
               invalid={!!errors.event_time}
-              aria-describedby={describedBy("booking-time", !!errors.event_time, false)}
+              aria-describedby={describedBy("booking-time", !!errors.event_time, true)}
               value={values.event_time}
               onChange={(e) => change({ event_time: e.target.value })}
             />
           </Field>
 
           {isAppointment && (
-            <Field label="Tipo evento" htmlFor="appointment-type" required error={first(errors.event_type)}>
+            <Field label="Tipo evento" htmlFor="appointment-type" error={first(errors.event_type)}>
               <Select
                 id="appointment-type"
                 invalid={!!errors.event_type}

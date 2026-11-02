@@ -98,7 +98,7 @@ export async function getRoomBookingSlots(from: string, to: string): Promise<Roo
       id: r.id,
       event_date: toDateOnly(r.event_date),
       room_id: String(r.room ?? ""),
-      client_name: client ? `${client.first_name} ${client.last_name}` : "",
+      client_name: client ? `${client.first_name} ${client.last_name ?? ""}`.trim() : "",
       adults: num(r.adults),
       children: num(r.children),
     };
@@ -269,17 +269,19 @@ export async function getNextEventAfter(date: string): Promise<NextEventBrief | 
     const me = await getCurrentProfile();
     if (!me || !me.active) return null;
     const db = await getAdminPb();
-    const page = await db.collection("bookings").getList(1, 1, {
+    // Primi eventi per data; l'ordine per ora (senza ora in fondo) si applica in memoria come nell'agenda:
+    // in PocketBase un orario vuoto verrebbe prima degli altri.
+    const page = await db.collection("bookings").getList(1, 50, {
       filter: db.filter("kind = {:k} && status != {:s} && event_date > {:after}", {
         k: "evento",
         s: "annullato",
         after: dayEndPb(date),
       }),
-      sort: "event_date,event_time",
+      sort: "event_date",
       expand: "client",
       skipTotal: true,
     });
-    const r = page.items[0] as unknown as PbRecord | undefined;
+    const r = sortBookingRecords(page.items as unknown as PbRecord[])[0];
     if (!r) return null;
     const client = r.expand?.client as PbRecord | undefined;
     const clientName = client ? `${client.first_name} ${client.last_name}`.trim() : "";

@@ -217,7 +217,7 @@ export async function renderQuoteDocx(model: QuoteDocumentModel): Promise<Buffer
   const clientLines: Paragraph[] = [
     eyebrow("Cliente"),
     kv("Nome", client.fullName),
-    kv("Telefono", client.phone),
+    ...(client.phone ? [kv("Telefono", client.phone)] : []),
     ...(client.email ? [kv("Email", client.email)] : []),
     ...(client.taxCode ? [kv("Codice fiscale", client.taxCode)] : []),
     ...(client.vatNumber ? [kv("Partita IVA", client.vatNumber)] : []),

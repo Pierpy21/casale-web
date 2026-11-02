@@ -22,7 +22,8 @@ export function totalCovers(b: Pick<BookingListItem, "adults" | "children">): nu
 
 /** Titolo di una prenotazione: il nome del cliente (non esiste più un nome evento). */
 export function clientFullName(b: Pick<BookingListItem, "client">): string {
-  return `${b.client.first_name} ${b.client.last_name}`;
+  // Cognome facoltativo: senza cognome niente spazio finale.
+  return `${b.client.first_name} ${b.client.last_name ?? ""}`.trim();
 }
 
 export function bookingTitle(b: Pick<BookingListItem, "client">): string {

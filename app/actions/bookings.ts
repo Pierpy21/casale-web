@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
-import { BookingAllergiesInput, BookingInput, BookingNoteBody, coversInputFor, DishesInput, type DishInputType } from "@/lib/validation";
+import { BookingAllergiesInput, BookingInput, BookingNoteBody, CoversInput, DishesInput, type DishInputType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } from "@/lib/action-utils";
 import { createQuote } from "@/lib/rpc/quotes";
 import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canSeeAppointments, isAdmin } from "@/lib/permissions";
@@ -196,7 +196,7 @@ export async function deleteBooking(id: string, opts?: MutationOptions): Promise
   });
 }
 
-/** Coperti: admin o sala (con audit). Per gli appuntamenti sono consentiti 0 ospiti. */
+/** Coperti: admin o sala (con audit). Sono consentiti 0 ospiti (nessun minimo). */
 export async function updateBookingCovers(id: string, input: unknown, opts?: MutationOptions): Promise<ActionResult> {
   if (!isRecordId(id)) return fail("Prenotazione non valida.");
   const auth = await authorize(canEditCovers, "Non sei autorizzato a modificare i coperti.");
@@ -211,7 +211,7 @@ export async function updateBookingCovers(id: string, input: unknown, opts?: Mut
     const conflict = await checkConflict(auth.db, opts, booking);
     if (conflict) return conflict;
 
-    const parsed = coversInputFor(kindOf(booking)).safeParse(input);
+    const parsed = CoversInput.safeParse(input);
     if (!parsed.success) return invalidInput(parsed.error);
 
     try {
