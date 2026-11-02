@@ -99,17 +99,62 @@ export function validateAllergies(rows: AllergyRow[]): Errors {
 }
 
 // ---------------------------------------------------------------------------
-// Cliente nuovo
+// Cellulare
 // ---------------------------------------------------------------------------
 
-/** Unico campo obbligatorio del cliente nella prenotazione: il nome. Cellulare ed email sono facoltativi (formato controllato dal server). */
+/** Stessa regola di lib/validation.ts (phoneChecks): 6-30 caratteri, cifre + spazi ( ) -, almeno 6 cifre. Null = valido. */
+export function phoneError(raw: string): string | null {
+  const phone = raw.trim();
+  if (phone.length < 6) return "Telefono troppo corto (minimo 6 caratteri)";
+  if (phone.length > 30) return "Telefono troppo lungo";
+  if (!/^[+0-9 ()-]+$/.test(phone)) return "Formato telefono non valido";
+  if (phone.replace(/\D/g, "").length < 6) return "Formato telefono non valido (servono almeno 6 cifre)";
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Cliente di rubrica (evento e appuntamento)
+// ---------------------------------------------------------------------------
+
+/** Evento e appuntamento: nome e cellulare del cliente obbligatori (il cellulare identifica il cliente). */
 export function validateNewClient(c: NewClientDraft): Errors {
   const errors: Errors = {};
   if (!c.full_name.trim()) errors["new_client.full_name"] = ["Inserisci il nome del cliente"];
-  // Formato solo se il cellulare è compilato (vuoto = nessun cellulare).
   const phone = c.phone.trim();
-  if (phone && phone.length < 6) errors["new_client.phone"] = ["Telefono troppo corto (minimo 6 caratteri)"];
+  if (!phone) errors["new_client.phone"] = ["Inserisci il cellulare del cliente"];
+  else {
+    const message = phoneError(phone);
+    if (message) errors["new_client.phone"] = [message];
+  }
   return errors;
+}
+
+// ---------------------------------------------------------------------------
+// Ospite (prenotazione normale)
+// ---------------------------------------------------------------------------
+
+/** Ospite di una prenotazione normale: nome (obbligatorio) e cellulare (facoltativo). Nessun cliente di rubrica. */
+export interface GuestDraft {
+  name: string;
+  phone: string;
+}
+
+export function validateGuest(g: GuestDraft): Errors {
+  const errors: Errors = {};
+  if (!g.name.trim()) errors["guest_name"] = ["Inserisci il nome dell'ospite"];
+  // Il cellulare è facoltativo: controllo del formato solo se compilato.
+  if (g.phone.trim()) {
+    const message = phoneError(g.phone);
+    if (message) errors["guest_phone"] = [message];
+  }
+  return errors;
+}
+
+export function guestPayload(g: GuestDraft) {
+  return {
+    guest_name: g.name.trim(),
+    guest_phone: g.phone.trim() || null,
+  };
 }
 
 /** Nome completo di un cliente della rubrica ("Mario Rossi"). */

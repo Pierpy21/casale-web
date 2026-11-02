@@ -2,14 +2,9 @@ import Link from "next/link";
 import { format, isSameMonth } from "date-fns";
 import { Plus } from "lucide-react";
 import type { BookingListItem } from "@/lib/types";
-import { BOOKING_KIND_LABELS, STATUS_COLORS, STATUS_LABELS } from "@/lib/types";
-import { bookingTitle, formatCovers, formatTime } from "@/components/bookings/format";
-import { MenuBadge } from "@/components/menu/MenuBadge";
-import { StatusDot, cn } from "@/components/ui";
-import { dayCountLabel, formatIt, toISO } from "./agenda-utils";
-
-/** Pill visibili per cella: oltre, "+N altri" apre il giorno. Altezza cella fissa = 10rem. */
-const MAX_PILLS = 2;
+import { cn } from "@/components/ui";
+import { summarizeDay } from "./DaySummary";
+import { capitalize, formatIt, toISO } from "./agenda-utils";
 
 export interface MonthViewProps {
   /** Mese visualizzato (qualsiasi giorno del mese). */
@@ -22,50 +17,16 @@ export interface MonthViewProps {
   onOpenDay: (iso: string) => void;
 }
 
-/**
- * Evento compatto. Eventi: ORA + NOME MENÙ (dato principale). Prenotazioni e appuntamenti (senza menù):
- * ORA + titolo, con il tipo in riga secondaria.
- */
-function MonthPill({ booking: b }: { booking: BookingListItem }) {
-  const time = formatTime(b.event_time);
-  const isEvent = b.kind === "evento";
-  const menuName = b.menu?.name ?? null;
-  const primary = isEvent ? (menuName ?? "Menù da definire") : bookingTitle(b);
-  const secondary = [isEvent ? null : BOOKING_KIND_LABELS[b.kind], b.room?.name ?? "Sala da assegnare", formatCovers(b)]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    <Link
-      href={`/admin/prenotazioni/${b.id}`}
-      title={`${BOOKING_KIND_LABELS[b.kind]} · ${primary} · ${STATUS_LABELS[b.status]}`}
-      style={{ borderLeftColor: STATUS_COLORS[b.status] }}
-      className={cn(
-        "flex min-w-0 flex-col gap-0.5 border-l-[3px] bg-cream/70 px-2 py-1 transition-colors duration-200 hover:bg-sand/60",
-        b.status === "annullato" && "opacity-70",
-      )}
-    >
-      <span className="flex min-w-0 items-center gap-1.5">
-        {b.kind !== "normale" && <StatusDot status={b.status} size="sm" />}
-        {time && <span className="shrink-0 text-[11px] font-medium tabular-nums text-ink">{time}</span>}
-        {isEvent && menuName ? (
-          <MenuBadge menuId={b.menu?.id ?? null} name={menuName} size="sm" className="min-w-0 truncate" />
-        ) : (
-          <span
-            className={cn(
-              "min-w-0 truncate font-serif text-[13px] leading-tight",
-              isEvent ? "italic text-slate-dark" : "text-ink",
-            )}
-          >
-            {primary}
-          </span>
-        )}
-      </span>
-      <span className="truncate text-[11px] text-slate-dark">{secondary}</span>
-    </Link>
-  );
+/** Coperti in forma leggibile per l'etichetta accessibile: "nessun coperto", "1 coperto", "48 coperti". */
+function coversLabel(covers: number): string {
+  if (covers === 0) return "nessun coperto";
+  return `${covers} ${covers === 1 ? "coperto" : "coperti"}`;
 }
 
-/** Griglia mensile lun-dom, desktop. Celle di altezza uniforme; un giorno vuoto crea un evento (admin), un giorno con eventi apre la vista giorno. */
+/**
+ * Griglia mensile lun-dom, desktop. Ogni cella mostra solo i coperti totali del giorno (prenotazioni attive).
+ * Un giorno vuoto crea un evento (admin); un giorno con prenotazioni apre la vista giorno, e il "+" crea un altro evento.
+ */
 export function MonthView({ monthDate, days, today, byDate, isAdmin, onOpenDay }: MonthViewProps) {
   const weekdayLabels = days.slice(0, 7).map((day) => formatIt(day, "EEE"));
 
@@ -86,10 +47,12 @@ export function MonthView({ monthDate, days, today, byDate, isAdmin, onOpenDay }
           const items = byDate.get(iso) ?? [];
           const inMonth = isSameMonth(day, monthDate);
           const isToday = iso === today;
-          const label = formatIt(day, "EEEE d MMMM");
+          const label = capitalize(formatIt(day, "EEEE d MMMM"));
+          const covers = summarizeDay(items).covers;
 
+          // @container: l'etichetta "coperti" / "cop." dipende dalla larghezza reale della cella.
           const cellClass = cn(
-            "flex h-[10rem] min-w-0 flex-col gap-1.5 overflow-hidden border-b border-r border-sand p-1.5 text-left transition-colors duration-200",
+            "@container flex h-[6rem] min-w-0 flex-col gap-1.5 overflow-hidden border-b border-r border-sand p-1.5 text-left transition-colors duration-200",
             inMonth ? "bg-paper" : "bg-cream/60",
           );
           const dayNumber = (
@@ -129,55 +92,36 @@ export function MonthView({ monthDate, days, today, byDate, isAdmin, onOpenDay }
             );
           }
 
-          const shown = items.slice(0, MAX_PILLS);
-          const hidden = items.length - shown.length;
-
           return (
             <div key={iso} className={cn(cellClass, "relative")}>
-              {/* Lo spazio libero di un giorno con eventi apre la vista giorno; per crearne un altro c'è il "+". */}
+              {/* Tutta la cella apre la vista giorno: il contenuto sopra non intercetta il click, tranne il "+". */}
               <button
                 type="button"
                 onClick={() => onOpenDay(iso)}
-                aria-label={`Apri ${label}`}
+                aria-label={`${label}: ${coversLabel(covers)}`}
                 className="absolute inset-0 transition-colors hover:bg-cream/70"
               />
-              <div className="relative flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => onOpenDay(iso)}
-                  aria-label={`Apri ${label}, ${dayCountLabel(items)}`}
-                  className="rounded-[2px] transition-colors hover:bg-cream"
-                >
-                  {dayNumber}
-                </button>
-                <span className="flex items-center gap-1">
-                  <span className="text-[11px] tabular-nums text-slate-dark">{items.length}</span>
-                  {isAdmin && (
-                    <Link
-                      href={`/admin/prenotazioni/nuova?tipo=evento&date=${iso}`}
-                      aria-label={`Nuovo evento, ${label}`}
-                      className="grid size-6 place-items-center rounded-[2px] text-petrol transition-colors hover:bg-cream"
-                    >
-                      <Plus aria-hidden="true" className="size-4" />
-                    </Link>
-                  )}
-                </span>
+              <div className="pointer-events-none relative flex items-start justify-between">
+                {dayNumber}
+                {isAdmin && (
+                  <Link
+                    href={`/admin/prenotazioni/nuova?tipo=evento&date=${iso}`}
+                    aria-label={`Nuovo evento, ${label}`}
+                    className="pointer-events-auto grid size-6 place-items-center rounded-[2px] text-petrol transition-colors hover:bg-cream"
+                  >
+                    <Plus aria-hidden="true" className="size-4" />
+                  </Link>
+                )}
               </div>
 
-              {shown.map((booking) => (
-                <div key={booking.id} className="relative">
-                  <MonthPill booking={booking} />
+              {covers > 0 && (
+                <div className="pointer-events-none flex flex-1 flex-col items-center justify-center text-center">
+                  <span className="font-serif text-[26px] leading-none tabular-nums text-petrol">{covers}</span>
+                  <span aria-hidden="true" className="mt-1 text-[11px] text-slate-dark">
+                    <span className="hidden @min-[7rem]:inline">coperti</span>
+                    <span className="@min-[7rem]:hidden">cop.</span>
+                  </span>
                 </div>
-              ))}
-
-              {hidden > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onOpenDay(iso)}
-                  className="relative self-start text-left text-[12px] font-medium text-petrol underline-offset-2 hover:underline"
-                >
-                  +{hidden} altri
-                </button>
               )}
             </div>
           );

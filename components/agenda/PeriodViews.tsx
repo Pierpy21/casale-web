@@ -70,6 +70,7 @@ export function DayView({
   items,
   rooms,
   canAssignRooms,
+  canDeleteBookings,
   selected,
   kind,
   nextEvent = null,
@@ -78,6 +79,8 @@ export function DayView({
   items: BookingListItem[];
   rooms: Room[];
   canAssignRooms: boolean;
+  /** Permesso di eliminare le prenotazioni normali (solo admin). */
+  canDeleteBookings: boolean;
   /** Giorno selezionato (ISO): riferimento per il riquadro "Prossimo evento". */
   selected: string;
   nextEvent?: NextEventBrief | null;
@@ -100,7 +103,7 @@ export function DayView({
           ))}
         </section>
       )}
-      {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} date={selected} canAssign={canAssignRooms} />}
+      {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} date={selected} canAssign={canAssignRooms} canDeleteBookings={canDeleteBookings} />}
     </div>
   );
 }

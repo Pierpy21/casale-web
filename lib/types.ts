@@ -24,8 +24,13 @@ export const BOOKING_KIND_LABELS: Record<BookingKind, string> = { evento: "Event
 /** Suggerimenti per il tipo evento (testo libero, max 60 caratteri). */
 export const EVENT_TYPES = ["Matrimonio", "Battesimo", "Comunione", "Cresima", "Compleanno", "Anniversario", "Laurea", "Aziendale", "Altro"] as const;
 
+/**
+ * Prenotazione. Evento e appuntamento hanno il cliente di rubrica (`client_id`); la prenotazione normale no:
+ * nome e cellulare dell'ospite stanno sulla prenotazione (`guest_name`, `guest_phone`). Per gli altri tipi i campi ospite sono null.
+ * Per nome e telefono da mostrare usare bookingPersonName / bookingPhone (components/bookings/format.ts).
+ */
 export interface Booking {
-  id: string; client_id: string; kind: BookingKind; event_type: string | null; event_date: string; event_time: string | null;
+  id: string; client_id: string | null; guest_name: string | null; guest_phone: string | null; kind: BookingKind; event_type: string | null; event_date: string; event_time: string | null;
   room_id: string | null; /** Tavolo (solo prenotazioni normali): null se non assegnato. */ table_number: number | null; adults: number; children: number; kids_menus: number;
   menu_id: string | null; kids_menu_id: string | null; setup_colors: string[]; setup_notes: string | null;
   status: BookingStatus; notes: string | null; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string;
@@ -66,7 +71,8 @@ export interface EventSheetRow {
 /** Foglio eventi di un giorno (`date` YYYY-MM-DD), già ordinato per orario. */
 export interface EventSheet { date: string; rows: EventSheetRow[]; totals: EventSheetTotals; }
 export interface BookingListItem extends Booking {
-  client: Pick<Client, "id" | "first_name" | "last_name" | "phone">;
+  /** Cliente di rubrica (evento e appuntamento). Null per le prenotazioni normali e nei dati senza cliente. */
+  client: Pick<Client, "id" | "first_name" | "last_name" | "phone"> | null;
   room: Pick<Room, "id" | "name" | "capacity"> | null;
   menu: Pick<Menu, "id" | "name" | "price_per_person"> | null;
   kids_menu: Pick<Menu, "id" | "name"> | null;
@@ -81,7 +87,8 @@ export interface NextEventBrief { id: string; event_date: string; event_time: st
 /** Slot di occupazione sala per la vista agenda (select minima, senza annullati). */
 export interface RoomBookingSlot { id: string; event_date: string; room_id: string; client_name: string; adults: number; children: number; }
 export interface BookingDetail extends Booking {
-  client: Client; room: Room | null; menu: Menu | null; kids_menu: Menu | null;
+  /** Cliente di rubrica (evento e appuntamento); null per le prenotazioni normali. */
+  client: Client | null; room: Room | null; menu: Menu | null; kids_menu: Menu | null;
   dishes: BookingDish[]; allergies: BookingAllergy[];
 }
 export interface BookingChange { id: string; booking_id: string | null; booking_label: string | null; changed_by: string | null; changed_by_name: string; table_name: string; field: string; old_value: string | null; new_value: string | null; created_at: string; }

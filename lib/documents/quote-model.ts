@@ -1,6 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { computeQuoteTotals, formatEUR, round2 } from "@/lib/quote-utils";
+import { bookingPersonName, bookingPhone } from "@/components/bookings/format";
 import {
   COURSE_LABELS,
   COURSE_ORDER,
@@ -164,12 +165,13 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
       issuedAt: formatDateShort(q.issued_at),
       validUntil: q.valid_until ? formatDateShort(q.valid_until) : null,
     },
+    // Il preventivo nasce da un evento, quindi ha sempre il cliente di rubrica; i campi restano null-safe.
     client: {
-      fullName: `${b.client.first_name} ${b.client.last_name ?? ""}`.trim(),
-      phone: orNull(b.client.phone),
-      email: orNull(b.client.email),
-      taxCode: orNull(b.client.tax_code),
-      vatNumber: orNull(b.client.vat_number),
+      fullName: bookingPersonName(b),
+      phone: orNull(bookingPhone(b)),
+      email: orNull(b.client?.email ?? null),
+      taxCode: orNull(b.client?.tax_code ?? null),
+      vatNumber: orNull(b.client?.vat_number ?? null),
     },
     event: {
       dateLong: formatDateLong(b.event_date),

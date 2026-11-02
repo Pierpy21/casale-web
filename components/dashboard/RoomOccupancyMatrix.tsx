@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatIt, toDate } from "@/components/agenda/agenda-utils";
-import { bookingTitle, totalCovers } from "@/components/bookings/format";
+import { bookingPersonName, totalCovers } from "@/components/bookings/format";
 import { useMenuColor } from "@/components/menu/MenuColorsProvider";
 import { EmptyState, StatusDot } from "@/components/ui";
 import { STATUS_LABELS, type BookingListItem, type Room } from "@/lib/types";
@@ -89,7 +89,7 @@ function OccupancyCell({ booking, capacity }: { booking: BookingListItem; capaci
   return (
     <Link
       href={`/admin/prenotazioni/${booking.id}`}
-      title={`${menuName} · ${bookingTitle(booking)}: ${covers} coperti su capienza ${capacity} · ${STATUS_LABELS[booking.status]}`}
+      title={`${menuName} · ${bookingPersonName(booking)}: ${covers} coperti su capienza ${capacity} · ${STATUS_LABELS[booking.status]}`}
       style={{ backgroundColor: color.solid, color: color.onSolid }}
       className="flex min-h-20 flex-col justify-center gap-1.5 rounded-[2px] px-3 py-2.5 transition-[filter] duration-200 hover:brightness-95"
     >
@@ -100,7 +100,7 @@ function OccupancyCell({ booking, capacity }: { booking: BookingListItem; capaci
       <span className="text-[12px] font-semibold tabular-nums">
         {covers}/{capacity} coperti
       </span>
-      <span className="line-clamp-1 break-words text-[12px]">{bookingTitle(booking)}</span>
+      <span className="line-clamp-1 break-words text-[12px]">{bookingPersonName(booking)}</span>
     </Link>
   );
 }

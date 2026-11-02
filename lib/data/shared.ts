@@ -2,7 +2,8 @@ import "server-only";
 import type PocketBase from "pocketbase";
 import { pocketbasePublicUrl } from "@/lib/pocketbase/config";
 import { listByParents } from "@/lib/pocketbase/queries";
-import { type PbRecord } from "@/lib/pocketbase/helpers";
+import { nn, type PbRecord } from "@/lib/pocketbase/helpers";
+import type { BookingPersonSource } from "@/components/bookings/format";
 import {
   mapBooking,
   mapClient,
@@ -26,6 +27,20 @@ import type {
 // Espansioni PocketBase per le prenotazioni (relazioni per nome campo).
 export const BOOKING_LIST_EXPAND = "client,room,menu,kids_menu";
 export const BOOKING_DETAIL_EXPAND = "client,room,menu,kids_menu";
+
+/**
+ * Nome e cellulare della persona di un record prenotazione (cliente espanso o passato a parte).
+ * Usare con bookingPersonName / bookingPhone (components/bookings/format.ts).
+ */
+export function bookingPersonOf(r: PbRecord, client?: PbRecord | null): BookingPersonSource {
+  const c = client !== undefined ? client : ((r.expand?.client as PbRecord | undefined) ?? null);
+  return {
+    kind: nn(r.kind) ?? "evento",
+    guest_name: nn(r.guest_name),
+    guest_phone: nn(r.guest_phone),
+    client: c ? { first_name: nn(c.first_name), last_name: nn(c.last_name), phone: nn(c.phone) } : null,
+  };
+}
 
 /** Ordine agenda: data, poi ora (senza ora in fondo). */
 export function sortBookingRecords(records: PbRecord[]): PbRecord[] {
@@ -95,9 +110,8 @@ export async function bookingListItems(db: PocketBase, records: PbRecord[]): Pro
     return {
       ...b,
       // Solo i campi che le liste mostrano: codice fiscale, P.IVA e note del cliente non vanno al browser di sala e cucina.
-      client: client
-        ? listClient(mapClient(client))
-        : { id: b.client_id, first_name: "", last_name: "", phone: "" },
+      // Prenotazioni normali (ospite sulla prenotazione): nessun cliente.
+      client: client ? listClient(mapClient(client)) : null,
       room: room ? mapRoom(room) : null,
       menu: menu
         ? { id: menu.id, name: String(menu.name ?? ""), price_per_person: Number(menu.price_per_person ?? 0) }
@@ -127,9 +141,7 @@ export async function bookingDetail(db: PocketBase, record: PbRecord): Promise<B
 
   return {
     ...b,
-    client: client
-      ? mapClient(client)
-      : ({ id: b.client_id, first_name: "", last_name: "", phone: "", email: null, tax_code: null, vat_number: null, notes: null, created_at: "", updated_at: "" } as Client),
+    client: client ? mapClient(client) : null,
     room: room ? mapRoom(room) : null,
     menu: b.menu_id ? menusById.get(b.menu_id) ?? null : null,
     kids_menu: b.kids_menu_id ? menusById.get(b.kids_menu_id) ?? null : null,

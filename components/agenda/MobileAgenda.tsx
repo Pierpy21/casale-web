@@ -19,6 +19,8 @@ export interface MobileAgendaProps {
   rooms: Room[];
   /** Permesso di assegnare la sala alle prenotazioni normali. */
   canAssignRooms: boolean;
+  /** Permesso di eliminare le prenotazioni normali (solo admin). */
+  canDeleteBookings: boolean;
   kind: AgendaKindFilter;
   onKindChange: (kind: AgendaKindFilter) => void;
   onNavigate: (iso: string) => void;
@@ -35,6 +37,7 @@ export function MobileAgenda({
   calendarByDate,
   rooms,
   canAssignRooms,
+  canDeleteBookings,
   kind,
   onKindChange,
   onNavigate,
@@ -81,7 +84,7 @@ export function MobileAgenda({
               {cards.map((booking) => (
                 <BookingCard key={booking.id} booking={booking} variant="full" dishes="collapsible" wholeCardLink />
               ))}
-              {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} date={selected} canAssign={canAssignRooms} />}
+              {reservations.length > 0 && <ReservationList bookings={reservations} rooms={rooms} date={selected} canAssign={canAssignRooms} canDeleteBookings={canDeleteBookings} />}
             </div>
           )}
         </SwipeDay>

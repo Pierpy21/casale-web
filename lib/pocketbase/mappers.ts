@@ -130,7 +130,10 @@ export function mapMenu(r: PbRecord, items: MenuItem[], baseUrl: string): Menu {
 export function mapBooking(r: PbRecord): Booking {
   return {
     id: r.id,
-    client_id: String(r.client ?? ""),
+    client_id: nn(r.client),
+    // Ospite delle prenotazioni normali (vuoto → null). Per gli altri tipi restano vuoti.
+    guest_name: nn(r.guest_name)?.trim() || null,
+    guest_phone: nn(r.guest_phone)?.trim() || null,
     // Le prenotazioni senza tipo (dati precedenti alla migrazione) sono eventi.
     kind: (nn(r.kind) ?? "evento") as BookingKind,
     event_type: nn(r.event_type),

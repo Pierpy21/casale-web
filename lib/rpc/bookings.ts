@@ -5,6 +5,7 @@ import { UserFacingError } from "@/lib/action-utils";
 import { generateRecordId, dayStartPb, nn, num, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
 import { countWhere, fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { mapBooking } from "@/lib/pocketbase/mappers";
+import { bookingPersonName } from "@/components/bookings/format";
 import { eventStatusFor, statusAfterPayments } from "@/lib/booking-status";
 import {
   allergiesSummary,
@@ -121,7 +122,10 @@ function queueDishes(batch: Batch, actor: Actor, bookingId: string, oldRows: PbR
   }
 }
 
-/** Cliente della prenotazione: quello di rubrica, oppure quello con lo stesso telefono, oppure uno nuovo (nella batch). */
+/**
+ * Cliente di rubrica di un evento o appuntamento: quello scelto, oppure quello con lo stesso telefono, oppure uno nuovo (nella batch).
+ * Non si chiama per le prenotazioni normali (vedi upsertBooking). Il telefono del cliente nuovo è obbligatorio (validazione).
+ */
 async function planClient(db: PocketBase, input: BookingInputType, batch: Batch): Promise<string> {
   if (input.client_id) {
     const existing = await fetchOne(db, "clients", input.client_id);
@@ -130,8 +134,7 @@ async function planClient(db: PocketBase, input: BookingInputType, batch: Batch)
   }
   const wanted = input.new_client;
   if (!wanted) throw new UserFacingError("Indica il cliente");
-  // Il riuso per telefono vale solo se il telefono ha cifre: senza telefono ogni cliente nuovo è distinto
-  // (altrimenti si aggancherebbe a un cliente qualunque che non ha il telefono).
+  // Il cellulare identifica il cliente: il riuso avviene per telefono (solo cifre, indipendente da spazi e +39).
   const phoneDigits = normalizePhone(wanted.phone);
   if (phoneDigits) {
     const clients = await listAll(db, "clients", "", { fields: "id,phone" });
@@ -166,16 +169,23 @@ export async function countPayments(db: PocketBase, bookingId: string): Promise<
   return countWhere(db, "payments", db.filter("booking = {:id}", { id: bookingId }));
 }
 
+/**
+ * Campi della prenotazione. Normali: cliente vuoto, ospite (nome e cellulare) sulla prenotazione.
+ * Evento e appuntamento: cliente di rubrica, ospite vuoto. Il cambio di tipo in modifica azzera ciò che non serve.
+ */
 function bookingRecordFields(
   input: BookingInputType,
   actor: Actor,
-  clientId: string,
+  clientId: string | null,
   menuId: string | null,
   kidsMenuId: string | null,
   status: BookingStatus,
 ) {
+  const normal = input.kind === "normale";
   return {
-    client: clientId,
+    client: normal ? "" : (clientId ?? ""),
+    guest_name: normal ? (input.guest_name ?? "") : "",
+    guest_phone: normal ? (input.guest_phone ?? "") : "",
     kind: input.kind,
     event_type: input.event_type ?? "",
     event_date: dayStartPb(input.event_date),
@@ -236,7 +246,8 @@ export async function upsertBooking(
 
   const batch = db.createBatch();
   // Cliente nuovo: il record cliente viene messo nella stessa batch, prima della prenotazione.
-  const clientId = await planClient(db, input, batch);
+  // Prenotazione normale: nessun cliente di rubrica (l'ospite sta sulla prenotazione).
+  const clientId = input.kind === "normale" ? null : await planClient(db, input, batch);
   const fields = bookingRecordFields(input, actor, clientId, menuId, kidsMenuId, status);
 
   if (!id) {
@@ -252,6 +263,8 @@ export async function upsertBooking(
     const before_ = bookingAuditValues(mapBooking(before as PbRecord));
     const after_ = bookingAuditValues({
       client_id: clientId,
+      guest_name: input.kind === "normale" ? (input.guest_name ?? null) : null,
+      guest_phone: input.kind === "normale" ? (input.guest_phone ?? null) : null,
       kind: input.kind,
       event_type: input.event_type ?? null,
       event_date: input.event_date,
@@ -528,8 +541,14 @@ export async function deleteBookingRecord(db: PocketBase, id: string, actor: Act
   ]);
   const clientId = nn(booking.client);
   const client = clientId ? await fetchOne(db, "clients", clientId) : null;
-  const clientName = client ? `${client.first_name} ${client.last_name ?? ""}`.trim() : "cliente sconosciuto";
-  const label = `Prenotazione del ${toDateOnly(booking.event_date)} — ${clientName}`;
+  // Nome di chi era prenotato: l'ospite (prenotazioni normali) oppure il cliente di rubrica.
+  const personName =
+    bookingPersonName({
+      kind: String(booking.kind || "evento"),
+      guest_name: nn(booking.guest_name),
+      client: client ? { first_name: String(client.first_name ?? ""), last_name: nn(client.last_name) } : null,
+    }) || "cliente sconosciuto";
+  const label = `Prenotazione del ${toDateOnly(booking.event_date)} — ${personName}`;
   const linked = [
     quotes.length > 0 ? `${quotes.length} ${quotes.length === 1 ? "preventivo" : "preventivi"}` : null,
     payments.length > 0 ? `${payments.length} ${payments.length === 1 ? "acconto" : "acconti"}` : null,

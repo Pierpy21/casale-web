@@ -133,6 +133,7 @@ export function AgendaBoard({
             items={byDate.get(selected) ?? []}
             rooms={rooms}
             canAssignRooms={canAssignRooms}
+            canDeleteBookings={isAdmin}
             selected={selected}
             kind={kind}
             nextEvent={nextEvent}
@@ -154,6 +155,7 @@ export function AgendaBoard({
           calendarByDate={allByDate}
           rooms={rooms}
           canAssignRooms={canAssignRooms}
+          canDeleteBookings={isAdmin}
           kind={kind}
           onKindChange={(next) => navigate(selected, view, next)}
           onNavigate={(iso) => navigate(iso, view)}

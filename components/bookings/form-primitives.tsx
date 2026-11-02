@@ -12,6 +12,7 @@ import {
   suggestionFullName,
   type AllergyRow,
   type Errors,
+  type GuestDraft,
   type NewClientDraft,
 } from "./booking-form-model";
 import { ClientNameCombobox } from "./ClientNameCombobox";
@@ -354,7 +355,55 @@ function ClientLinkChip({ client, onClear, disabled }: { client: ClientSuggestio
 }
 
 /**
- * Cliente nuovo: nome, cellulare, email (il server riusa il cliente se il telefono esiste già).
+ * Ospite di una prenotazione normale: nome (obbligatorio) e cellulare (facoltativo). Nessun cliente di rubrica:
+ * i dati restano sulla prenotazione.
+ */
+export function GuestFields({
+  value,
+  errors,
+  onChange,
+  disabled,
+}: {
+  value: GuestDraft;
+  errors: Errors;
+  onChange: (changes: Partial<GuestDraft>) => void;
+  disabled?: boolean;
+}) {
+  const nameError = first(errors["guest_name"]);
+  const phoneError = first(errors["guest_phone"]);
+  return (
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <Field label="Nome" htmlFor="guest-name" required error={nameError} className="sm:col-span-2">
+        <Input
+          id="guest-name"
+          autoComplete="off"
+          disabled={disabled}
+          invalid={!!nameError}
+          aria-describedby={describedBy("guest-name", !!nameError, false)}
+          value={value.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          placeholder="Nome e cognome"
+        />
+      </Field>
+      <Field label="Cellulare" htmlFor="guest-phone" error={phoneError} hint="Facoltativo · es. +39 340 1234567">
+        <Input
+          id="guest-phone"
+          type="tel"
+          inputMode="tel"
+          autoComplete="off"
+          disabled={disabled}
+          invalid={!!phoneError}
+          aria-describedby={describedBy("guest-phone", !!phoneError, true)}
+          value={value.phone}
+          onChange={(e) => onChange({ phone: e.target.value })}
+        />
+      </Field>
+    </div>
+  );
+}
+
+/**
+ * Cliente nuovo (evento e appuntamento): nome, cellulare obbligatorio, email (il server riusa il cliente se il telefono esiste già).
  * Con `link` il campo Nome suggerisce i clienti esistenti.
  */
 export function NewClientFields({
@@ -400,7 +449,7 @@ export function NewClientFields({
         )}
         {link?.linked && <ClientLinkChip client={link.linked} onClear={link.onClear} disabled={disabled} />}
       </Field>
-      <Field label="Cellulare" htmlFor="client-phone" error={phoneError} hint="Facoltativo · es. +39 340 1234567">
+      <Field label="Cellulare" htmlFor="client-phone" error={phoneError} required hint="es. +39 340 1234567">
         <Input
           id="client-phone"
           type="tel"

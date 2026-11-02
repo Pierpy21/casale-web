@@ -14,7 +14,7 @@ import { KindBadge } from "@/components/bookings/KindBadge";
 import { decodeWarnings } from "@/components/bookings/booking-form-model";
 import { PreventivoMenu } from "@/components/bookings/QuoteActions";
 import { CourseList } from "@/components/bookings/MenuPreview";
-import { bookingTitle, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
+import { bookingPersonName, bookingPhone, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
 import type { NameLookup } from "@/components/bookings/change-labels";
 import {
   BookingNumbers,
@@ -96,8 +96,11 @@ export default async function BookingDetailPage({
   const paymentsError = Number.isFinite(failedDeposits) && failedDeposits > 0 ? failedDeposits : undefined;
   const warnings = decodeWarnings(query.warnings);
 
+  // Evento e appuntamento: cliente di rubrica. Normale: ospite sulla prenotazione (client è null).
   const client = booking.client;
-  const clientName = `${client.first_name} ${client.last_name}`.trim();
+  const isGuest = booking.kind === "normale";
+  const personName = bookingPersonName(booking);
+  const phone = bookingPhone(booking);
   const eventDate = toDate(booking.event_date);
   const time = formatTime(booking.event_time);
   const finance = financeVisible ? getPaymentSummary(booking, payments) : null;
@@ -110,7 +113,7 @@ export default async function BookingDetailPage({
   const lookup: NameLookup = {
     rooms: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
     menus: Object.fromEntries(menus.map((m) => [m.id, m.name])),
-    clients: { [booking.client_id]: clientName },
+    clients: booking.client_id ? { [booking.client_id]: personName } : {},
   };
 
   // Numeri in alto: i riquadri economici compaiono solo per l'admin.
@@ -270,7 +273,7 @@ export default async function BookingDetailPage({
             {time ? ` · ore ${time}` : ""}
           </p>
           <div className="flex min-w-0 items-start justify-between gap-3">
-            <h1 className="min-w-0 flex-1 text-3xl leading-tight wrap-anywhere sm:text-4xl desk:text-5xl">{bookingTitle(booking)}</h1>
+            <h1 className="min-w-0 flex-1 text-3xl leading-tight wrap-anywhere sm:text-4xl desk:text-5xl">{personName}</h1>
             {financeVisible && (
               <PreventivoMenu
                 bookingId={booking.id}
@@ -361,50 +364,51 @@ export default async function BookingDetailPage({
 
           <section aria-labelledby="cliente-title" className="flex min-w-0 flex-col gap-5 border-t border-sand pt-8 first:border-t-0 first:pt-0">
             <div className="flex flex-col gap-2">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">Cliente</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">{isGuest ? "Ospite" : "Cliente"}</p>
               <h3 id="cliente-title" className="text-2xl wrap-anywhere">
-                {clientName}
+                {personName}
               </h3>
             </div>
             <dl className="flex min-w-0 flex-col gap-4">
-              {!kitchen && client.phone && (
+              {!kitchen && phone && (
                 <InfoRow label="Telefono">
-                  <a href={telHref(client.phone)} className="wrap-anywhere font-medium text-petrol underline-offset-4 hover:underline">
-                    {client.phone}
+                  <a href={telHref(phone)} className="wrap-anywhere font-medium text-petrol underline-offset-4 hover:underline">
+                    {phone}
                   </a>
                 </InfoRow>
               )}
-              {!kitchen && client.email && (
+              {/* Email, codice fiscale, P.IVA e note esistono solo nella rubrica: il cliente (non l'ospite). */}
+              {!kitchen && client?.email && (
                 <InfoRow label="Email">
                   <a href={`mailto:${client.email}`} className="wrap-anywhere text-petrol underline-offset-4 hover:underline">
                     {client.email}
                   </a>
                 </InfoRow>
               )}
-              {admin && client.tax_code && (
+              {admin && client?.tax_code && (
                 <InfoRow label="Codice fiscale">
                   <span className="wrap-anywhere font-mono text-[14px]">{client.tax_code}</span>
                 </InfoRow>
               )}
-              {admin && client.vat_number && (
+              {admin && client?.vat_number && (
                 <InfoRow label="P.IVA">
                   <span className="wrap-anywhere font-mono text-[14px]">{client.vat_number}</span>
                 </InfoRow>
               )}
-              {admin && client.notes && (
+              {admin && client?.notes && (
                 <InfoRow label="Note cliente">
                   <span className="wrap-anywhere text-[14px] text-slate-dark">{client.notes}</span>
                 </InfoRow>
               )}
             </dl>
             <div className="no-print flex flex-wrap gap-3">
-              {!kitchen && client.phone && (
+              {!kitchen && phone && (
                 <>
-                  <a href={telHref(client.phone)} className={CALL_BUTTON}>
+                  <a href={telHref(phone)} className={CALL_BUTTON}>
                     Chiama
                   </a>
                   <a
-                    href={whatsappHref(client.phone)}
+                    href={whatsappHref(phone)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={buttonClasses("outline", "sm", "min-h-11 rounded-none")}
@@ -413,7 +417,7 @@ export default async function BookingDetailPage({
                   </a>
                 </>
               )}
-              {admin && (
+              {admin && client && (
                 <ButtonLink href={`/admin/clienti/${client.id}`} variant="ghost" size="sm" className="min-h-11">
                   Scheda cliente
                 </ButtonLink>

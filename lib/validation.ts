@@ -115,23 +115,32 @@ const finalTotalSchema = z.preprocess(
 // ---------------------------------------------------------------------
 // Cliente
 // ---------------------------------------------------------------------
-/** Cellulare facoltativo: vuoto → null; se compilato deve avere formato e lunghezza validi. */
-const optPhone = z.preprocess(
+/** Formato del cellulare: 6-30 caratteri, cifre, + spazi ( ) -, con almeno 6 cifre (il riuso del cliente usa le cifre). */
+const phoneChecks = z
+  .string()
+  .min(6, "Telefono troppo corto (minimo 6 caratteri)")
+  .max(MAX_PHONE, "Telefono troppo lungo")
+  .regex(/^[+0-9 ()-]+$/, "Formato telefono non valido")
+  .refine((s) => s.replace(/\D/g, "").length >= 6, "Formato telefono non valido (servono almeno 6 cifre)");
+
+/** Cellulare facoltativo (ospite della prenotazione normale): vuoto → null; se compilato deve avere formato valido. */
+const optPhone = z.preprocess(emptyToNull, phoneChecks.nullable());
+
+/**
+ * Cellulare obbligatorio del cliente di rubrica (evento e appuntamento: identifica il cliente).
+ * Vuoto → "Inserisci il cellulare del cliente".
+ */
+const requiredPhone = z.preprocess(
   emptyToNull,
-  z
-    .string()
-    .min(6, "Telefono troppo corto (minimo 6 caratteri)")
-    .max(MAX_PHONE, "Telefono troppo lungo")
-    .regex(/^[+0-9 ()-]+$/, "Formato telefono non valido")
-    .nullable(),
+  z.string({ message: "Inserisci il cellulare del cliente" }).pipe(phoneChecks),
 );
 
 export const ClientInput = z.object({
-  /** Il nome è l'unico campo obbligatorio del cliente. */
+  /** Il nome è obbligatorio, insieme al cellulare. */
   first_name: z.string().trim().min(1, "Nome obbligatorio").max(MAX_TEXT, "Nome troppo lungo"),
   /** Cognome facoltativo (vuoto → null). */
   last_name: z.preprocess(emptyToNull, z.string().max(MAX_TEXT, "Cognome troppo lungo").nullable()),
-  phone: optPhone,
+  phone: requiredPhone,
   email: z.preprocess(emptyToNull, z.email({ message: "Email non valida" }).nullable()),
   tax_code: z.preprocess(
     normalizeCode,
@@ -217,17 +226,17 @@ export type CoversInputType = z.infer<typeof CoversInput>;
 // ---------------------------------------------------------------------
 // Prenotazione
 // ---------------------------------------------------------------------
-/** Cliente nuovo inserito dentro la prenotazione (riusato se il telefono esiste gia'). */
 /**
+ * Cliente nuovo inserito in un evento o appuntamento (riusato se il telefono esiste gia').
  * Accetta "full_name" (campo unico del form) oppure first_name/last_name. Output: nome = prima parola,
- * cognome = il resto (vuoto se assente). Unico campo obbligatorio: il nome. Cellulare facoltativo (output "" se assente).
+ * cognome = il resto (vuoto se assente). Nome e cellulare sono obbligatori: il cellulare identifica il cliente.
  */
 export const NewClientInput = z
   .object({
     full_name: z.string().trim().max(200, "Nome troppo lungo").optional(),
     first_name: z.string().trim().max(200, "Nome troppo lungo").optional(),
     last_name: z.string().trim().max(200, "Cognome troppo lungo").optional(),
-    phone: ClientInput.shape.phone,
+    phone: requiredPhone,
     email: ClientInput.shape.email,
   })
   .superRefine((v, ctx) => {
@@ -238,7 +247,7 @@ export const NewClientInput = z
   .transform((v) => {
     const source = v.full_name && v.full_name.length > 0 ? v.full_name : [v.first_name, v.last_name].filter(Boolean).join(" ");
     const [first = "", ...rest] = source.trim().split(/\s+/);
-    return { first_name: first, last_name: rest.join(" "), phone: v.phone ?? "", email: v.email ?? null };
+    return { first_name: first, last_name: rest.join(" "), phone: v.phone, email: v.email ?? null };
   });
 export type NewClientInputType = z.output<typeof NewClientInput>;
 
@@ -248,13 +257,50 @@ const eventTypeSchema = z.preprocess(
   z.string().max(60, "Tipo evento troppo lungo (max 60 caratteri)").nullable(),
 );
 
-export const BookingInput = z
+/** Nome dell'ospite (prenotazione normale): obbligatorio, trim, max 200. */
+const guestNameSchema = z.preprocess(
+  emptyToNull,
+  z.string().max(MAX_TEXT, "Nome troppo lungo (max 200 caratteri)").nullable(),
+);
+
+/**
+ * Payload di una prenotazione normale inviato dal vecchio client (coda offline): il "cliente nuovo" diventa l'ospite.
+ * Solo se manca guest_name: nome da full_name (o nome + cognome), cellulare da new_client.phone.
+ * Non tocca gli altri tipi né i payload già nel formato nuovo.
+ */
+function legacyNormalGuest(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const o = raw as Record<string, unknown>;
+  if (o.kind !== "normale") return raw;
+  // Prenotazione normale: cliente di rubrica e cliente nuovo sono ignorati, quindi non si validano
+  // (un cliente nuovo con cellulare vuoto non deve far fallire una prenotazione normale in coda).
+  const base: Record<string, unknown> = { ...o, client_id: null, new_client: null };
+  const hasGuest = typeof o.guest_name === "string" && o.guest_name.trim() !== "";
+  const nc = o.new_client;
+  if (hasGuest || !nc || typeof nc !== "object") return base;
+  const c = nc as Record<string, unknown>;
+  const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+  const fullName = str(c.full_name) || [str(c.first_name), str(c.last_name)].filter(Boolean).join(" ");
+  return {
+    ...base,
+    guest_name: fullName,
+    guest_phone: o.guest_phone ?? (typeof c.phone === "string" ? c.phone : null),
+  };
+}
+
+const BookingObject = z
   .object({
     /** evento | normale | appuntamento. Default: evento (compatibilita'). */
     kind: kindSchema,
-    /** Cliente dalla rubrica (solo admin) oppure nuovo cliente: esattamente uno dei due. */
+    /**
+     * Evento e appuntamento: cliente dalla rubrica (solo admin) oppure nuovo cliente, esattamente uno dei due.
+     * Prenotazione normale: ignorati (l'ospite è in guest_name / guest_phone).
+     */
     client_id: optUuid,
     new_client: NewClientInput.nullish(),
+    /** Solo prenotazioni normali: nome dell'ospite (obbligatorio) e cellulare (facoltativo). */
+    guest_name: guestNameSchema.optional(),
+    guest_phone: optPhone.optional(),
     event_type: eventTypeSchema,
     event_date: dateSchema,
     event_time: z.preprocess(emptyToNull, timeSchema.nullable()),
@@ -288,30 +334,46 @@ export const BookingInput = z
   })
   .superRefine((v, ctx) => {
     const issue = (path: string, message: string) => ctx.addIssue({ code: "custom", message, path: [path] });
-    if (!v.client_id && !v.new_client) issue("client_id", "Indica il cliente");
-    if (v.client_id && v.new_client) {
-      issue("new_client", "Scegli un cliente esistente oppure inserisci un nuovo cliente, non entrambi");
-    }
 
-    // Di tutti i tipi solo il nome del cliente è obbligatorio: tipo evento, ora e coperti sono facoltativi.
-    if (v.kind === "evento") {
-      // Il menù è facoltativo: senza menù l'evento non ha copia piatti e il preventivo automatico ha 0 righe.
-      checkCovers(v, ctx);
-    } else if (v.kind === "normale") {
+    // Di tutti i tipi solo il nome (del cliente o dell'ospite) è obbligatorio: tipo evento, ora e coperti sono facoltativi.
+    if (v.kind === "normale") {
+      // Ospite sulla prenotazione: nessun cliente di rubrica (client_id e new_client sono ignorati).
+      if (!v.guest_name) issue("guest_name", "Inserisci il nome dell'ospite");
       if (v.menu_id || v.kids_menu_id) issue("menu_id", "Le prenotazioni normali non hanno menù");
       if (v.status === "opzione") issue("status", "Le prenotazioni normali non hanno lo stato Attesa");
       checkCovers(v, ctx);
     } else {
-      // appuntamento: incontro con il cliente, niente menù.
-      if (v.menu_id || v.kids_menu_id) issue("menu_id", "Gli appuntamenti non hanno menù");
-      checkCovers(v, ctx);
+      // Evento e appuntamento: un cliente di rubrica, esattamente uno tra esistente e nuovo.
+      if (!v.client_id && !v.new_client) issue("client_id", "Indica il cliente");
+      if (v.client_id && v.new_client) {
+        issue("new_client", "Scegli un cliente esistente oppure inserisci un nuovo cliente, non entrambi");
+      }
+      if (v.kind === "evento") {
+        // Il menù è facoltativo: senza menù l'evento non ha copia piatti e il preventivo automatico ha 0 righe.
+        checkCovers(v, ctx);
+      } else {
+        // appuntamento: incontro con il cliente, niente menù.
+        if (v.menu_id || v.kids_menu_id) issue("menu_id", "Gli appuntamenti non hanno menù");
+        checkCovers(v, ctx);
+      }
     }
   })
-  .transform((v) => ({
-    ...v,
-    // Normali: sempre confermate (annullato escluso). Eventi: stato richiesto o "opzione", ricalcolato dal server.
-    status: v.kind === "normale" ? normalBookingStatus(v.status ?? "confermato") : (v.status ?? "opzione"),
-  }));
+  .transform((v) => {
+    const normal = v.kind === "normale";
+    return {
+      ...v,
+      // Normali: nessun cliente di rubrica, ospite sulla prenotazione. Altri tipi: nessun ospite.
+      client_id: normal ? null : (v.client_id ?? null),
+      new_client: normal ? null : (v.new_client ?? null),
+      guest_name: normal ? (v.guest_name ?? null) : null,
+      guest_phone: normal ? (v.guest_phone ?? null) : null,
+      // Normali: sempre confermate (annullato escluso). Eventi: stato richiesto o "opzione", ricalcolato dal server.
+      status: normal ? normalBookingStatus(v.status ?? "confermato") : (v.status ?? "opzione"),
+    };
+  });
+
+/** Prenotazione (evento, normale, appuntamento). Accetta anche i payload normali del vecchio client (vedi legacyNormalGuest). */
+export const BookingInput = z.preprocess(legacyNormalGuest, BookingObject);
 export type BookingInputType = z.infer<typeof BookingInput>;
 
 /** Testo di una nota interna sulla prenotazione (cucina e admin). */
