@@ -50,7 +50,7 @@ export interface Menu { id: string; name: string; season: string | null; price_p
 export interface BookingDish { id: string; booking_id: string; course: Course; name: string; sort: number; }
 export interface BookingAllergy { id: string; booking_id: string; subject_name: string | null; condition: string; notes: string | null; }
 export interface Booking {
-  id: string; client_id: string; event_name: string | null; event_date: string; event_time: string | null;
+  id: string; client_id: string; event_date: string; event_time: string | null;
   room_id: string | null; adults: number; children: number; kids_menus: number;
   menu_id: string | null; kids_menu_id: string | null; setup_colors: string[]; setup_notes: string | null;
   status: BookingStatus; notes: string | null; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string;
@@ -90,7 +90,7 @@ Inoltre in `src/lib/quote-utils.ts` (puro, usabile client e server): `export fun
 - `ClientInput`: first_name, last_name (trim, min 1), phone (trim, min 6, regex `^[+0-9 ()-]+$`), email (email o "" → null), tax_code (opz., 16 alfanumerici uppercase o "" → null), vat_number (opz., 11 cifre, ammesso prefisso IT, o "" → null), notes (opz.).
 - `AllergyInput`: { subject_name?: string|null, condition: string min 1, notes?: string|null }
 - `DishInput`: { course: Course, name: string min 1, sort: int >= 0 }
-- `BookingInput`: client_id uuid, event_name?, event_date `YYYY-MM-DD`, event_time? `HH:MM` o null, room_id uuid|null, adults int>=0, children int>=0, kids_menus int>=0 (refine: kids_menus <= children; adults+children >= 1), menu_id uuid|null, kids_menu_id uuid|null, setup_colors: array di SETUP_COLORS, setup_notes?, status BookingStatus (default "opzione"), notes?, allergies: AllergyInput[], dishes?: DishInput[] (se assente e menu_id presente, il backend copia i piatti dal menù).
+- `BookingInput`: client_id uuid, event_date `YYYY-MM-DD`, event_time? `HH:MM` o null, room_id uuid|null, adults int>=0, children int>=0, kids_menus int>=0 (refine: kids_menus <= children; adults+children >= 1), menu_id uuid|null, kids_menu_id uuid|null, setup_colors: array di SETUP_COLORS, setup_notes?, status BookingStatus (default "opzione"), notes?, allergies: AllergyInput[], dishes?: DishInput[] (se assente e menu_id presente, il backend copia i piatti dal menù).
 - `CoversInput`: { adults, children, kids_menus } con le stesse regole.
 - `OperatorInput`: full_name min 2, email, password min 8, role "sala"|"cucina", is_chef boolean (forzato false se role ≠ "cucina").
 - `OperatorUpdateInput`: full_name, role "sala"|"cucina", is_chef, active.

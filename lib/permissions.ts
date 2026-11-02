@@ -72,6 +72,11 @@ export function canAssignRoom(p: Profile, kind: BookingKind): boolean {
   return isAdmin(p) || (p.active && p.role === "sala");
 }
 
+/** Foglio eventi del giorno (export PDF/DOCX per la cucina): admin e cucina attivi. La sala non lo esporta. */
+export function canViewEventSheet(p: Profile): boolean {
+  return p.active && (p.role === "admin" || p.role === "cucina");
+}
+
 /** Giacenza: admin e cucina (leggere, inviare report). */
 export function canUseInventory(p: Profile): boolean {
   return p.active && (p.role === "admin" || p.role === "cucina");

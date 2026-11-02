@@ -47,10 +47,12 @@ export function DocumentDownload({
 
   // Il documento si genera sul server: offline non è disponibile.
   if (!online) {
+    // Con flex-wrap l'avviso va su una riga propria (basis-full) invece di uscire dal bottone, che può avere
+    // `whitespace-nowrap` da buttonClasses.
     return (
-      <span aria-disabled="true" className={cn(className, "cursor-not-allowed opacity-50")}>
+      <span aria-disabled="true" className={cn(className, "flex-wrap cursor-not-allowed opacity-50")}>
         {children}
-        <span className="ml-1 text-[12px] font-normal normal-case tracking-normal text-slate-dark">· Disponibile solo online</span>
+        <span className="ml-1 basis-full text-center text-[12px] font-normal normal-case tracking-normal text-slate-dark">· Disponibile solo online</span>
       </span>
     );
   }

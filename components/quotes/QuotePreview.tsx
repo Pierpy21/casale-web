@@ -89,7 +89,6 @@ export function QuotePreview({ model }: QuotePreviewProps) {
           <section className={styles.col} aria-label="Evento">
             <p className={styles.eyebrow}>Evento</p>
             <dl>
-              {event.name ? <KeyValue label="Evento" value={event.name} /> : null}
               <KeyValue label="Data" value={event.dateLong} />
               {event.time ? <KeyValue label="Ora" value={event.time} /> : null}
               <KeyValue label="Sala" value={event.room} />

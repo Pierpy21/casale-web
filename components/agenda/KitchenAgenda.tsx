@@ -19,7 +19,8 @@ import {
   type AgendaKindFilter,
   type IsoRange,
 } from "./agenda-utils";
-import { MenuChips, summarizeDay } from "./DaySummary";
+import { DaySummary } from "./DaySummary";
+import { EventSheetButton } from "./EventSheetButton";
 import { MobileCalendar } from "./MobileCalendar";
 import { EmptyDay, nextEventFrom } from "./NextEventHint";
 
@@ -99,7 +100,6 @@ export function KitchenAgenda({
   const items = filterBookings(dayItems, kind);
   const events = items.filter((b) => b.kind === "evento");
   const others = items.filter((b) => b.kind !== "evento");
-  const summary = summarizeDay(items);
   const headline = capitalize(formatIt(toDate(selected), "EEEE d MMMM"));
 
   const subline = dayCountLabel(items);
@@ -140,7 +140,8 @@ export function KitchenAgenda({
             </div>
           </header>
 
-          <MenuChips menus={summary.menus} size="lg" />
+          {/* Riepilogo della giornata, con i menù in dimensione grande per la cucina. */}
+          <DaySummary bookings={items} menuSize="lg" />
 
           {items.length === 0 ? (
             <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={(iso) => navigate(iso)} />
@@ -148,9 +149,13 @@ export function KitchenAgenda({
             <>
               {events.length > 0 && (
                 <section aria-label="Eventi del giorno" className="flex min-w-0 flex-col gap-4">
-                  <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
-                    Eventi · {events.length}
-                  </h2>
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                    <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+                      Eventi · {events.length}
+                    </h2>
+                    {/* Foglio eventi per la cucina. Questa vista è solo del ruolo cucina (agenda/page.tsx); la route accetta anche admin. */}
+                    <EventSheetButton date={selected} />
+                  </div>
                   <ul className="flex min-w-0 flex-col gap-5">{events.map(kitchenCard)}</ul>
                 </section>
               )}

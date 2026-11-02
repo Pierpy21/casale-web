@@ -23,6 +23,14 @@ export interface ReservationSheetView {
   rows: ReservationPdfRow[];
 }
 
+/** Intestazione e piè di pagina del foglio: stessi testi del PDF e dell'anteprima HTML. */
+export const SHEET_ISSUER = {
+  name: "Casale del Notaio",
+  tagline: "Del gusto il Teatro.",
+  lines: ["Via Nicolosi 67, 95032 Belpasso (CT)", "+39 340 109 0100 · info@casaledelnotaio.it"],
+  footer: "Casale del Notaio · Via Nicolosi 67, Belpasso (CT)",
+} as const;
+
 const capitalize = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 /** Testi e valori del foglio (puro): usato anche dal renderer DOCX. */

@@ -134,7 +134,6 @@ export function mapBooking(r: PbRecord): Booking {
     // Le prenotazioni senza tipo (dati precedenti alla migrazione) sono eventi.
     kind: (nn(r.kind) ?? "evento") as BookingKind,
     event_type: nn(r.event_type),
-    event_name: nn(r.event_name),
     event_date: toDateOnly(r.event_date),
     event_time: nn(r.event_time),
     room_id: nn(r.room),

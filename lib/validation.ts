@@ -259,7 +259,6 @@ export const BookingInput = z
     client_id: optUuid,
     new_client: NewClientInput.nullish(),
     event_type: eventTypeSchema,
-    event_name: optText,
     event_date: dateSchema,
     event_time: z.preprocess(emptyToNull, timeSchema.nullable()),
     room_id: optUuid,
@@ -298,7 +297,6 @@ export const BookingInput = z
     }
 
     if (v.kind === "evento") {
-      if (!v.event_name) issue("event_name", "Nome evento obbligatorio");
       if (!v.event_type) issue("event_type", "Tipo evento obbligatorio");
       // Il menù è facoltativo: senza menù l'evento non ha copia piatti e il preventivo automatico ha 0 righe.
       checkCovers(v, ctx);

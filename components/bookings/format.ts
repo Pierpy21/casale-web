@@ -20,13 +20,13 @@ export function totalCovers(b: Pick<BookingListItem, "adults" | "children">): nu
   return b.adults + b.children;
 }
 
-export function bookingTitle(b: Pick<BookingListItem, "event_name" | "client">): string {
-  const eventName = b.event_name?.trim();
-  return eventName ? eventName : `${b.client.first_name} ${b.client.last_name}`;
-}
-
+/** Titolo di una prenotazione: il nome del cliente (non esiste più un nome evento). */
 export function clientFullName(b: Pick<BookingListItem, "client">): string {
   return `${b.client.first_name} ${b.client.last_name}`;
+}
+
+export function bookingTitle(b: Pick<BookingListItem, "client">): string {
+  return clientFullName(b);
 }
 
 export interface DishGroup {

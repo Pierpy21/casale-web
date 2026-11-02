@@ -123,11 +123,13 @@ export function MenuChips({ menus, size = "md", title = "Menù del giorno", clas
 export interface DaySummaryProps {
   /** Prenotazioni del giorno (anche annullate o appuntamenti: vengono esclusi qui). */
   bookings: BookingListItem[];
+  /** Dimensione dei chip menù (`lg` per la cucina). */
+  menuSize?: "md" | "lg";
   className?: string;
 }
 
 /** Riepilogo compatto della giornata: tre indicatori e i menù del giorno. Non renderizza nulla senza prenotazioni attive. */
-export function DaySummary({ bookings, className }: DaySummaryProps) {
+export function DaySummary({ bookings, menuSize = "md", className }: DaySummaryProps) {
   const summary = summarizeDay(bookings);
   if (summary.bookingsCount === 0) return null;
 
@@ -145,7 +147,7 @@ export function DaySummary({ bookings, className }: DaySummaryProps) {
         <Stat label="Di cui alla carta" value={summary.alCartaCovers} hint={`Eventi ${summary.eventCovers}`} />
         <Stat label="Adulti / bambini" value={`${summary.adults} / ${summary.children}`} />
       </div>
-      <MenuChips menus={summary.menus} />
+      <MenuChips menus={summary.menus} size={menuSize} />
     </section>
   );
 }

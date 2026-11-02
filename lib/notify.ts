@@ -156,7 +156,6 @@ function toBrief(r: PbRecord, allergyCount: number): BookingBrief {
     id: r.id,
     kind: (String(r.kind || "evento")) as BookingBrief["kind"],
     event_type: r.event_type ? String(r.event_type) : null,
-    event_name: r.event_name ? String(r.event_name) : null,
     event_time: r.event_time ? String(r.event_time) : null,
     event_date: toDateOnly(r.event_date),
     status: r.status as BookingStatus,

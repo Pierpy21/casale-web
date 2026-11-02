@@ -212,7 +212,6 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
           </View>
           <View style={styles.col}>
             <Text style={styles.eyebrow}>Evento</Text>
-            {event.name ? <KeyValue label="Evento" value={event.name} /> : null}
             <KeyValue label="Data" value={event.dateLong} />
             {event.time ? <KeyValue label="Ora" value={event.time} /> : null}
             <KeyValue label="Sala" value={event.room} />

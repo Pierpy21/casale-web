@@ -224,7 +224,6 @@ export async function renderQuoteDocx(model: QuoteDocumentModel): Promise<Buffer
   ];
   const eventLines: Paragraph[] = [
     eyebrow("Evento"),
-    ...(event.name ? [kv("Evento", event.name)] : []),
     kv("Data", event.dateLong),
     ...(event.time ? [kv("Ora", event.time)] : []),
     kv("Sala", event.room),

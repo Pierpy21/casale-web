@@ -2,7 +2,8 @@ import { STATUS_LABELS, type BookingStatus } from "@/lib/types";
 
 /** Etichette italiane dei campi registrati in booking_changes (nomi colonna del DB). */
 const FIELD_LABELS: Record<string, string> = {
-  event_name: "Nome evento",
+  /** Storico: il campo è stato rimosso (il nome è il cliente); resta solo per leggere le voci vecchie del registro. */
+  event_name: "Nome evento (rimosso)",
   event_date: "Data evento",
   event_time: "Ora",
   client_id: "Cliente",

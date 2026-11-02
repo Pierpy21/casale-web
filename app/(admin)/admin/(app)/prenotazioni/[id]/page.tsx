@@ -279,7 +279,6 @@ export default async function BookingDetailPage({
               />
             )}
           </div>
-          {booking.event_name && <p className="wrap-anywhere text-[15px] text-slate-dark">{clientName}</p>}
           <div className="flex flex-wrap items-center gap-3">
             <KindBadge kind={booking.kind} />
             <StatusBadge status={booking.status} />
@@ -440,7 +439,6 @@ export default async function BookingDetailPage({
                 <StatusBadge status={booking.status} />
               </InfoRow>
               {isEvent && <InfoRow label="Tipo evento">{booking.event_type?.trim() || "Non indicato"}</InfoRow>}
-              {booking.event_name && <InfoRow label="Nome evento">{booking.event_name}</InfoRow>}
               {isEvent && (
                 <InfoRow label="Colori">
                   {booking.setup_colors.length > 0 ? (

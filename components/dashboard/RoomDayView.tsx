@@ -187,7 +187,6 @@ function BookingBlock({ booking, capacity }: { booking: BookingListItem; capacit
       </span>
       <span className="break-words text-[13px]">
         {clientFullName(booking)}
-        {booking.event_name ? ` · ${booking.event_name}` : ""}
       </span>
     </Link>
   );

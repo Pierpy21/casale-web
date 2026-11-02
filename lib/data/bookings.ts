@@ -7,7 +7,7 @@ import { isRecordId, dayEndPb, dayStartPb, nn, num, toDateOnly, type PbRecord } 
 import { mapChange } from "@/lib/pocketbase/mappers";
 import { listAll, listByParents, fetchOne } from "@/lib/pocketbase/queries";
 import { addDaysISO, monthBounds, romeToday } from "@/lib/dates";
-import { canAssignRoom, canSeeAppointments, canViewActivityLog, isAdmin } from "@/lib/permissions";
+import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, isAdmin } from "@/lib/permissions";
 import { mondayOf } from "@/lib/stats-period";
 import {
   BOOKING_KINDS,
@@ -18,6 +18,9 @@ import {
   type BookingListItem,
   type CoversStats,
   type DashboardStats,
+  type EventSheet,
+  type EventSheetMenuTotal,
+  type EventSheetRow,
   type MenuConsumption,
   type NextEventBrief,
   type Profile,
@@ -27,6 +30,8 @@ import {
   type StatsKind,
   type WeekStats,
 } from "@/lib/types";
+import { groupDishes } from "@/components/bookings/format";
+import { getBookingNotesFor } from "./notes";
 import {
   BOOKING_DETAIL_EXPAND,
   BOOKING_LIST_EXPAND,
@@ -92,7 +97,6 @@ export async function getRoomBookingSlots(from: string, to: string): Promise<Roo
     return {
       id: r.id,
       event_date: toDateOnly(r.event_date),
-      event_name: r.event_name ? String(r.event_name) : null,
       room_id: String(r.room ?? ""),
       client_name: client ? `${client.first_name} ${client.last_name}` : "",
       adults: num(r.adults),
@@ -192,6 +196,71 @@ export async function getReservationSheet(date: string): Promise<ReservationShee
 }
 
 /**
+ * Foglio eventi di un giorno (export PDF/DOCX per la cucina): solo banchetti (kind evento) non annullati,
+ * in ordine di orario. Stessi dati della scheda cucina (getBookingsInRange + note cucina), senza telefono e prezzi.
+ * Null se non loggato o se non admin / cucina attivi.
+ */
+export async function getEventSheet(date: string): Promise<EventSheet | null> {
+  if (!ISO_DATE.test(date)) return null;
+  const me = await getCurrentProfile();
+  if (!me || !canViewEventSheet(me)) return null;
+
+  // getBookingsInRange esclude già gli annullati e (per la cucina) azzera prezzi e telefono.
+  const events = (await getBookingsInRange(date, date)).filter((b) => b.kind === "evento");
+  const notesById = await getBookingNotesFor(events.map((b) => b.id));
+
+  let adults = 0;
+  let children = 0;
+  const menus = new Map<string, EventSheetMenuTotal>();
+  const addMenu = (key: string, name: string, kind: EventSheetMenuTotal["kind"], quantity: number) => {
+    if (quantity <= 0) return;
+    const current = menus.get(key);
+    if (current) current.quantity += quantity;
+    else menus.set(key, { name, kind, quantity });
+  };
+
+  const rows: EventSheetRow[] = events.map((b) => {
+    adults += b.adults;
+    children += b.children;
+    if (b.menu) addMenu(`menu:${b.menu.id}`, b.menu.name, "menu", b.adults);
+    if (b.kids_menu) addMenu(`kids:${b.kids_menu.id}`, b.kids_menu.name, "kids", b.kids_menus);
+
+    return {
+      time: b.event_time ? b.event_time.slice(0, 5) : null,
+      client_name: `${b.client.first_name} ${b.client.last_name}`.trim(),
+      room: b.room?.name ?? null,
+      adults: b.adults,
+      children: b.children,
+      menu: b.menu?.name ?? null,
+      kids_menu: b.kids_menu?.name ?? null,
+      kids_menus: b.kids_menus,
+      dishes: groupDishes(b.dishes).map((g) => ({ course: g.course, label: g.label, items: g.items.map((d) => d.name) })),
+      allergies: b.allergies.map((a) => ({
+        subject: a.subject_name?.trim() || null,
+        condition: a.condition,
+        notes: a.notes?.trim() || null,
+      })),
+      setup_colors: b.setup_colors,
+      setup_notes: b.setup_notes?.trim() || null,
+      booking_notes: b.notes?.trim() || null,
+      kitchen_notes: (notesById[b.id] ?? []).map((n) => ({ author: n.author_name, body: n.body, created_at: n.created_at })),
+    };
+  });
+
+  return {
+    date,
+    rows,
+    totals: {
+      events: events.length,
+      adults,
+      children,
+      covers: adults + children,
+      menus: [...menus.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name, "it")),
+    },
+  };
+}
+
+/**
  * Primo evento (banchetto non annullato) con data successiva a `date`, per l'empty state dell'agenda. Ogni profilo attivo; errori → null.
  */
 export async function getNextEventAfter(date: string): Promise<NextEventBrief | null> {
@@ -213,14 +282,13 @@ export async function getNextEventAfter(date: string): Promise<NextEventBrief | 
     const r = page.items[0] as unknown as PbRecord | undefined;
     if (!r) return null;
     const client = r.expand?.client as PbRecord | undefined;
-    const eventName = r.event_name ? String(r.event_name).trim() : "";
     const clientName = client ? `${client.first_name} ${client.last_name}`.trim() : "";
     return {
       id: r.id,
       event_date: toDateOnly(r.event_date),
       event_time: nn(r.event_time),
-      // Stessa regola di bookingTitle (components/bookings/format.ts): nome evento, altrimenti cliente.
-      title: eventName || clientName || "Evento",
+      // Stessa regola di bookingTitle (components/bookings/format.ts): nome del cliente.
+      title: clientName || "Evento",
     };
   } catch {
     return null;
