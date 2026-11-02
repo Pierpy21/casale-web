@@ -195,7 +195,7 @@ export function ClientNameCombobox({ id, value, invalid, describedBy, disabled, 
               >
                 <span className="wrap-anywhere text-[15px] text-ink">
                   {suggestionFullName(client)}
-                  <span className="text-slate-dark"> · {client.phone}</span>
+                  {client.phone && <span className="text-slate-dark"> · {client.phone}</span>}
                 </span>
                 {email && <span className="block truncate text-[13px] text-slate">{email}</span>}
               </li>

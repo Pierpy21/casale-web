@@ -119,6 +119,11 @@ export function quoteTotals(draft: QuoteDraft, lines: QuoteLineDraft[]): QuoteTo
   });
 }
 
+/** Voce aggiunta a mano e lasciata vuota (descrizione e prezzo): non è una voce, si ignora all'invio. */
+export function isBlankQuoteLine(line: QuoteLineDraft): boolean {
+  return !line.description.trim() && line.unit_price.trim() === "";
+}
+
 export interface QuotePayload {
   lines: QuoteLine[];
   discount: number;
@@ -142,10 +147,10 @@ export function buildQuotePayload(
     (errors[key] ??= []).push(message);
   };
 
-  if (lines.length === 0) add("quote.lines", "Aggiungi almeno una voce al preventivo");
-
+  // Nessuna voce: il preventivo si crea comunque (come quello automatico senza menù). Le righe vuote si ignorano.
   const out: QuoteLine[] = [];
   lines.forEach((line, index) => {
+    if (isBlankQuoteLine(line)) return;
     const description = line.description.trim();
     if (!description) add(`quote.lines.${index}.description`, "Descrizione obbligatoria");
     const quantity = parseAmount(line.quantity);

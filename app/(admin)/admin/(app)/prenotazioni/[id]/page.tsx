@@ -97,7 +97,7 @@ export default async function BookingDetailPage({
   const warnings = decodeWarnings(query.warnings);
 
   const client = booking.client;
-  const clientName = `${client.first_name} ${client.last_name}`;
+  const clientName = `${client.first_name} ${client.last_name}`.trim();
   const eventDate = toDate(booking.event_date);
   const time = formatTime(booking.event_time);
   const finance = financeVisible ? getPaymentSummary(booking, payments) : null;

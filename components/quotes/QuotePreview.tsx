@@ -80,7 +80,7 @@ export function QuotePreview({ model }: QuotePreviewProps) {
             <p className={styles.eyebrow}>Cliente</p>
             <dl>
               <KeyValue label="Nome" value={client.fullName} />
-              <KeyValue label="Telefono" value={client.phone} />
+              {client.phone ? <KeyValue label="Telefono" value={client.phone} /> : null}
               {client.email ? <KeyValue label="Email" value={client.email} /> : null}
               {client.taxCode ? <KeyValue label="Codice fiscale" value={client.taxCode} /> : null}
               {client.vatNumber ? <KeyValue label="Partita IVA" value={client.vatNumber} /> : null}

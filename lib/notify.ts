@@ -159,7 +159,7 @@ function toBrief(r: PbRecord, allergyCount: number): BookingBrief {
     event_time: r.event_time ? String(r.event_time) : null,
     event_date: toDateOnly(r.event_date),
     status: r.status as BookingStatus,
-    client_name: client ? `${client.first_name} ${client.last_name}` : "",
+    client_name: client ? `${client.first_name} ${client.last_name ?? ""}`.trim() : "",
     room_name: room ? String(room.name) : null,
     menu_name: menu ? String(menu.name) : null,
     adults: Number(r.adults ?? 0),

@@ -92,10 +92,7 @@ export async function createQuote(
       kids_menu: kids ? { name: String(kids.name), price_per_person: num(kids.price_per_person) } : null,
     });
   }
-  // Preventivo automatico senza menù (evento senza menù): 0 righe automatiche, il preventivo si crea comunque.
-  if (draft && lines.length === 0) {
-    throw new UserFacingError("Nessuna riga da preventivare: aggiungi almeno una riga.");
-  }
+  // Nessuna riga (evento senza menù e senza voci): il preventivo si crea comunque, con 0 righe, come quello automatico.
 
   const issued = romeToday();
   const validUntil = draft?.valid_until ?? addDaysISO(issued, 30);
