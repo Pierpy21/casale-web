@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { InventoryProductList } from "@/components/inventory/InventoryProductList";
 import { ButtonLink, PageHeader } from "@/components/ui";
 import { requireProfile } from "@/lib/auth";
-import { getInventoryProducts } from "@/lib/data/inventory";
+import { getInventoryProducts, getInventorySuppliers } from "@/lib/data/inventory";
 import { canManageInventory } from "@/lib/permissions";
 
 export const metadata: Metadata = {
@@ -14,7 +14,10 @@ export default async function InventoryProductsPage() {
   const profile = await requireProfile();
   if (!canManageInventory(profile)) redirect("/admin/giacenza");
 
-  const products = await getInventoryProducts({ includeInactive: true });
+  const [products, suppliers] = await Promise.all([
+    getInventoryProducts({ includeInactive: true }),
+    getInventorySuppliers({ includeInactive: true }),
+  ]);
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
@@ -24,12 +27,17 @@ export default async function InventoryProductsPage() {
         title="Prodotti"
         description="Catalogo dei prodotti scelti nelle giacenze. Un prodotto disattivato non compare più tra le scelte; lo storico resta invariato."
         actions={
-          <ButtonLink href="/admin/giacenza" variant="ghost" size="sm">
-            ← Giacenza
-          </ButtonLink>
+          <>
+            <ButtonLink href="/admin/giacenza/fornitori" variant="outline" size="sm">
+              Fornitori
+            </ButtonLink>
+            <ButtonLink href="/admin/giacenza" variant="ghost" size="sm">
+              ← Giacenza
+            </ButtonLink>
+          </>
         }
       />
-      <InventoryProductList products={products} />
+      <InventoryProductList products={products} suppliers={suppliers} />
     </div>
   );
 }

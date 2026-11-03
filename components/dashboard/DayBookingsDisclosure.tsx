@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { bookingPersonName, formatCovers, formatTime } from "@/components/bookings/format";
-import { Disclosure } from "@/components/ui";
+import { bookingPersonName, bookingPhone, bookingTimeSortKey, bookingWhen, formatCovers } from "@/components/bookings/format";
+import { Disclosure, PhoneLink } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import type { BookingListItem } from "@/lib/types";
 
@@ -12,9 +12,13 @@ export interface DayBookingsDisclosureProps {
   className?: string;
 }
 
-/** Tendina chiusa di default con le prenotazioni normali del giorno: ora, cliente, coperti, sala. */
+/** Tendina chiusa di default con le prenotazioni normali del giorno: pasto, cliente, coperti, sala. */
 export function DayBookingsDisclosure({ dayLabel, bookings, className }: DayBookingsDisclosureProps) {
-  const sorted = [...bookings].sort((a, b) => (a.event_time ?? "99:99").localeCompare(b.event_time ?? "99:99"));
+  const sorted = [...bookings].sort((a, b) => {
+    const ka = bookingTimeSortKey(a);
+    const kb = bookingTimeSortKey(b);
+    return ka === kb ? 0 : ka < kb ? -1 : 1;
+  });
 
   return (
     <Disclosure
@@ -33,20 +37,27 @@ export function DayBookingsDisclosure({ dayLabel, bookings, className }: DayBook
       ) : (
         <ul className="divide-y divide-sand border-t border-sand">
           {sorted.map((booking) => {
-            const time = formatTime(booking.event_time);
+            const when = bookingWhen(booking);
+            const phone = bookingPhone(booking);
             return (
               <li key={booking.id} className="min-w-0">
                 <Link
                   href={`/admin/prenotazioni/${booking.id}`}
                   className="flex min-h-11 min-w-0 flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-[14px] text-ink transition-colors duration-200 hover:bg-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-petrol"
                 >
-                  <span className="w-14 shrink-0 font-serif text-lg tabular-nums">{time ?? "—"}</span>
+                  <span className="w-20 shrink-0 font-serif text-lg tabular-nums">{when ?? "—"}</span>
                   <span className="min-w-0 flex-1 break-words font-medium">{bookingPersonName(booking)}</span>
                   <span className="shrink-0 tabular-nums text-slate-dark">{formatCovers(booking)}</span>
                   <span className="w-full break-words text-[13px] text-slate-dark sm:w-auto sm:shrink-0">
                     {booking.room?.name ?? "Sala da assegnare"}
                   </span>
                 </Link>
+                {/* Telefono sotto il link, non dentro: un <a> dentro un <a> non è valido. */}
+                {phone && (
+                  <div className="px-4 pb-2.5">
+                    <PhoneLink phone={phone} className="text-[13px]" />
+                  </div>
+                )}
               </li>
             );
           })}

@@ -4,12 +4,24 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { createBooking, updateBooking } from "@/app/actions/bookings";
+import { addPayment } from "@/app/actions/payments";
 import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
-import { Alert, Field, Input, Modal, Select, Textarea, cn } from "@/components/ui";
+import { Alert, Button, Field, Input, Modal, Select, Textarea, cn } from "@/components/ui";
+import { PaymentDraftFields } from "@/components/payments/PaymentDraftFields";
+import {
+  buildPaymentFormData,
+  emptyPaymentDraft,
+  newPaymentLabel,
+  parseAmountInput,
+  validateDraft,
+  type DraftErrors,
+  type PaymentDraft,
+} from "@/components/payments/draft";
 import {
   EVENT_TYPES,
   STATUS_LABELS,
   type BookingDetail,
+  type BookingMeal,
   type BookingStatus,
   type ClientOption,
   type ClientSuggestion,
@@ -33,7 +45,6 @@ import {
   newClientPayload,
   resolveEventType,
   roomWarnings,
-  timeInputValue,
   validateAllergies,
   validateNewClient,
   type AllergyRow,
@@ -51,6 +62,7 @@ import {
   ColorChips,
   FormCard,
   GroupLabel,
+  MealChoice,
   MenuChoice,
   SubmitBar,
   focusFirstInvalid,
@@ -59,7 +71,7 @@ import {
 } from "./form-primitives";
 import { DishesEditor, type DishPayload } from "./DishesEditor";
 import { QuotePanel } from "./QuotePanel";
-import { EMPTY_QUOTE_DRAFT, autoQuoteLines, buildQuotePayload, type QuoteDraft, type QuotePayload } from "./quote-draft";
+import { EMPTY_QUOTE_DRAFT, autoQuoteLines, buildQuotePayload, quoteTotals, type QuoteDraft, type QuotePayload } from "./quote-draft";
 
 export interface EventFormProps {
   mode: "create" | "edit";
@@ -84,7 +96,8 @@ export interface EventFormProps {
 interface EventValues {
   event_date: string;
   eventType: EventTypeState;
-  event_time: string;
+  /** Pasto facoltativo: pranzo, cena o nessuno. */
+  meal: BookingMeal | null;
   status: BookingStatus;
   adults: number;
   children: number;
@@ -103,7 +116,7 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
     return {
       event_date: initialDate,
       eventType: { choice: "", custom: "" },
-      event_time: "",
+      meal: null,
       status: "opzione",
       adults: 0,
       children: 0,
@@ -120,7 +133,7 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
   return {
     event_date: booking.event_date,
     eventType: eventTypeState(booking.event_type),
-    event_time: timeInputValue(booking.event_time),
+    meal: booking.meal,
     status: booking.status,
     adults: booking.adults,
     children: booking.children,
@@ -172,6 +185,12 @@ export function EventForm({
   // Solo creazione: piatti personalizzati per questo evento (null = copia del menù scelto). Il catalogo non cambia.
   const [customDishes, setCustomDishes] = useState<DishPayload[] | null>(null);
   const [dishesEditorOpen, setDishesEditorOpen] = useState(false);
+  // Solo creazione, admin: acconto facoltativo, registrato subito dopo l'evento. Chiuso di default.
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [deposit, setDeposit] = useState<PaymentDraft>(() => emptyPaymentDraft());
+  const [depositErrors, setDepositErrors] = useState<DraftErrors>({});
+  const depositAllowed = !isEdit && isAdmin;
+  const depositActive = depositAllowed && depositOpen;
 
   /** Ogni modifica dell'utente toglie gli errori visibili: si ricalcolano alla prossima pressione di "salva". */
   const change = (changes: Partial<EventValues>) => {
@@ -181,6 +200,19 @@ export function EventForm({
   const changeQuote = (changes: Partial<QuoteDraft>) => {
     setErrors({});
     setQuote((q) => ({ ...q, ...changes }));
+  };
+  const changeDeposit = (changes: Partial<PaymentDraft>) => {
+    setDepositErrors({});
+    setDeposit((d) => ({ ...d, ...changes }));
+  };
+  const openDeposit = () => {
+    setDeposit(emptyPaymentDraft());
+    setDepositErrors({});
+    setDepositOpen(true);
+  };
+  const closeDeposit = () => {
+    setDepositOpen(false);
+    setDepositErrors({});
   };
   const changeNewClient = (changes: Partial<NewClientDraft>) => {
     setErrors({});
@@ -215,6 +247,9 @@ export function EventForm({
     quote.priceOverrides,
   );
   const quoteLines = [...autoLines, ...quote.extra];
+  // Residuo dopo l'acconto: solo se c'è un preventivo con un totale e un importo valido.
+  const quoteTotal = createQuote ? quoteTotals(quote, quoteLines).total : 0;
+  const depositAmount = depositActive ? parseAmountInput(deposit.amount) : null;
   const warnings = roomWarnings({
     roomId: values.room_id,
     eventDate: values.event_date,
@@ -301,12 +336,18 @@ export function EventForm({
       quotePayload = built.payload;
     }
 
+    // Acconto: stesse regole del pannello Pagamenti (importo, data, metodo obbligatorio, ricevuta).
+    const depositErrs = depositActive ? validateDraft(deposit) : {};
+    setDepositErrors(depositErrs);
+
     setErrors(local);
-    if (Object.keys(local).length > 0) {
+    if (Object.keys(local).length > 0 || Object.keys(depositErrs).length > 0) {
       setFormError("Controlla i campi evidenziati.");
       focusFirstInvalid(formRef.current);
       return;
     }
+    // FormData pronto prima dell'invio: il file della ricevuta resta nella bozza fino al salvataggio.
+    const depositForm = depositActive ? buildPaymentFormData(deposit) : null;
 
     const payload = {
       kind: "evento",
@@ -317,7 +358,7 @@ export function EventForm({
           : { new_client: newClientPayload(newClient) }),
       event_type: eventType,
       event_date: eventDate,
-      event_time: values.event_time || null,
+      meal: values.meal,
       room_id: values.room_id,
       adults: values.adults,
       children: values.children,
@@ -364,15 +405,41 @@ export function EventForm({
         applyError(result);
         return;
       }
-      // Offline: l'evento non ha ancora un id reale, quindi si torna all'agenda (in cache).
+      // Offline: l'evento ha solo un id temporaneo. L'acconto va in coda con lo stesso id: la coda lo sostituisce
+      // con quello reale quando l'evento parte (vedi sync.ts, rewriteTempIds).
       if (isQueued(result)) {
+        if (depositForm && result.tempId) {
+          const dep = await submitMutation("payments.addPayment", addPayment, [result.tempId, depositForm], {
+            label: newPaymentLabel(deposit),
+            entity: { type: "booking", id: result.tempId },
+          });
+          if (!dep.ok) {
+            // Caso raro: il browser risulta online ma la creazione è finita in coda. Non inviare di nuovo il modulo.
+            setFormError(`L’evento è salvato sul dispositivo, ma l’acconto non è stato registrato: ${dep.error} Aggiungilo dalla pagina dell’evento dopo l’invio.`);
+            return;
+          }
+        }
+        // Offline: l'evento non ha ancora un id reale, quindi si torna all'agenda (in cache).
         router.push(`/admin/agenda?date=${eventDate}&view=day`);
         return;
       }
-      // Con preventivo creato si apre il preventivo; altrimenti la prenotazione (con eventuali avvisi).
       const { id, quote_id, warnings: serverWarnings } = result.data;
-      const target = quote_id ? `/admin/preventivi/${quote_id}` : `/admin/prenotazioni/${id}`;
-      router.push(serverWarnings.length > 0 ? `${target}?warnings=${encodeWarnings(serverWarnings)}` : target);
+      // Acconto dopo l'evento. Se non si salva, l'evento resta: si porta alla prenotazione con il pannello Pagamenti aperto.
+      let depositError: string | null = null;
+      if (depositForm) {
+        const dep = await submitMutation("payments.addPayment", addPayment, [id, depositForm], {
+          label: newPaymentLabel(deposit),
+          entity: { type: "booking", id },
+        });
+        if (!dep.ok) depositError = dep.error;
+      }
+      const allWarnings = depositError ? [...serverWarnings, `Acconto non registrato: ${depositError}`] : serverWarnings;
+      const query: string[] = [];
+      if (depositError) query.push("payments_error=1", "pannello=pagamenti");
+      if (allWarnings.length > 0) query.push(`warnings=${encodeWarnings(allWarnings)}`);
+      // Con preventivo creato si apre il preventivo; altrimenti la prenotazione (con eventuali avvisi).
+      const base = quote_id && !depositError ? `/admin/preventivi/${quote_id}` : `/admin/prenotazioni/${id}`;
+      router.push(query.length > 0 ? `${base}?${query.join("&")}` : base);
     });
   };
 
@@ -448,20 +515,14 @@ export function EventForm({
                 </Field>
               )}
 
-              <Field label="Ora" htmlFor="event-time" error={first(errors.event_time)} hint="Facoltativa">
-                <Input
-                  id="event-time"
-                  type="time"
-                  invalid={!!errors.event_time}
-                  aria-describedby={describedBy("event-time", !!errors.event_time, true)}
-                  value={values.event_time}
-                  onChange={(e) => change({ event_time: e.target.value })}
-                />
-              </Field>
+              <MealChoice value={values.meal} onChange={(meal) => change({ meal })} disabled={pending} />
 
               <div className="flex min-w-0 flex-col gap-1.5">
                 <span className="text-[13px] font-medium text-ink">Stato</span>
-                <p className="rounded-btn border border-sand bg-cream/60 px-3.5 py-2.5 text-[15px] text-ink">{eventStatusLabel(values.status)}</p>
+                {/* Con un acconto già inserito l'evento risulta confermato: anteprima, il server ricalcola al salvataggio. */}
+                <p className="rounded-btn border border-sand bg-cream/60 px-3.5 py-2.5 text-[15px] text-ink">
+                  {eventStatusLabel(depositActive ? "confermato" : values.status)}
+                </p>
                 <span className="text-[13px] text-slate-dark">Si aggiorna da solo con gli acconti registrati.</span>
                 {isEdit && (
                   <span className="text-[13px] text-slate-dark">
@@ -618,6 +679,46 @@ export function EventForm({
               <Textarea id="notes" rows={4} value={values.notes} onChange={(e) => change({ notes: e.target.value })} />
             </Field>
           </FormCard>
+
+          {depositAllowed && (
+            <FormCard label="Acconto (facoltativo)">
+              {depositActive ? (
+                <>
+                  <PaymentDraftFields
+                    idPrefix="deposit-new"
+                    draft={deposit}
+                    errors={depositErrors}
+                    onChange={changeDeposit}
+                    disabled={pending}
+                  />
+                  {depositAmount !== null && quoteTotal > 0 && (
+                    <p className="text-[14px] text-slate-dark">
+                      Residuo dopo l’acconto:{" "}
+                      <span className="font-serif text-2xl tabular-nums text-ink">
+                        {formatEUR(Math.max(0, Math.round((quoteTotal - depositAmount) * 100) / 100))}
+                      </span>
+                    </p>
+                  )}
+                  <div className="flex justify-start">
+                    <Button variant="ghost" size="sm" className="min-h-11" disabled={pending} onClick={closeDeposit}>
+                      Togli acconto
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <p className="text-[14px] leading-relaxed text-slate-dark">
+                    Se il cliente versa una caparra, si registra qui. Con un acconto l’evento passa da “In attesa” a “Confermato”.
+                  </p>
+                  <div>
+                    <Button variant="outline" size="sm" className="min-h-11" disabled={pending} onClick={openDeposit}>
+                      Aggiungi acconto
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </FormCard>
+          )}
         </div>
 
         {!isEdit && (

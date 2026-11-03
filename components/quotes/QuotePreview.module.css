@@ -74,6 +74,21 @@
   color: #5a6668;
 }
 
+.logoBlock {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.logoNumber {
+  margin: calc(2.1 * var(--mm)) 0 0;
+  font-size: calc(3.17 * var(--mm)); /* 9 pt */
+  line-height: 1.3;
+  color: #5a6668;
+  text-align: right;
+}
+
 .logo {
   display: block;
   flex: 0 0 auto;

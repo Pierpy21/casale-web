@@ -1,15 +1,18 @@
-import type { InventorySupplier } from "@/lib/types";
+import { inventoryPdfFileName as fileNameFor } from "@/lib/inventory-utils";
 
 /**
  * URL inline del PDF di un report di giacenza (route /api/inventory/[id]/pdf). Funzione pura: usabile da server e client.
- * Con `supplier`: solo la lista d'ordine di quel fornitore.
+ * Con `supplierId`: solo la lista d'ordine di quel fornitore.
  */
-export function inventoryPdfHref(reportId: string, supplier?: InventorySupplier): string {
+export function inventoryPdfHref(reportId: string, supplierId?: string): string {
   const base = `/api/inventory/${reportId}/pdf`;
-  return supplier ? `${base}?supplier=${supplier}` : base;
+  return supplierId ? `${base}?supplier=${encodeURIComponent(supplierId)}` : base;
 }
 
-/** Nome del file scaricato/condiviso, coerente con la route del PDF. */
-export function inventoryPdfFileName(reportDate: string, supplier?: InventorySupplier): string {
-  return supplier ? `giacenza-${reportDate}-${supplier}.pdf` : `giacenza-${reportDate}.pdf`;
+/**
+ * Nome del file scaricato/condiviso, coerente con la route del PDF. Con `supplierName` (nome del fornitore nel report)
+ * è la lista d'ordine di quel fornitore, con il nome in slug.
+ */
+export function inventoryPdfFileName(reportDate: string, supplierName?: string | null): string {
+  return fileNameFor(reportDate, supplierName);
 }

@@ -5,8 +5,8 @@ import { formatEUR, kidsMenuRowLabel } from "@/lib/quote-utils";
 
 export interface BookingSummaryProps {
   booking: Pick<BookingDetail, "kind" | "adults" | "children" | "kids_menus" | "event_type" | "menu" | "kids_menu">;
-  /** Orario già formattato HH:mm, oppure null. */
-  time: string | null;
+  /** Pasto (Pranzo / Cena) per evento e normale, orario HH:mm per l'appuntamento; null se non indicato. */
+  when: string | null;
   /** Riepilogo economico: solo per l'amministrazione (null = non visibile). */
   finance: PaymentSummary | null;
 }
@@ -19,10 +19,10 @@ const GRID_COLUMNS = {
 
 /**
  * Numeri della prenotazione sotto il titolo, stessa forma del riepilogo giornata (Stat + chip menù).
- * Eventi: coperti, menù bambini, totale previsto e residuo (admin). Normali: coperti, adulti/bambini, ora.
+ * Eventi: coperti, menù bambini, totale previsto e residuo (admin). Normali: coperti, adulti/bambini, pasto.
  * Appuntamenti: ora e tipo evento.
  */
-export function BookingSummary({ booking, time, finance }: BookingSummaryProps) {
+export function BookingSummary({ booking, when, finance }: BookingSummaryProps) {
   const covers = booking.adults + booking.children;
   const tiles: { key: string; label: string; value: string | number; hint?: string; highlight?: boolean }[] = [];
 
@@ -58,9 +58,9 @@ export function BookingSummary({ booking, time, finance }: BookingSummaryProps) 
   } else if (booking.kind === "normale") {
     tiles.push({ key: "covers", label: "Coperti", value: covers });
     tiles.push({ key: "guests", label: "Adulti / bambini", value: `${booking.adults} / ${booking.children}` });
-    tiles.push({ key: "time", label: "Ora", value: time ?? "—" });
+    tiles.push({ key: "when", label: "Pasto", value: when ?? "—" });
   } else {
-    tiles.push({ key: "time", label: "Ora", value: time ?? "—" });
+    tiles.push({ key: "when", label: "Ora", value: when ?? "—" });
     tiles.push({ key: "type", label: "Tipo evento", value: booking.event_type?.trim() || "—" });
   }
 

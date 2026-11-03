@@ -33,7 +33,7 @@ export function MenuConsumptionList({ menus }: MenuConsumptionListProps) {
           <ul className="flex flex-col divide-y divide-sand">
             {group.items.map((menu) => (
               <li key={menu.menu_id} className="flex min-w-0 flex-col gap-2 py-3">
-                <div className="flex min-w-0 items-baseline justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <MenuBadge menuId={menu.menu_id} name={menu.name} />
                   <span className="shrink-0 text-[13px] tabular-nums text-slate-dark">{servingsLabel(menu.servings)}</span>
                 </div>

@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import { MenuBadge } from "@/components/menu/MenuBadge";
-import type { WeekStats } from "@/lib/types";
+import type { StatsKind, WeekStats } from "@/lib/types";
 import { busiestDayLabel, countLabel } from "./week-format";
 
 export interface WeekDetailsProps {
   week: WeekStats;
+  /** Filtro tipo della pagina: nasconde eventi o prenotazioni (e i menù) quando non pertinenti. */
+  kind?: StatsKind;
 }
 
 function Item({ label, children }: { label: string; children: ReactNode }) {
@@ -17,8 +19,8 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Dettagli di una settimana: n. eventi e prenotazioni, giorno più pieno e menù serviti (con il colore del menù). */
-export function WeekDetails({ week }: WeekDetailsProps) {
-  const menus = week.menus;
+export function WeekDetails({ week, kind = "tutti" }: WeekDetailsProps) {
+  const menus: WeekStats["menus"] = kind === "normale" ? [] : week.menus;
   // Menù più servito: quello con più porzioni (adulti o bambini); a parità vince il primo nell'elenco.
   const topMenu = menus.reduce<(typeof menus)[number] | null>(
     (best, menu) => (best === null || menu.servings > best.servings ? menu : best),
@@ -27,18 +29,22 @@ export function WeekDetails({ week }: WeekDetailsProps) {
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-        <Item label="Eventi">{countLabel(week.events, "evento", "eventi")}</Item>
-        <Item label="Prenotazioni">{countLabel(week.normal_bookings, "prenotazione", "prenotazioni")}</Item>
+        {kind !== "normale" && <Item label="Eventi">{countLabel(week.events, "evento", "eventi")}</Item>}
+        {kind !== "evento" && (
+          <Item label="Prenotazioni">{countLabel(week.normal_bookings, "prenotazione", "prenotazioni")}</Item>
+        )}
         <Item label="Giorno più pieno">
           {week.busiest_day ? busiestDayLabel(week.busiest_day) : <span className="text-slate-dark">Nessuno</span>}
         </Item>
-        <Item label="Menù più servito">
-          {topMenu ? (
-            <MenuBadge menuId={topMenu.menu_id} name={topMenu.name} />
-          ) : (
-            <span className="text-slate-dark">Nessun menù</span>
-          )}
-        </Item>
+        {kind !== "normale" && (
+          <Item label="Menù più servito">
+            {topMenu ? (
+              <MenuBadge menuId={topMenu.menu_id} name={topMenu.name} />
+            ) : (
+              <span className="text-slate-dark">Nessun menù</span>
+            )}
+          </Item>
+        )}
       </dl>
 
       {menus.length > 1 && (

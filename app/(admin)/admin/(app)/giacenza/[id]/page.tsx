@@ -8,8 +8,8 @@ import { MarkSeenButton } from "@/components/inventory/ReportActions";
 import { Badge, DocumentDownload, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
 import { requireProfile } from "@/lib/auth";
-import { mergeReportLines } from "@/lib/inventory-utils";
-import { getInventoryReport } from "@/lib/data/inventory";
+import { mergeReportLines, reportSuppliers } from "@/lib/inventory-utils";
+import { getInventoryReport, getInventorySuppliers } from "@/lib/data/inventory";
 import { canManageInventory, canUseInventory } from "@/lib/permissions";
 
 export const metadata: Metadata = {
@@ -23,12 +23,15 @@ export default async function InventoryReportPage({ params }: { params: Promise<
   const { id } = await params;
   if (!isUuid(id)) notFound();
 
-  const report = await getInventoryReport(id);
+  const [report, suppliers] = await Promise.all([getInventoryReport(id), getInventorySuppliers({ includeInactive: true })]);
   if (!report) notFound();
 
   const admin = canManageInventory(profile);
   const grouping: InventoryReportGrouping = admin ? "supplier" : "category";
   const rows = mergeReportLines(report.lines);
+  // Fornitori del report (ordine del catalogo), solo quelli visibili a chi guarda: la route PDF accetta questi.
+  const visibleIds = new Set(suppliers.map((s) => s.id));
+  const pdfSuppliers = reportSuppliers(report.lines, suppliers).filter((s) => visibleIds.has(s.id));
   const toOrderCount = rows.filter((row) => (row.to_order ?? 0) > 0).length;
   const presentCount = rows.filter((row) => (row.stock ?? 0) > 0).length;
   const seen = report.status === "visto";
@@ -57,20 +60,34 @@ export default async function InventoryReportPage({ params }: { params: Promise<
         </p>
         {report.notes && <p className="whitespace-pre-line wrap-anywhere text-[15px] leading-relaxed text-ink">{report.notes}</p>}
 
-        <div className="no-print flex flex-wrap items-start gap-3">
-          <DocumentDownload
-            href={inventoryPdfHref(report.id)}
-            fileName={inventoryPdfFileName(report.report_date)}
-            mimeType="application/pdf"
-            className={buttonClasses("outline", "md", "min-h-11")}
-          >
-            PDF completo
-          </DocumentDownload>
+        <div className="no-print flex flex-wrap items-start gap-x-6 gap-y-4">
+          <div role="group" aria-label="PDF della giacenza" className="flex min-w-0 flex-wrap gap-2">
+            <DocumentDownload
+              href={inventoryPdfHref(report.id)}
+              fileName={inventoryPdfFileName(report.report_date)}
+              mimeType="application/pdf"
+              className={buttonClasses("outline", "md", "min-h-11")}
+            >
+              PDF completo
+            </DocumentDownload>
+            {/* Una lista d'ordine per fornitore. Per la cucina solo i fornitori attivi (quelli che la route accetta). */}
+            {pdfSuppliers.map((supplier) => (
+              <DocumentDownload
+                key={supplier.id}
+                href={inventoryPdfHref(report.id, supplier.id)}
+                fileName={inventoryPdfFileName(report.report_date, supplier.name)}
+                mimeType="application/pdf"
+                className={buttonClasses("outline", "sm", "min-h-11")}
+              >
+                PDF {supplier.name}
+              </DocumentDownload>
+            ))}
+          </div>
           {admin && <MarkSeenButton reportId={report.id} seen={seen} />}
         </div>
       </header>
 
-      <InventoryReportSections report={report} grouping={grouping} />
+      <InventoryReportSections report={report} grouping={grouping} suppliers={suppliers} />
     </div>
   );
 }

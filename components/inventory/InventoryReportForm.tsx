@@ -5,13 +5,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent, type KeyboardEvent } from "react";
 import { createInventoryProduct, submitInventoryReport } from "@/app/actions/inventory";
 import { Alert, Button, Field, Input, cn } from "@/components/ui";
-import { compareInventoryProducts, INVENTORY_CATEGORY_COLORS } from "@/lib/inventory-utils";
+import { compareInventoryProducts, defaultInventorySupplier, INVENTORY_CATEGORY_COLORS, sortSuppliers } from "@/lib/inventory-utils";
 import { isQueued, submitMutation } from "@/lib/offline/submit";
 import {
   INVENTORY_CATEGORIES,
   INVENTORY_CATEGORY_LABELS,
-  INVENTORY_SUPPLIERS,
-  INVENTORY_SUPPLIER_LABELS,
   type InventoryCategory,
   type InventoryProduct,
   type InventorySupplier,
@@ -32,6 +30,8 @@ import { useIsTablet } from "./use-is-tablet";
 export interface InventoryReportFormProps {
   /** Prodotti attivi dal catalogo. */
   products: InventoryProduct[];
+  /** Fornitori (anche disattivati: quelli con prodotti restano visibili). Ordine di visualizzazione. */
+  suppliers: InventorySupplier[];
   /** Data di oggi (YYYY-MM-DD), calcolata sul server per evitare differenze di fuso. */
   today: string;
   /** Raggruppamento: per categoria (cucina) o per fornitore (admin). */
@@ -42,18 +42,21 @@ type Group = {
   key: string;
   label: string;
   category?: InventoryCategory;
-  supplier?: InventorySupplier;
+  supplierId?: string;
   all: InventoryProduct[];
 };
 
-function buildGroups(products: InventoryProduct[], groupBy: "category" | "supplier"): Group[] {
+function buildGroups(products: InventoryProduct[], groupBy: "category" | "supplier", suppliers: InventorySupplier[]): Group[] {
   if (groupBy === "supplier") {
-    return INVENTORY_SUPPLIERS.map((supplier) => ({
-      key: supplier,
-      label: INVENTORY_SUPPLIER_LABELS[supplier],
-      supplier,
-      all: products.filter((p) => p.supplier === supplier),
-    }));
+    // Attivi, più quelli disattivati che hanno ancora prodotti (altrimenti i prodotti sparirebbero dalla giacenza).
+    return sortSuppliers(suppliers)
+      .filter((s) => s.active || products.some((p) => p.supplier_id === s.id))
+      .map((supplier) => ({
+        key: supplier.id,
+        label: supplier.name,
+        supplierId: supplier.id,
+        all: products.filter((p) => p.supplier_id === supplier.id),
+      }));
   }
   return INVENTORY_CATEGORIES.map((category) => ({
     key: category,
@@ -74,7 +77,7 @@ const APPENDED_SORT = 1_000_000;
  * o per fornitore (admin), ricerca che filtra tutte le sezioni, barra di riepilogo e invio fisso in basso.
  * Le quantità restano in una bozza locale: un ricaricamento non fa perdere il lavoro.
  */
-export function InventoryReportForm({ products: initialProducts, today, groupBy = "category" }: InventoryReportFormProps) {
+export function InventoryReportForm({ products: initialProducts, suppliers, today, groupBy = "category" }: InventoryReportFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [products, setProducts] = useState<InventoryProduct[]>(initialProducts);
@@ -82,7 +85,7 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
   const [notes, setNotes] = useState("");
   const [counts, setCounts] = useState<Counts>({});
   const [openGroups, setOpenGroups] = useState<Set<string>>(
-    () => new Set(buildGroups(initialProducts, groupBy).filter((g) => g.all.length > 0).slice(0, 1).map((g) => g.key)),
+    () => new Set(buildGroups(initialProducts, groupBy, suppliers).filter((g) => g.all.length > 0).slice(0, 1).map((g) => g.key)),
   );
   const [query, setQuery] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -133,7 +136,7 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
   const searching = normalizedQuery.length > 0;
   const matches = (p: InventoryProduct) => !searching || normalizeSearchText(p.name).includes(normalizedQuery);
 
-  const groups = buildGroups(products, groupBy).map((group) => ({
+  const groups = buildGroups(products, groupBy, suppliers).map((group) => ({
     ...group,
     shown: group.all.filter(matches),
     filled: group.all.filter((p) => isFilled(counts[p.id])).length,
@@ -189,15 +192,17 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
           name: input.name,
           unit: input.unit,
           category: input.category,
-          ...(input.supplier ? { supplier: input.supplier } : {}),
+          ...(input.supplierId ? { supplier_id: input.supplierId } : {}),
         },
       ],
       { label: `Nuovo prodotto · ${input.name}`, createsTempId: true },
     );
     if (!result.ok) return result.error;
     // Offline il server non ha ancora risposto: il prodotto locale usa l'id temporaneo e i dati inseriti.
+    // Senza fornitore scelto, il predefinito è quello che il server userebbe (l'attivo "Altro", o il primo attivo).
+    const offlineSupplierId = input.supplierId ?? defaultInventorySupplier(suppliers)?.id ?? "";
     const ref = isQueued(result)
-      ? { id: result.data.id, name: input.name, unit: input.unit, category: input.category, supplier: input.supplier ?? ("altro" as const) }
+      ? { id: result.data.id, name: input.name, unit: input.unit, category: input.category, supplier_id: offlineSupplierId }
       : result.data;
     setProducts((list) => {
       if (list.some((p) => p.id === ref.id)) return list;
@@ -206,7 +211,7 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
         name: ref.name,
         unit: ref.unit,
         category: ref.category,
-        supplier: ref.supplier,
+        supplier_id: ref.supplier_id,
         sort: APPENDED_SORT,
         active: true,
         // Vuoto: nessuna verifica di conflitto lato server per un prodotto appena creato.
@@ -393,7 +398,7 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
               key={activeGroup.key}
               embedded
               category={activeGroup.category}
-              supplier={activeGroup.supplier}
+              supplierId={activeGroup.supplierId}
               label={activeGroup.label}
               products={activeGroup.shown}
               totalCount={activeGroup.all.length}
@@ -411,7 +416,7 @@ export function InventoryReportForm({ products: initialProducts, today, groupBy 
             <InventoryCategorySection
               key={group.key}
               category={group.category}
-              supplier={group.supplier}
+              supplierId={group.supplierId}
               label={group.label}
               products={group.shown}
               totalCount={group.all.length}

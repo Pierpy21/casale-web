@@ -3,10 +3,10 @@ import { getCurrentProfile } from "@/lib/auth";
 import { getAdminPb } from "@/lib/pocketbase/admin";
 import { dayEndPb, dayStartPb, isRecordId } from "@/lib/pocketbase/helpers";
 import { fetchOne, listAll } from "@/lib/pocketbase/queries";
-import { mapInventoryLine, mapInventoryProduct, mapInventoryReport } from "@/lib/pocketbase/mappers";
+import { mapInventoryLine, mapInventoryProduct, mapInventoryReport, mapInventorySupplier } from "@/lib/pocketbase/mappers";
 import { canUseInventory, isAdmin } from "@/lib/permissions";
-import { compareInventoryProducts } from "@/lib/inventory-utils";
-import type { InventoryProduct, InventoryReport } from "@/lib/types";
+import { compareInventoryProducts, sortSuppliers } from "@/lib/inventory-utils";
+import type { InventoryProduct, InventoryReport, InventorySupplier } from "@/lib/types";
 
 // Giacenza: leggibile da admin e cucina. Gli accessi passano dal client di servizio dopo il controllo del profilo.
 
@@ -18,6 +18,20 @@ export async function getInventoryProducts(opts?: { includeInactive?: boolean })
   const filter = includeInactive ? "" : db.filter("active = {:a}", { a: true });
   const records = await listAll(db, "inventory_products", filter);
   return records.map(mapInventoryProduct).sort(compareInventoryProducts);
+}
+
+/**
+ * Fornitori in ordine di visualizzazione. I disattivati li vede solo l'admin (con includeInactive); per la cucina
+ * l'elenco è quello degli attivi.
+ */
+export async function getInventorySuppliers(opts?: { includeInactive?: boolean }): Promise<InventorySupplier[]> {
+  const me = await getCurrentProfile();
+  if (!me || !canUseInventory(me)) return [];
+  const db = await getAdminPb();
+  const includeInactive = Boolean(opts?.includeInactive) && isAdmin(me);
+  const filter = includeInactive ? "" : db.filter("active = {:a}", { a: true });
+  const records = await listAll(db, "inventory_suppliers", filter);
+  return sortSuppliers(records.map(mapInventorySupplier));
 }
 
 /** Storico dei report (senza righe), più recenti per primi, con filtro per data e paginazione. */

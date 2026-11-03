@@ -6,6 +6,7 @@ import {
   type InventoryReport,
   type InventoryReportLine,
   type InventoryState,
+  type InventorySupplier,
   type AppNotification,
   type BookingAllergy,
   type BookingChange,
@@ -26,8 +27,9 @@ import {
   type Role,
   type Room,
   type Booking,
+  type BookingMeal,
 } from "@/lib/types";
-import { normalizeInventoryCategory, normalizeInventorySupplier } from "@/lib/inventory-utils";
+import { normalizeInventoryCategory } from "@/lib/inventory-utils";
 import { fileUrl, nn, num, toDateOnly, toIsoDateTime, type PbRecord } from "./helpers";
 
 export function courseRank(c: Course): number {
@@ -127,6 +129,12 @@ export function mapMenu(r: PbRecord, items: MenuItem[], baseUrl: string): Menu {
   };
 }
 
+/** Pasto del record: solo i valori noti ("pranzo", "cena"); vuoto o sconosciuto → null. */
+export function mealOf(r: PbRecord): BookingMeal | null {
+  const meal = nn(r.meal);
+  return meal === "pranzo" || meal === "cena" ? meal : null;
+}
+
 export function mapBooking(r: PbRecord): Booking {
   return {
     id: r.id,
@@ -138,6 +146,9 @@ export function mapBooking(r: PbRecord): Booking {
     kind: (nn(r.kind) ?? "evento") as BookingKind,
     event_type: nn(r.event_type),
     event_date: toDateOnly(r.event_date),
+    // Pasto (evento e normale): solo i valori noti, il resto (vuoto o sconosciuto) è null.
+    meal: mealOf(r),
+    // Orario: solo per l'appuntamento (dati precedenti alla migrazione del pasto possono averlo anche su evento e normale).
     event_time: nn(r.event_time),
     room_id: nn(r.room),
     table_number: num(r.table_number) > 0 ? num(r.table_number) : null,
@@ -247,13 +258,22 @@ export function mapPayment(r: PbRecord): Payment {
   };
 }
 
+export function mapInventorySupplier(r: PbRecord): InventorySupplier {
+  return {
+    id: r.id,
+    name: String(r.name ?? ""),
+    sort: num(r.sort),
+    active: Boolean(r.active),
+  };
+}
+
 export function mapInventoryProduct(r: PbRecord): InventoryProduct {
   return {
     id: r.id,
     name: String(r.name ?? ""),
     unit: nn(r.unit),
     category: normalizeInventoryCategory(r.category),
-    supplier: normalizeInventorySupplier(r.supplier),
+    supplier_id: String(r.supplier ?? ""),
     sort: num(r.sort),
     active: Boolean(r.active),
     updated_at: toIsoDateTime(r.updated),
@@ -270,7 +290,8 @@ export function mapInventoryLine(r: PbRecord): InventoryReportLine {
     state: r.state as InventoryState,
     quantity: num(r.quantity),
     sort: num(r.sort),
-    supplier: normalizeInventorySupplier(r.supplier),
+    supplier_id: String(r.supplier ?? ""),
+    supplier_name: String(r.supplier_name ?? ""),
     category: normalizeInventoryCategory(r.category),
   };
 }

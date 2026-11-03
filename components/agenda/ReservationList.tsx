@@ -6,8 +6,8 @@ import { useRef, useState, useTransition, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { assignBookingRoom, assignBookingTable, deleteBooking } from "@/app/actions/bookings";
 import { ReservationSheetButton } from "@/components/agenda/ReservationSheetButton";
-import { bookingPersonName, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
-import { Button, Modal, Select } from "@/components/ui";
+import { bookingPersonName, bookingPhone, bookingTimeSortKey, bookingWhen, formatCovers, totalCovers } from "@/components/bookings/format";
+import { Button, Modal, PhoneLink, Select } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { FIELD_BASE, FIELD_TEXT, borderClass } from "@/components/ui/Input";
 import { isBrowserOnline } from "@/lib/offline/network";
@@ -44,15 +44,16 @@ interface TableOverride {
 /** Il tavolo è un intero da 1 a 9999 (vuoto = nessun tavolo). */
 const TABLE_MAX_DIGITS = 4;
 
-function byTimeThenName(a: BookingListItem, b: BookingListItem): number {
-  const ta = a.event_time ?? "99:99";
-  const tb = b.event_time ?? "99:99";
-  if (ta !== tb) return ta < tb ? -1 : 1;
+/** Pranzo, poi cena, poi a parità il nome. */
+function byMealThenName(a: BookingListItem, b: BookingListItem): number {
+  const ka = bookingTimeSortKey(a);
+  const kb = bookingTimeSortKey(b);
+  if (ka !== kb) return ka < kb ? -1 : 1;
   return bookingPersonName(a).localeCompare(bookingPersonName(b), "it");
 }
 
 /**
- * Prenotazioni normali del giorno come lista compatta: ora · cliente · coperti · note, e a destra la sala e il tavolo.
+ * Prenotazioni normali del giorno come lista compatta: pasto · cliente · coperti · note, e a destra la sala e il tavolo.
  * Tap sulla sala = assegnazione istantanea; tavolo salvato su blur o Invio. Entrambi ottimistici, con rollback e messaggio.
  * La X elimina la prenotazione dopo conferma: riga tolta subito, ripristinata se il salvataggio fallisce.
  */
@@ -76,7 +77,7 @@ export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBoo
   const pendingDraft = useRef(new Map<string, string>());
 
   const activeRooms = rooms.filter((room) => room.active).sort((a, b) => a.sort - b.sort);
-  const sorted = [...bookings].sort(byTimeThenName).filter((booking) => !removedIds.has(booking.id));
+  const sorted = [...bookings].sort(byMealThenName).filter((booking) => !removedIds.has(booking.id));
 
   const roomIdOf = (booking: BookingListItem): string | null => {
     const override = overrides[booking.id];
@@ -270,12 +271,13 @@ export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBoo
           const notes = booking.notes?.trim();
           const table = tableOf(booking);
           const tableText = booking.id in tableDrafts ? tableDrafts[booking.id] : table === null ? "" : String(table);
-          const time = formatTime(booking.event_time);
+          const when = bookingWhen(booking);
+          const phone = bookingPhone(booking);
           // X in fondo alla riga (dopo Sala e Tavolo): allineata al campo, 44px di area di tocco.
           const deleteControl = canDeleteBookings ? (
             <button
               type="button"
-              aria-label={time ? `Elimina prenotazione di ${title} delle ${time}` : `Elimina prenotazione di ${title}`}
+              aria-label={when ? `Elimina prenotazione di ${title}, ${when}` : `Elimina prenotazione di ${title}`}
               disabled={deletingId !== null}
               onClick={() => setAskDelete(booking)}
               className="inline-flex size-11 shrink-0 items-center justify-center self-end rounded-lg text-slate-dark transition-colors duration-150 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol disabled:cursor-not-allowed disabled:opacity-50"
@@ -291,7 +293,7 @@ export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBoo
             >
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                  <span className="shrink-0 text-[15px] font-medium tabular-nums text-ink">{time ?? "—"}</span>
+                  <span className="shrink-0 text-[15px] font-medium tabular-nums text-ink">{when ?? "—"}</span>
                   <Link
                     href={`/admin/prenotazioni/${booking.id}`}
                     className="min-w-0 break-words font-serif text-[16px] leading-snug text-petrol hover:underline"
@@ -309,6 +311,8 @@ export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBoo
                     </span>
                   )}
                 </p>
+                {/* Fuori dal link del nome. La cucina non riceve il telefono (hideKitchenPhone): bookingPhone è null. */}
+                {phone && <PhoneLink phone={phone} className="text-[13px]" />}
               </div>
 
               {canAssign ? (
@@ -440,7 +444,7 @@ export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBoo
               Prenotazione di <span className="font-medium text-ink">{bookingPersonName(askDelete)}</span>
             </p>
             <p className="text-[13px] text-slate-dark tabular-nums">
-              {formatTime(askDelete.event_time) ?? "—"} · {totalCovers(askDelete)} {totalCovers(askDelete) === 1 ? "coperto" : "coperti"}
+              {bookingWhen(askDelete) ?? "—"} · {totalCovers(askDelete)} {totalCovers(askDelete) === 1 ? "coperto" : "coperti"}
             </p>
             <p className="text-[15px] leading-relaxed text-slate-dark">
               L’operazione non può essere annullata. Eventuali preventivi e acconti collegati vengono eliminati insieme.

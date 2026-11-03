@@ -47,6 +47,8 @@ const styles = StyleSheet.create({
   issuerTagline: { fontFamily: FONT.serifItalic, fontSize: 9.5, lineHeight: 1.3, color: COLOR.petrol, marginBottom: 8 },
   issuerText: { fontSize: 8.5, color: COLOR.slate, marginBottom: 1 },
   logo: { width: 150, height: 50 },
+  logoBlock: { alignItems: "flex-end" },
+  logoNumber: { fontSize: 9, color: COLOR.slate, marginTop: 6, textAlign: "right" },
   rule: { height: 0.75, backgroundColor: COLOR.line, marginTop: 14, marginBottom: 14 },
   rulePlain: { height: 0.5, backgroundColor: COLOR.line, marginTop: 6, marginBottom: 6 },
   eyebrow: {
@@ -181,16 +183,19 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
             <Text style={styles.issuerText}>{issuer.phone}</Text>
             <Text style={styles.issuerText}>{issuer.email}</Text>
           </View>
-          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image non supporta la prop alt */}
-          <Image src={logo} style={styles.logo} />
+          {/* Logo e, sotto in piccolo, il numero del preventivo */}
+          <View style={styles.logoBlock}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image non supporta la prop alt */}
+            <Image src={logo} style={styles.logo} />
+            <Text style={styles.logoNumber}>N. {meta.number}</Text>
+          </View>
         </View>
         <View style={styles.rule} />
 
         {/* Titolo e metadati */}
         <View style={styles.titleRow}>
           <View>
-            <Text style={styles.eyebrow}>{model.title}</Text>
-            <Text style={styles.docTitle}>N. {meta.number}</Text>
+            <Text style={styles.docTitle}>{model.title}</Text>
           </View>
           <View style={styles.metaBlock}>
             <Text style={styles.metaText}>Data di emissione: {meta.issuedAt}</Text>
@@ -213,7 +218,7 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
           <View style={styles.col}>
             <Text style={styles.eyebrow}>Evento</Text>
             <KeyValue label="Data" value={event.dateLong} />
-            {event.time ? <KeyValue label="Ora" value={event.time} /> : null}
+            {event.meal ? <KeyValue label="Pasto" value={event.meal} /> : null}
             <KeyValue label="Sala" value={event.room} />
             <KeyValue label="Adulti" value={String(event.adults)} />
             <KeyValue label="Bambini" value={String(event.children)} />

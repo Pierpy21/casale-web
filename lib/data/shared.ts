@@ -3,7 +3,7 @@ import type PocketBase from "pocketbase";
 import { pocketbasePublicUrl } from "@/lib/pocketbase/config";
 import { listByParents } from "@/lib/pocketbase/queries";
 import { nn, type PbRecord } from "@/lib/pocketbase/helpers";
-import type { BookingPersonSource } from "@/components/bookings/format";
+import { bookingTimeSortKey, type BookingPersonSource } from "@/components/bookings/format";
 import {
   mapBooking,
   mapClient,
@@ -42,18 +42,18 @@ export function bookingPersonOf(r: PbRecord, client?: PbRecord | null): BookingP
   };
 }
 
-/** Ordine agenda: data, poi ora (senza ora in fondo). */
+/** Ordine agenda: data, poi pasto (pranzo, cena), poi appuntamenti per ora, senza pasto né ora in fondo. */
 export function sortBookingRecords(records: PbRecord[]): PbRecord[] {
+  const whenKey = (r: PbRecord): string =>
+    bookingTimeSortKey({ kind: nn(r.kind), meal: nn(r.meal), event_time: nn(r.event_time) });
   return [...records].sort((a, b) => {
     const da = String(a.event_date ?? "");
     const db_ = String(b.event_date ?? "");
     if (da !== db_) return da < db_ ? -1 : 1;
-    const ta = String(a.event_time ?? "");
-    const tb = String(b.event_time ?? "");
-    if (ta === tb) return 0;
-    if (!ta) return 1;
-    if (!tb) return -1;
-    return ta < tb ? -1 : 1;
+    const ka = whenKey(a);
+    const kb = whenKey(b);
+    if (ka === kb) return 0;
+    return ka < kb ? -1 : 1;
   });
 }
 

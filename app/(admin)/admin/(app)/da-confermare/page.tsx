@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
-import { bookingPersonName, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
+import { bookingPersonName, bookingWhen, formatCovers, totalCovers } from "@/components/bookings/format";
 import { Badge, EmptyState, PageHeader, type BadgeTone } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { requireAdmin } from "@/lib/auth";
@@ -17,7 +17,7 @@ interface DayGroup {
   items: BookingListItem[];
 }
 
-/** Raggruppa per data mantenendo l'ordine ricevuto (già per data e ora). */
+/** Raggruppa per data mantenendo l'ordine ricevuto (già per data e pasto/ora). */
 function groupByDate(items: BookingListItem[]): DayGroup[] {
   const groups: DayGroup[] = [];
   for (const item of items) {
@@ -63,7 +63,7 @@ export default async function DaConfermarePage() {
               </h2>
               <ul className="flex flex-col gap-3">
                 {group.items.map((booking) => {
-                  const time = formatTime(booking.event_time);
+                  const when = bookingWhen(booking);
                   const pending = pendingLabel(booking);
                   const menuName = booking.menu?.name ?? (booking.kind === "evento" ? "Menù da definire" : null);
                   return (
@@ -78,7 +78,7 @@ export default async function DaConfermarePage() {
                         <div className="flex min-w-0 flex-col gap-1.5">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge tone={pending.tone}>{pending.label}</Badge>
-                            {time && <span className="font-serif text-lg tabular-nums">{time}</span>}
+                            {when && <span className="font-serif text-lg tabular-nums">{when}</span>}
                           </div>
                           <p className="min-w-0 break-words font-serif text-xl leading-tight text-ink">{bookingPersonName(booking)}</p>
                           <p className="min-w-0 break-words text-[14px] text-slate-dark">{bookingPersonName(booking)}</p>

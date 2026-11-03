@@ -1,29 +1,19 @@
-// Giacenza: utilità pure (senza server-only): normalizzazione di fornitore e categoria, raggruppamenti per il report e per il PDF.
+// Giacenza: utilità pure (senza server-only): fornitori (ordine, predefinito, nome file), categoria e raggruppamenti per il report e per il PDF.
 import {
   INVENTORY_CATEGORIES,
   INVENTORY_CATEGORY_LABELS,
-  INVENTORY_SUPPLIERS,
-  INVENTORY_SUPPLIER_LABELS,
   type InventoryCategory,
   type InventoryProduct,
   type InventoryReportLine,
   type InventorySupplier,
 } from "./types";
 
-export const DEFAULT_INVENTORY_SUPPLIER: InventorySupplier = "altro";
+/** Etichetta di riserva per una riga o un prodotto senza fornitore (la relazione è obbligatoria: non dovrebbe capitare). */
+export const NO_SUPPLIER_LABEL = "Senza fornitore";
 export const DEFAULT_INVENTORY_CATEGORY: InventoryCategory = "altro";
-
-export function isInventorySupplier(v: unknown): v is InventorySupplier {
-  return typeof v === "string" && (INVENTORY_SUPPLIERS as readonly string[]).includes(v);
-}
 
 export function isInventoryCategory(v: unknown): v is InventoryCategory {
   return typeof v === "string" && (INVENTORY_CATEGORIES as readonly string[]).includes(v);
-}
-
-/** Valore dal database → fornitore valido (fuori elenco o vuoto → altro). */
-export function normalizeInventorySupplier(v: unknown): InventorySupplier {
-  return isInventorySupplier(v) ? v : DEFAULT_INVENTORY_SUPPLIER;
 }
 
 /** Valore dal database → categoria valida (fuori elenco o vuota → altro). */
@@ -33,6 +23,39 @@ export function normalizeInventoryCategory(v: unknown): InventoryCategory {
 
 export function inventoryCategoryRank(c: InventoryCategory): number {
   return INVENTORY_CATEGORIES.indexOf(c);
+}
+
+/** Ordine di visualizzazione dei fornitori: `sort`, poi nome. */
+export function sortSuppliers<T extends Pick<InventorySupplier, "sort" | "name">>(list: T[]): T[] {
+  return [...list].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name, "it"));
+}
+
+/**
+ * Fornitore predefinito per i prodotti creati senza scelta: l'attivo chiamato "Altro", altrimenti il primo attivo
+ * in ordine. Null se non ce n'e' nessuno attivo.
+ */
+export function defaultInventorySupplier(suppliers: InventorySupplier[]): InventorySupplier | null {
+  const active = sortSuppliers(suppliers.filter((s) => s.active));
+  return active.find((s) => s.name.trim().toLowerCase() === "altro") ?? active[0] ?? null;
+}
+
+/** Nome del fornitore per il file: minuscolo, senza accenti, lettere e cifre separate da trattini. */
+export function inventorySupplierSlug(name: string): string {
+  const slug = name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "fornitore";
+}
+
+/**
+ * Nome del file PDF di un report di giacenza: completo, oppure la lista d'ordine di un fornitore
+ * (`giacenza-2026-11-03-viagrande.pdf`). Usato da route, PDF e pulsanti.
+ */
+export function inventoryPdfFileName(reportDate: string, supplierName?: string | null): string {
+  return supplierName ? `giacenza-${reportDate}-${inventorySupplierSlug(supplierName)}.pdf` : `giacenza-${reportDate}.pdf`;
 }
 
 /** Ordine catalogo: categoria (ordine di visualizzazione), poi ordine manuale, poi nome. */
@@ -136,13 +159,38 @@ export interface InventoryGroup<K extends string, T> {
   items: T[];
 }
 
-/** Gruppi per fornitore (solo quelli non vuoti), nell'ordine di INVENTORY_SUPPLIERS. Gli elementi mantengono l'ordine in ingresso. */
-export function groupLinesBySupplier(lines: InventoryReportLine[]): InventoryGroup<InventorySupplier, InventoryReportLine>[] {
-  return INVENTORY_SUPPLIERS.map((key) => ({
-    key,
-    label: INVENTORY_SUPPLIER_LABELS[key],
-    items: lines.filter((l) => normalizeInventorySupplier(l.supplier) === key),
-  })).filter((g) => g.items.length > 0);
+/** Fornitore citato da un report: id e nome (snapshot della riga, come era al momento dell'invio). */
+export interface InventoryReportSupplier {
+  id: string;
+  name: string;
+}
+
+/**
+ * Fornitori con almeno una riga nel report, nell'ordine del catalogo (sort). Il nome è quello dello snapshot;
+ * i fornitori non più in elenco vanno in fondo, per nome. Un report senza righe dà una lista vuota.
+ */
+export function reportSuppliers(
+  lines: Pick<InventoryReportLine, "supplier_id" | "supplier_name">[],
+  suppliers: InventorySupplier[],
+): InventoryReportSupplier[] {
+  const names = new Map<string, string>();
+  for (const line of lines) {
+    if (!names.has(line.supplier_id)) names.set(line.supplier_id, line.supplier_name || NO_SUPPLIER_LABEL);
+  }
+  const rank = new Map<string, number>(sortSuppliers(suppliers).map((s, index): [string, number] => [s.id, index]));
+  const last = Number.MAX_SAFE_INTEGER;
+  return [...names]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => (rank.get(a.id) ?? last) - (rank.get(b.id) ?? last) || a.name.localeCompare(b.name, "it"));
+}
+
+/** Gruppi per fornitore (solo quelli non vuoti), nell'ordine dei fornitori. Gli elementi mantengono l'ordine in ingresso. */
+export function groupLinesBySupplier(lines: InventoryReportLine[], suppliers: InventorySupplier[]): InventoryGroup<string, InventoryReportLine>[] {
+  return reportSuppliers(lines, suppliers).map((s) => ({
+    key: s.id,
+    label: s.name,
+    items: lines.filter((l) => l.supplier_id === s.id),
+  }));
 }
 
 /** Gruppi per categoria (solo quelli non vuoti), nell'ordine di INVENTORY_CATEGORIES. Gli elementi mantengono l'ordine in ingresso. */
@@ -157,7 +205,7 @@ export function groupLinesByCategory(lines: InventoryReportLine[]): InventoryGro
 /** Campi di una riga del report che servono per ricomporre il prodotto (anche prima della scrittura su PocketBase). */
 export type InventoryLineSnapshot = Pick<
   InventoryReportLine,
-  "product_id" | "product_name" | "unit" | "supplier" | "category" | "state" | "quantity"
+  "product_id" | "product_name" | "unit" | "supplier_id" | "supplier_name" | "category" | "state" | "quantity"
 >;
 
 /** Riga del report unificata per prodotto: giacenza (presente) e quantità da ordinare (da_ordinare) sulla stessa riga. */
@@ -166,7 +214,9 @@ export interface InventoryOrderRow {
   product_id: string | null;
   name: string;
   unit: string | null;
-  supplier: InventorySupplier;
+  supplier_id: string;
+  /** Nome del fornitore come era al momento dell'invio. */
+  supplier_name: string;
   category: InventoryCategory;
   /** Giacenza; null se non indicata. */
   stock: number | null;
@@ -186,7 +236,8 @@ export function mergeReportLines(lines: InventoryLineSnapshot[]): InventoryOrder
         product_id: line.product_id,
         name: line.product_name,
         unit: line.unit,
-        supplier: normalizeInventorySupplier(line.supplier),
+        supplier_id: line.supplier_id,
+        supplier_name: line.supplier_name || NO_SUPPLIER_LABEL,
         category: normalizeInventoryCategory(line.category),
         stock: null,
         to_order: null,
@@ -200,30 +251,43 @@ export function mergeReportLines(lines: InventoryLineSnapshot[]): InventoryOrder
   return [...byKey.values()];
 }
 
-/** Righe unificate per fornitore (ordine INVENTORY_SUPPLIERS, solo non vuoti); dentro, per categoria e poi nome. */
-export function groupOrderRowsBySupplier(rows: InventoryOrderRow[]): InventoryGroup<InventorySupplier, InventoryOrderRow>[] {
+/**
+ * Righe unificate per fornitore (ordine dei fornitori, solo quelli con righe), etichetta = nome dello snapshot.
+ * Dentro, per categoria e poi nome.
+ */
+export function groupOrderRowsBySupplier(rows: InventoryOrderRow[], suppliers: InventorySupplier[]): InventoryGroup<string, InventoryOrderRow>[] {
   const sorted = [...rows].sort(
     (a, b) => inventoryCategoryRank(a.category) - inventoryCategoryRank(b.category) || a.name.localeCompare(b.name, "it"),
   );
-  return INVENTORY_SUPPLIERS.map((key) => ({
-    key,
-    label: INVENTORY_SUPPLIER_LABELS[key],
-    items: sorted.filter((r) => r.supplier === key),
-  })).filter((g) => g.items.length > 0);
+  return reportSuppliers(rows, suppliers).map((s) => ({
+    key: s.id,
+    label: s.name,
+    items: sorted.filter((r) => r.supplier_id === s.id),
+  }));
 }
 
-/** Numero di prodotti da ordinare per fornitore (solo fornitori con almeno un prodotto). */
-export function countToOrderBySupplier(rows: InventoryOrderRow[]): Partial<Record<InventorySupplier, number>> {
-  const out: Partial<Record<InventorySupplier, number>> = {};
+/** Un fornitore con i prodotti da ordinare (conteggio > 0). */
+export interface InventoryToOrderCount {
+  supplier_id: string;
+  name: string;
+  count: number;
+}
+
+/** Numero di prodotti da ordinare per fornitore (solo fornitori con conteggio > 0), nell'ordine dei fornitori. */
+export function countToOrderBySupplier(rows: InventoryOrderRow[], suppliers: InventorySupplier[]): InventoryToOrderCount[] {
+  const counts = new Map<string, number>();
   for (const row of rows) {
-    if ((row.to_order ?? 0) > 0) out[row.supplier] = (out[row.supplier] ?? 0) + 1;
+    if ((row.to_order ?? 0) > 0) counts.set(row.supplier_id, (counts.get(row.supplier_id) ?? 0) + 1);
   }
-  return out;
+  return reportSuppliers(rows, suppliers)
+    .filter((s) => (counts.get(s.id) ?? 0) > 0)
+    .map((s) => ({ supplier_id: s.id, name: s.name, count: counts.get(s.id) ?? 0 }));
 }
 
-/** "Viagrande 5, Amadori 3" (solo fornitori con conteggio > 0, nell'ordine dei fornitori). Stringa vuota se nessuno. */
-export function formatToOrderSummary(counts: Partial<Record<InventorySupplier, number>>): string {
-  return INVENTORY_SUPPLIERS.filter((s) => (counts[s] ?? 0) > 0)
-    .map((s) => `${INVENTORY_SUPPLIER_LABELS[s]} ${counts[s]}`)
+/** "Viagrande 5, Amadori 3" (solo voci con conteggio > 0, nell'ordine ricevuto). Stringa vuota se nessuna. */
+export function formatToOrderSummary(counts: InventoryToOrderCount[]): string {
+  return counts
+    .filter((c) => c.count > 0)
+    .map((c) => `${c.name} ${c.count}`)
     .join(", ");
 }

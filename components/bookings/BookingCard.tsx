@@ -3,7 +3,7 @@ import Link from "next/link";
 import { formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { KitchenAllergyBanner } from "@/components/agenda/kitchen/KitchenAllergyBanner";
 import { MenuBadge } from "@/components/menu/MenuBadge";
-import { Badge, Disclosure, StatusDot } from "@/components/ui";
+import { Badge, Disclosure, PhoneLink, StatusDot } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import {
   BOOKING_KIND_LABELS,
@@ -19,8 +19,8 @@ import { KindBadge } from "./KindBadge";
 import {
   bookingPersonName,
   bookingPhone,
+  bookingWhen,
   formatCovers,
-  formatTime,
   groupDishes,
   totalCovers,
   type DishGroup,
@@ -43,7 +43,7 @@ export interface BookingCardProps {
   /** Variante full: tutta la card apre la prenotazione (stretched link); l'area piatti resta indipendente. */
   wholeCardLink?: boolean;
   /**
-   * Scheda cucina (sola lettura): nome prima dell'orario, allergie in cima, piatti sempre visibili,
+   * Scheda cucina (sola lettura): nome prima del pasto, allergie in cima, piatti sempre visibili,
    * tendina "Dettagli e note cucina". Implica la variante full.
    */
   kitchen?: BookingCardKitchen;
@@ -94,10 +94,13 @@ export function BookingCard({
   className,
 }: BookingCardProps) {
   const href = `/admin/prenotazioni/${b.id}`;
-  const time = formatTime(b.event_time);
+  // Pasto (pranzo o cena) per evento e normale, orario per l'appuntamento.
+  const when = bookingWhen(b);
+  const whenLine = b.kind === "appuntamento" && when ? `ore ${when}` : when;
   const dateLabel = showDate ? formatIt(toDate(b.event_date), "EEE d MMM") : null;
   const allergyCount = b.allergies.length;
   const title = bookingPersonName(b);
+  const phone = bookingPhone(b);
   const menuName = b.menu?.name ?? null;
   const isEvent = b.kind === "evento";
   const covers = totalCovers(b);
@@ -109,7 +112,7 @@ export function BookingCard({
     return (
       <Link
         href={href}
-        aria-label={`${BOOKING_KIND_LABELS[b.kind]}, ${isEvent ? (menuName ?? "Menù da definire") : title}${time ? `, ore ${time}` : ""}${b.room ? `, ${b.room.name}` : ""}${covers > 0 ? `, ${formatCovers(b)} coperti` : ""}${allergyCount > 0 ? `, ${allergyCount} allergie` : ""}, stato ${STATUS_LABELS[b.status]}`}
+        aria-label={`${BOOKING_KIND_LABELS[b.kind]}, ${isEvent ? (menuName ?? "Menù da definire") : title}${whenLine ? `, ${whenLine}` : ""}${b.room ? `, ${b.room.name}` : ""}${covers > 0 ? `, ${formatCovers(b)} coperti` : ""}${allergyCount > 0 ? `, ${allergyCount} allergie` : ""}, stato ${STATUS_LABELS[b.status]}`}
         style={{ borderLeftColor: STATUS_COLORS[b.status] }}
         className={cn(
           "flex min-w-0 flex-col gap-1.5 border-l-[3px] bg-cream/70 px-3 py-3 text-ink transition-colors duration-200 hover:bg-sand/60",
@@ -121,7 +124,7 @@ export function BookingCard({
           {b.kind !== "normale" && <StatusDot status={b.status} size="sm" />}
           <KindBadge kind={b.kind} compact />
           {dateLabel && <span className="font-medium">{dateLabel}</span>}
-          {time && <span className="font-medium tabular-nums text-ink">{time}</span>}
+          {when && <span className="font-medium tabular-nums text-ink">{when}</span>}
           {allergyCount > 0 && (
             <span
               className="ml-auto inline-flex shrink-0 items-center gap-1 text-danger"
@@ -175,7 +178,7 @@ export function BookingCard({
   const timeLine = (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
       {dateLabel && <span>{dateLabel}</span>}
-      {time && <span>ore {time}</span>}
+      {whenLine && <span>{whenLine}</span>}
       {b.room && <span>{b.room.name}</span>}
     </p>
   );
@@ -215,8 +218,9 @@ export function BookingCard({
               {nameLine}
             </>
           )}
-          {!isKitchen && bookingPhone(b) && (
-            <p className="break-words wrap-anywhere text-[14px] text-slate-dark">{bookingPhone(b)}</p>
+          {/* Fuori dal link del nome (niente <a> annidati); sopra il link a tutta card, come i piatti. */}
+          {!isKitchen && phone && (
+            <PhoneLink phone={phone} className={cn("text-[14px]", wholeCardLink && "relative z-10")} />
           )}
         </div>
 

@@ -21,7 +21,7 @@ import { buildEventSheetView, type EventBlockView, type EventFieldView, type Eve
 import type { EventSheet } from "@/lib/types";
 
 // Foglio eventi del giorno in DOCX: stessa impostazione del foglio prenotazioni (reservations-docx.ts).
-// Per ogni banchetto: titolo (orario, nome, coperti) e una tabella etichetta | valore.
+// Per ogni banchetto: titolo (pasto, nome, coperti) e una tabella etichetta | valore.
 
 const COLOR = {
   ink: "1C2B2D",
@@ -128,14 +128,14 @@ function summaryTable(fields: EventFieldView[]): Table {
   });
 }
 
-/** Intestazione del banchetto: orario, nome (serif) e coperti sulla stessa riga. */
+/** Intestazione del banchetto: pasto, nome (serif) e coperti sulla stessa riga. */
 function blockHeading(block: EventBlockView): Paragraph {
   return new Paragraph({
     keepNext: true,
     spacing: { before: 280, after: 100 },
     border: { top: { style: BorderStyle.SINGLE, size: 8, color: COLOR.ink, space: 6 } },
     children: [
-      text(`${block.time}  `, { size: 11, bold: true, color: COLOR.petrol }),
+      text(`${block.meal}  `, { size: 11, bold: true, color: COLOR.petrol }),
       text(block.heading, { size: 14, font: FONT.serif }),
       text(`   ${block.covers}`, { size: 9, color: COLOR.slate }),
     ],

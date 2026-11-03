@@ -1,6 +1,6 @@
 import { differenceInCalendarDays } from "date-fns";
 import { ArrowRight } from "lucide-react";
-import { bookingPersonName, formatTime } from "@/components/bookings/format";
+import { bookingPersonName, bookingTimeSortKey, mealLabel } from "@/components/bookings/format";
 import { EmptyState, cn } from "@/components/ui";
 import type { BookingListItem, NextEventBrief } from "@/lib/types";
 import { capitalize, formatIt, toDate, type AgendaKindFilter } from "./agenda-utils";
@@ -32,7 +32,7 @@ export function NextEventHint({
   const date = toDate(nextEvent.event_date);
   const days = differenceInCalendarDays(date, toDate(selected));
   const relative = days === 1 ? "domani" : `tra ${days} giorni`;
-  const time = formatTime(nextEvent.event_time);
+  const meal = mealLabel(nextEvent.meal);
 
   return (
     <button
@@ -48,7 +48,7 @@ export function NextEventHint({
         <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">Prossimo evento</span>
         <span className="text-[14px] text-ink tabular-nums">
           {capitalize(formatIt(date, "EEEE d MMMM"))} · {relative}
-          {time ? ` · ore ${time}` : ""}
+          {meal ? ` · ${meal}` : ""}
         </span>
         <span className="block w-full truncate font-serif text-lg text-ink">{nextEvent.title}</span>
       </span>
@@ -61,9 +61,9 @@ export function NextEventHint({
 export function nextEventFrom(bookings: BookingListItem[], selected: string, afterRange: NextEventBrief | null): NextEventBrief | null {
   const first = bookings
     .filter((b) => b.kind === "evento" && b.status !== "annullato" && b.event_date > selected)
-    .sort((a, b) => a.event_date.localeCompare(b.event_date) || (a.event_time ?? "99:99").localeCompare(b.event_time ?? "99:99"))[0];
+    .sort((a, b) => a.event_date.localeCompare(b.event_date) || bookingTimeSortKey(a).localeCompare(bookingTimeSortKey(b)))[0];
   if (!first) return afterRange;
-  return { id: first.id, event_date: first.event_date, event_time: first.event_time, title: bookingPersonName(first) };
+  return { id: first.id, event_date: first.event_date, meal: first.meal, title: bookingPersonName(first) };
 }
 
 /**

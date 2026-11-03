@@ -1,10 +1,12 @@
-import { STATUS_LABELS, type BookingStatus } from "@/lib/types";
+import { BOOKING_MEAL_LABELS, STATUS_LABELS, type BookingMeal, type BookingStatus } from "@/lib/types";
 
 /** Etichette italiane dei campi registrati in booking_changes (nomi colonna del DB). */
 const FIELD_LABELS: Record<string, string> = {
   /** Storico: il campo è stato rimosso (il nome è il cliente); resta solo per leggere le voci vecchie del registro. */
   event_name: "Nome evento (rimosso)",
   event_date: "Data evento",
+  meal: "Pasto",
+  /** Storico per evento e prenotazione normale (ora rimossa, sostituita dal pasto); attuale per l'appuntamento. */
   event_time: "Ora",
   client_id: "Cliente",
   guest_name: "Nome ospite",
@@ -78,6 +80,8 @@ export function formatChangeValue(field: string, value: string | null, lookup: N
       return formatIsoDate(value);
     case "event_time":
       return value.slice(0, 5);
+    case "meal":
+      return BOOKING_MEAL_LABELS[value as BookingMeal] ?? value;
     case "setup_colors": {
       try {
         const parsed: unknown = JSON.parse(value);

@@ -3,16 +3,19 @@
 import { isValid, parseISO } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Download, LoaderCircle, MessageCircle, Plus, Save, Trash2 } from "lucide-react";
 import { deleteQuote, updateQuote } from "@/app/actions/quotes";
 import { ConfirmAction } from "@/components/bookings/ConfirmAction";
+import { bookingPersonName, bookingPhone } from "@/components/bookings/format";
 import { parseFinalTotal } from "@/components/bookings/quote-draft";
-import { Alert, Button, DocumentDownload, Field, Input, Textarea, buttonClasses } from "@/components/ui";
+import { formatIt, toDate } from "@/components/agenda/agenda-utils";
+import { Alert, Button, DocumentDownload, Field, Input, Textarea, buttonClasses, cn } from "@/components/ui";
 import { submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import { buildQuoteDocumentModel } from "@/lib/documents/quote-model";
 import { DOCX_MIME, computeQuoteTotals, formatEUR, quoteFileName, round2 } from "@/lib/quote-utils";
 import type { QuoteLine, QuoteWithBooking } from "@/lib/types";
 import { QuotePreview } from "./QuotePreview";
+import { WhatsAppQuoteShare } from "./WhatsAppQuoteShare";
 
 type Errors = Record<string, string[]>;
 
@@ -121,6 +124,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
 
   const snapshot = snapshotOf(issuedAt, validUntil, rows, discount, finalTotal, vatRate, notes);
   const dirty = snapshot !== savedSnapshot;
+  const saveLabel = pending ? "Salvataggio…" : dirty ? "Salva preventivo" : saved ? "Preventivo salvato" : "Nessuna modifica da salvare";
 
   const updateRow = (index: number, changes: Partial<Omit<LineRow, "key">>) => {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...changes } : r)));
@@ -281,23 +285,42 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
         </dl>
 
         <div className="flex flex-col gap-3 border-t border-sand pt-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" variant="primary" size="md" disabled={pending || !dirty || rows.length === 0} aria-busy={pending || undefined}>
-              {pending ? "Salvataggio…" : "Salva preventivo"}
-            </Button>
-            {saved && !dirty && (
-              <span role="status" className="text-[13px] text-success">Preventivo salvato.</span>
-            )}
-          </div>
-
+          {/* Una riga sola: salvataggio come icona che cambia con lo stato, poi documenti e WhatsApp. */}
           <div className="no-print flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              disabled={pending || !dirty || rows.length === 0}
+              aria-busy={pending || undefined}
+              aria-label={saveLabel}
+              title={saveLabel}
+              className={cn(
+                // Quadrato alto quanto i pulsanti "md" accanto (py-3.5 + testo 13px ≈ 48px).
+                "relative inline-flex size-12 shrink-0 items-center justify-center rounded-btn border transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol disabled:cursor-not-allowed",
+                dirty
+                  ? "border-petrol bg-petrol text-paper hover:bg-petrol-hover"
+                  : saved
+                    ? "border-success text-success"
+                    : "border-petrol/40 text-petrol/50",
+              )}
+            >
+              {pending ? (
+                <LoaderCircle aria-hidden="true" className="size-5 animate-spin motion-reduce:animate-none" />
+              ) : saved && !dirty ? (
+                <Check aria-hidden="true" className="size-5" />
+              ) : (
+                <Save aria-hidden="true" className="size-5" />
+              )}
+              {/* Pallino: modifiche da salvare. */}
+              {dirty && !pending && <span aria-hidden="true" className="absolute right-1.5 top-1.5 size-2 rounded-full bg-mustard" />}
+            </button>
             <DocumentDownload
               href={`/api/quotes/${quote.id}/pdf`}
               fileName={quoteFileName(quote.number, "pdf")}
               mimeType="application/pdf"
               className={buttonClasses("outline", "md")}
             >
-              Scarica PDF
+              <Download aria-hidden="true" className="size-4" />
+              PDF
             </DocumentDownload>
             <DocumentDownload
               href={`/api/quotes/${quote.id}/docx`}
@@ -305,9 +328,25 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
               mimeType={DOCX_MIME}
               className={buttonClasses("outline", "md")}
             >
-              Scarica DOCX
+              <Download aria-hidden="true" className="size-4" />
+              DOCX
             </DocumentDownload>
+            <WhatsAppQuoteShare
+              quoteId={quote.id}
+              number={quote.number}
+              phone={bookingPhone(quote.booking)}
+              clientName={bookingPersonName(quote.booking)}
+              eventDate={formatIt(toDate(quote.booking.event_date), "EEEE d MMMM yyyy")}
+              total={computeQuoteTotals(quote).total}
+              className={buttonClasses("outline", "md")}
+            >
+              <MessageCircle aria-hidden="true" className="size-4" />
+              Invia su WhatsApp
+            </WhatsAppQuoteShare>
           </div>
+          {saved && !dirty && (
+            <span role="status" className="text-[13px] text-success">Preventivo salvato.</span>
+          )}
           {dirty && (
             <p className="text-[13px] text-slate-dark">
               Ci sono modifiche non salvate: i file scaricati riflettono l’ultima versione salvata.

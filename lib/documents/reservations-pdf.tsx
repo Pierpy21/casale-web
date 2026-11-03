@@ -18,7 +18,7 @@ import {
 } from "@/lib/documents/reservations-view";
 
 // Foglio prenotazioni del giorno in PDF: stessa impostazione tipografica del preventivo e del report di giacenza.
-// Una tabella: Nome | Sala | Tavolo | Orario | Cellulare. I valori mancanti diventano "—".
+// Una tabella: Nome | Sala | Tavolo | Pasto | Cellulare. I valori mancanti diventano "—".
 
 const COLOR = {
   ink: "#1C2B2D",
@@ -97,7 +97,7 @@ function ReservationsTable({ rows }: { rows: ReservationPdfRow[] }) {
         <Text style={[styles.cellName, styles.tableHeadText]}>Nome</Text>
         <Text style={[styles.cellRoom, styles.tableHeadText]}>Sala</Text>
         <Text style={[styles.tableHeadText, { width: 60, textAlign: "center" }]}>Tavolo</Text>
-        <Text style={[styles.tableHeadText, { width: 55, textAlign: "center" }]}>Orario</Text>
+        <Text style={[styles.tableHeadText, { width: 55, textAlign: "center" }]}>Pasto</Text>
         <Text style={[styles.cellPhone, styles.tableHeadText]}>Cellulare</Text>
       </View>
       {rows.map((row, i) => (
@@ -105,7 +105,7 @@ function ReservationsTable({ rows }: { rows: ReservationPdfRow[] }) {
           <Text style={styles.cellName}>{row.name}</Text>
           <Text style={styles.cellRoom}>{row.room}</Text>
           <Text style={styles.cellTable}>{row.table}</Text>
-          <Text style={styles.cellTime}>{row.time}</Text>
+          <Text style={styles.cellTime}>{row.meal}</Text>
           <Text style={styles.cellPhone}>{row.phone}</Text>
         </View>
       ))}

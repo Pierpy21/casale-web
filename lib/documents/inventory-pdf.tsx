@@ -11,11 +11,12 @@ import {
 } from "@react-pdf/renderer";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { groupOrderRowsBySupplier, mergeReportLines, type InventoryOrderRow } from "@/lib/inventory-utils";
-import { INVENTORY_SUPPLIER_LABELS, type InventoryReport, type InventorySupplier } from "@/lib/types";
+import { groupOrderRowsBySupplier, inventoryPdfFileName, mergeReportLines, type InventoryOrderRow } from "@/lib/inventory-utils";
+import type { InventoryReport, InventorySupplier } from "@/lib/types";
 
 // Report di giacenza in PDF: stessa impostazione tipografica del preventivo (lib/documents/quote-pdf.tsx).
 // Un blocco per fornitore (solo quelli con prodotti); ogni prodotto appare una volta, con giacenza e da ordinare.
+// Con un fornitore (lista d'ordine) il PDF contiene solo il suo blocco. Il nome del fornitore è quello dello snapshot del report.
 
 const COLOR = {
   ink: "#1C2B2D",
@@ -97,13 +98,16 @@ export interface InventoryPdfRow {
 }
 
 export interface InventoryPdfSection {
-  supplier: InventorySupplier;
+  supplierId: string;
+  /** Nome del fornitore come era nel report (snapshot). */
   label: string;
   rows: InventoryPdfRow[];
 }
 
 export interface InventoryPdfModel {
   title: string;
+  /** Nome del file scaricato (completo o della lista d'ordine di un fornitore). */
+  fileName: string;
   reportDate: string;
   createdBy: string;
   sentAt: string;
@@ -113,8 +117,10 @@ export interface InventoryPdfModel {
 }
 
 export interface InventoryPdfOptions {
-  /** Esporta solo i prodotti di un fornitore (lista d'ordine). */
+  /** Esporta solo i prodotti di questo fornitore (lista d'ordine). Se il report non ne ha righe, il titolo usa il suo nome attuale. */
   supplier?: InventorySupplier;
+  /** Elenco fornitori (ordine di visualizzazione dei blocchi). Senza, i blocchi seguono l'ordine dei nomi. */
+  suppliers?: InventorySupplier[];
 }
 
 const capitalize = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -136,20 +142,24 @@ export function buildInventoryPdfModel(report: InventoryReport, opts: InventoryP
   const [y, m, d] = report.report_date.split("-").map(Number);
   const day = new Date(y, m - 1, d);
   const rows = mergeReportLines(report.lines);
-  const scoped = opts.supplier ? rows.filter((r) => r.supplier === opts.supplier) : rows;
+  const scoped = opts.supplier ? rows.filter((r) => r.supplier_id === opts.supplier?.id) : rows;
+  const sections = groupOrderRowsBySupplier(scoped, opts.suppliers ?? []).map((g) => ({
+    supplierId: g.key,
+    label: g.label,
+    rows: g.items.map(toRow),
+  }));
+  // Lista d'ordine: il nome è quello dello snapshot del report; senza righe, il nome attuale del fornitore.
+  const supplierName = opts.supplier ? (sections[0]?.label ?? opts.supplier.name) : null;
   return {
-    title: opts.supplier ? `Ordine ${INVENTORY_SUPPLIER_LABELS[opts.supplier]}` : "Giacenza",
+    title: supplierName ? `Ordine ${supplierName}` : "Giacenza",
+    fileName: inventoryPdfFileName(report.report_date, supplierName),
     reportDate: capitalize(format(day, "EEEE d MMMM yyyy", { locale: it })),
     createdBy: report.created_by_name || "—",
     sentAt: report.created_at
       ? capitalize(format(new Date(report.created_at), "d MMM yyyy 'alle' HH:mm", { locale: it }))
       : "",
     notes: report.notes,
-    sections: groupOrderRowsBySupplier(scoped).map((g) => ({
-      supplier: g.key,
-      label: g.label,
-      rows: g.items.map(toRow),
-    })),
+    sections,
   };
 }
 
@@ -214,7 +224,7 @@ function InventoryDocument({ model, logo }: { model: InventoryPdfModel; logo: Bu
           <Text style={styles.empty}>Nessun prodotto.</Text>
         ) : (
           model.sections.map((section) => (
-            <View key={section.supplier} style={styles.section}>
+            <View key={section.supplierId} style={styles.section}>
               <Text style={styles.sectionTitle}>{section.label}</Text>
               <SupplierTable rows={section.rows} />
             </View>

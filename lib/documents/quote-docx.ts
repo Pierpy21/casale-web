@@ -195,6 +195,8 @@ export async function renderQuoteDocx(model: QuoteDocumentModel): Promise<Buffer
                 ],
                 { align: AlignmentType.RIGHT, after: 0 },
               ),
+              // Sotto il logo, in piccolo, il numero del preventivo.
+              para([text(`N. ${meta.number}`, { size: 9, color: COLOR.slate })], { align: AlignmentType.RIGHT, before: 80, after: 0 }),
             ],
           }),
         ],
@@ -204,8 +206,7 @@ export async function renderQuoteDocx(model: QuoteDocumentModel): Promise<Buffer
 
   // Titolo e metadati
   const titleBlock = [
-    para([text(model.title, { size: 8, bold: true, color: COLOR.bronze, caps: true, spacing: 30 })], { before: 280, after: 60 }),
-    para([text(`N. ${meta.number}`, { size: 22, font: FONT.serif })], { after: 240 }),
+    para([text(model.title, { size: 22, font: FONT.serif })], { before: 280, after: 240 }),
     para([text(`Data di emissione: ${meta.issuedAt}`, { size: 9, color: COLOR.slate })], { after: 20 }),
     ...(meta.validUntil
       ? [para([text(`Valido fino al: ${meta.validUntil}`, { size: 9, color: COLOR.slate })], { after: 20 })]
@@ -225,7 +226,7 @@ export async function renderQuoteDocx(model: QuoteDocumentModel): Promise<Buffer
   const eventLines: Paragraph[] = [
     eyebrow("Evento"),
     kv("Data", event.dateLong),
-    ...(event.time ? [kv("Ora", event.time)] : []),
+    ...(event.meal ? [kv("Pasto", event.meal)] : []),
     kv("Sala", event.room),
     kv("Adulti", String(event.adults)),
     kv("Bambini", String(event.children)),

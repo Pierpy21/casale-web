@@ -2,7 +2,8 @@
 
 import { FileText, ImageIcon, Paperclip, X } from "lucide-react";
 import { useRef } from "react";
-import { Button, Field, Input, Select, buttonClasses, cn } from "@/components/ui";
+import { ChoiceChip } from "@/components/bookings/form-primitives";
+import { Button, Field, Input, buttonClasses, cn } from "@/components/ui";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types";
 import {
   PAYMENT_METHOD_OPTIONS,
@@ -66,22 +67,32 @@ export function PaymentDraftFields({ idPrefix, draft, errors, onChange, disabled
         />
       </Field>
 
-      <Field label="Metodo" htmlFor={id("method")} error={errors.method}>
-        <Select
-          id={id("method")}
-          disabled={disabled}
-          invalid={!!errors.method}
-          value={draft.method}
-          onChange={(e) => onChange({ method: e.target.value as PaymentDraft["method"] })}
-        >
-          <option value="">Non specificato</option>
+      {/* Metodo obbligatorio: gruppo di pillole (come Pasto e Sala), a tutta larghezza. */}
+      <fieldset
+        disabled={disabled}
+        aria-describedby={errors.method ? id("method-error") : undefined}
+        className="flex min-w-0 flex-col gap-1.5 border-0 p-0 sm:col-span-2"
+      >
+        <legend className="mb-1.5 break-words text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark">
+          Metodo
+          <span aria-hidden="true" className="ml-1 text-danger">
+            *
+          </span>
+          <span className="sr-only"> (obbligatorio)</span>
+        </legend>
+        <div className="flex flex-wrap gap-2">
           {PAYMENT_METHOD_OPTIONS.map((m) => (
-            <option key={m} value={m}>
+            <ChoiceChip key={m} name={id("method")} selected={draft.method === m} onSelect={() => onChange({ method: m })}>
               {PAYMENT_METHOD_LABELS[m]}
-            </option>
+            </ChoiceChip>
           ))}
-        </Select>
-      </Field>
+        </div>
+        {errors.method && (
+          <p id={id("method-error")} className="text-[13px] text-danger" role="alert">
+            {errors.method}
+          </p>
+        )}
+      </fieldset>
 
       <Field label="Nota" htmlFor={id("notes")} error={errors.notes} hint={`Facoltativa · max ${PAYMENT_NOTES_MAX} caratteri`}>
         <Input

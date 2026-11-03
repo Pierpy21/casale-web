@@ -20,6 +20,7 @@ import {
   buildPaymentFormData,
   emptyPaymentDraft,
   isPdfReceipt,
+  newPaymentLabel,
   serverDraftErrors,
   validateDraft,
   type DraftErrors,
@@ -76,7 +77,7 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
     const formData = buildPaymentFormData(draft);
     startTransition(async () => {
       const result = await submitMutation("payments.addPayment", addPayment, [booking.id, formData], {
-        label: `Nuovo acconto · ${draft.amount.trim()} €`,
+        label: newPaymentLabel(draft),
         entity: { type: "booking", id: booking.id },
         expectedUpdated: updatedAtOf(booking),
       });
@@ -328,7 +329,7 @@ function SummaryCell({ label, value, emphasis = false }: { label: string; value:
       )}
     >
       <dt className="text-[10px] font-medium uppercase tracking-[0.12em] text-bronze sm:text-[11px]">{label}</dt>
-      <dd className="font-serif text-base tabular-nums text-ink break-words sm:text-xl">{value}</dd>
+      <dd className="whitespace-nowrap font-serif text-base tabular-nums text-ink sm:text-lg xl:text-xl">{value}</dd>
     </div>
   );
 }

@@ -38,7 +38,8 @@ export function EmptyState({ title, description, action, icon, variant = "dashed
 export interface PageHeaderProps {
   eyebrow?: string;
   title: string;
-  description?: string;
+  /** Testo o elementi (es. un numero di telefono con il pulsante copia). */
+  description?: ReactNode;
   actions?: ReactNode;
   /** Senza margine inferiore fisso: lo spazio verticale lo gestisce il contenitore. */
   compact?: boolean;

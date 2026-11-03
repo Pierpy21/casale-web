@@ -3,7 +3,7 @@
 import { ChevronDown, Plus } from "lucide-react";
 import { useId, useState } from "react";
 import { Button, cn } from "@/components/ui";
-import type { InventoryProduct, InventoryCategory, InventorySupplier } from "@/lib/types";
+import type { InventoryProduct, InventoryCategory } from "@/lib/types";
 import { InventoryNewProductForm } from "./InventoryNewProductForm";
 import { InventoryQuantityStepper } from "./InventoryQuantityStepper";
 import type { InventoryDraftCount } from "./inventory-draft";
@@ -14,14 +14,15 @@ export type NewInventoryProductInput = {
   name: string;
   unit: string | null;
   category: InventoryCategory;
-  supplier?: InventorySupplier;
+  /** Id del fornitore del gruppo (solo raggruppamento per fornitore). */
+  supplierId?: string;
 };
 
 export interface InventoryCategorySectionProps {
   /** Sezione per categoria: i prodotti aggiunti qui prendono questa categoria. */
   category?: InventoryCategory;
   /** Sezione per fornitore (admin): i prodotti aggiunti qui prendono questo fornitore; la categoria si sceglie. */
-  supplier?: InventorySupplier;
+  supplierId?: string;
   label: string;
   /** Prodotti della categoria da mostrare (già filtrati dalla ricerca). */
   products: InventoryProduct[];
@@ -47,7 +48,7 @@ export interface InventoryCategorySectionProps {
 /** Sezione a fisarmonica (categoria per la cucina, fornitore per l'admin): intestazione con conteggio, righe prodotto e aggiunta di un prodotto nuovo. */
 export function InventoryCategorySection({
   category,
-  supplier,
+  supplierId,
   label,
   products,
   totalCount,
@@ -93,7 +94,7 @@ export function InventoryCategorySection({
           <InventoryNewProductForm
             idPrefix={`${uid}-new`}
             category={category}
-            onCreate={(input) => onCreate({ ...input, supplier })}
+            onCreate={(input) => onCreate({ ...input, supplierId })}
             onClose={() => setAdding(false)}
             disabled={disabled}
           />
