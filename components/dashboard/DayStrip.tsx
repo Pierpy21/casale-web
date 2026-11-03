@@ -78,6 +78,37 @@ export function DayStrip({
     scroller.scrollTo({ left: Math.min(Math.max(center, 0), max), behavior });
   }, [selectedDay, recenterKey]);
 
+  // Desktop (puntatore fine): attrito come su telefono. Lo scorrimento orizzontale del trackpad avanza a passi
+  // di un giorno invece di scivolare via; la rotella verticale resta alla pagina.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller || !window.matchMedia("(pointer: fine)").matches) return;
+    let pending = 0;
+    let locked = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+      event.preventDefault();
+      pending += event.deltaX;
+      // Soglia: serve un gesto deciso per passare al giorno successivo; poi una breve pausa prima del passo dopo.
+      if (locked || Math.abs(pending) < 40) return;
+      const pill = scroller.querySelector<HTMLElement>("li");
+      const step = (pill?.offsetWidth ?? 56) + 4;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      scroller.scrollBy({ left: Math.sign(pending) * step, behavior: reduce ? "auto" : "smooth" });
+      pending = 0;
+      locked = true;
+      timer = setTimeout(() => {
+        locked = false;
+      }, 140);
+    };
+    scroller.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      scroller.removeEventListener("wheel", onWheel);
+      clearTimeout(timer);
+    };
+  }, []);
+
   // Rotazione o ridimensionamento: il giorno selezionato torna al centro (senza animazione).
   useEffect(() => {
     const scroller = scrollRef.current;
