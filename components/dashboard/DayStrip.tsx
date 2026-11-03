@@ -78,6 +78,9 @@ export function DayStrip({ days, selectedDay, todayIso, bookings, onSelectDay }:
                 <span aria-hidden="true" className="font-serif text-xl leading-none tabular-nums">
                   {formatIt(date, "d")}
                 </span>
+                <span aria-hidden="true" className="text-[10px] font-medium uppercase leading-none tracking-[0.08em] opacity-80">
+                  {formatIt(date, "MMM")}
+                </span>
                 {/* Riga fissa: "Oggi" e pallino dei giorni con eventi, così tutti i giorni hanno la stessa altezza. */}
                 <span aria-hidden="true" className="flex h-3 items-center gap-1 text-[9px] font-semibold uppercase leading-none tracking-[0.06em]">
                   {isToday && <span className={active ? undefined : "text-bronze"}>Oggi</span>}
