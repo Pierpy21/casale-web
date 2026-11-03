@@ -300,19 +300,21 @@ export function WeekOccupancy({
       </PinnedBar>
 
       {/* Su telefono titolo più piccolo perché "Dashboard · Domenica 28 marzo" resti su una riga; da sm in su invariato. */}
-      {/* "Oggi" in alto a destra: torna a oggi (settimana corrente e giorno). pr-20 lascia spazio al pulsante accanto al titolo. */}
-      <div className="relative min-w-0 [&_h1]:pr-20 desk:[&_h1]:pr-28 [&_h1]:text-xl sm:[&_h1]:text-3xl desk:[&_h1]:text-4xl">
-        <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
+      {/* "Oggi" a destra, centrato sulla riga del titolo "Dashboard · giorno": torna a oggi (settimana corrente e giorno). */}
+      <div className="flex min-w-0 items-end justify-between gap-3 [&_h1]:text-xl sm:[&_h1]:text-3xl desk:[&_h1]:text-4xl">
+        <div className="min-w-0 flex-1">
+          <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
+        </div>
         <button
           type="button"
           // Sempre attivo: anche con oggi già selezionato riporta la striscia su oggi dopo averla scorsa.
           onClick={goToday}
-          className="absolute right-0 top-0 inline-flex min-h-11 items-center rounded-btn border border-petrol px-4 text-[12px] font-medium uppercase tracking-[0.12em] text-petrol transition-colors duration-200 hover:bg-petrol hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol desk:min-h-12 desk:px-6 desk:text-[14px]"
+          // -mb: il pulsante (44/48px) è più alto della riga del titolo; il margine negativo lo centra su di essa.
+          className="-mb-2.5 inline-flex min-h-11 shrink-0 items-center rounded-btn border border-petrol px-4 text-[12px] font-medium uppercase tracking-[0.12em] text-petrol transition-colors duration-200 hover:bg-petrol hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol sm:-mb-1.5 desk:-mb-1 desk:min-h-12 desk:px-6 desk:text-[14px]"
         >
           Oggi
         </button>
       </div>
-
 
       {/* Indicatori: una riga sola a 4 colonne, senza riquadri: separatori verticali tra gli indicatori. */}
       <section aria-label="Indicatori principali" className="grid min-w-0 grid-cols-4 divide-x divide-sand border-y border-sand">
