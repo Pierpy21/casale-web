@@ -45,7 +45,7 @@ export function DayStrip({ days, selectedDay, todayIso, bookings, onSelectDay }:
   return (
     // Scorrimento orizzontale contenuto nella striscia (niente trascinamento della pagina su iOS), scrollbar nascosta.
     <div className="min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <ul aria-label="Giorni" className="flex w-max items-stretch gap-1.5 px-4">
+      <ul aria-label="Giorni" className="flex w-max items-stretch gap-1.5 px-4 sm:px-6 desk:px-10 optouch:px-8">
         {days.map((iso) => {
           const date = toDate(iso);
           const active = iso === selectedDay;

@@ -235,8 +235,8 @@ export function WeekOccupancy({
     <>
       <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
 
-      {/* Telefono e tablet: giorni in cima, sempre visibili mentre si scorre la pagina. */}
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 -mx-4 min-w-0 border-b border-sand bg-paper/95 pb-1.5 pt-2 backdrop-blur sm:-mx-6 desk:hidden">
+      {/* Giorni in cima su ogni dispositivo, sempre visibili mentre si scorre la pagina (margini come la ricerca della giacenza). */}
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 -mx-4 min-w-0 border-b border-sand bg-paper/95 pb-1.5 pt-2 backdrop-blur sm:-mx-6 desk:top-0 desk:-mx-10 optouch:-mx-8">
         <DayStrip
           days={stripDays}
           selectedDay={selectedDay}
