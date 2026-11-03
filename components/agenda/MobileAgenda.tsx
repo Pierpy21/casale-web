@@ -1,7 +1,6 @@
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { StatusLegend } from "@/components/ui";
 import type { BookingListItem, NextEventBrief, Room } from "@/lib/types";
-import { AgendaKindSwitch } from "./AgendaKindSwitch";
 import { DaySummary } from "./DaySummary";
 import { MobileCalendar } from "./MobileCalendar";
 import { EmptyDay } from "./NextEventHint";
@@ -21,15 +20,15 @@ export interface MobileAgendaProps {
   canAssignRooms: boolean;
   /** Permesso di eliminare le prenotazioni normali (solo admin). */
   canDeleteBookings: boolean;
+  /** Filtro per tipo corrente (la scelta sta nella barra sopra, in AgendaBoard). */
   kind: AgendaKindFilter;
-  onKindChange: (kind: AgendaKindFilter) => void;
   onNavigate: (iso: string) => void;
   /** Prossimo evento dopo il giorno selezionato (null se non ce n'è). */
   nextEvent?: NextEventBrief | null;
   onOpenNextEvent: (iso: string) => void;
 }
 
-/** Agenda mobile (< lg): filtro per tipo, calendario mensile in alto, lista del giorno sotto. La creazione è nel pulsante + globale (layout admin). */
+/** Agenda mobile (< desk): calendario mensile in alto, lista del giorno sotto. Periodo e filtro stanno nella barra fissa (AgendaBoard). */
 export function MobileAgenda({
   selected,
   today,
@@ -39,7 +38,6 @@ export function MobileAgenda({
   canAssignRooms,
   canDeleteBookings,
   kind,
-  onKindChange,
   onNavigate,
   nextEvent = null,
   onOpenNextEvent,
@@ -53,8 +51,7 @@ export function MobileAgenda({
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <StatusLegend />
-      <MobileCalendar selected={selected} today={today} byDate={calendarByDate} onNavigate={onNavigate} />
-      <AgendaKindSwitch value={kind} onChange={onKindChange} />
+      <MobileCalendar selected={selected} today={today} byDate={calendarByDate} onNavigate={onNavigate} showHeader={false} />
 
       <section aria-labelledby="giorno-titolo" className="flex flex-col gap-4">
         <div className="flex min-w-0 items-end justify-between gap-3 border-b border-sand pb-3">

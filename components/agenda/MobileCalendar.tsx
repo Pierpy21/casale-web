@@ -20,10 +20,12 @@ export interface MobileCalendarProps {
   /** Tutti i banchetti per giorno: i pallini contano solo gli eventi (kind "evento"). */
   byDate: Map<string, BookingListItem[]>;
   onNavigate: (iso: string) => void;
+  /** Intestazione con mese, "Oggi" e frecce. Falso quando la barra dell'agenda la sostituisce. */
+  showHeader?: boolean;
 }
 
 /** Calendario mensile compatto (mobile): swipe orizzontale o frecce cambiano mese. Pallini = eventi del giorno. */
-export function MobileCalendar({ selected, today, byDate, onNavigate }: MobileCalendarProps) {
+export function MobileCalendar({ selected, today, byDate, onNavigate, showHeader = true }: MobileCalendarProps) {
   const selectedDate = toDate(selected);
   const days = monthGridDates(selected);
   const title = capitalize(formatIt(selectedDate, "LLLL yyyy"));
@@ -35,20 +37,22 @@ export function MobileCalendar({ selected, today, byDate, onNavigate }: MobileCa
   return (
     <SwipeDay onPrev={() => onNavigate(prevMonth)} onNext={() => onNavigate(nextMonth)}>
       <section aria-label="Calendario mensile" className="flex flex-col gap-3">
-        <header className="flex flex-wrap items-center justify-between gap-x-2 gap-y-3">
-          <h1 className="min-w-0 break-words font-serif text-3xl leading-tight">{title}</h1>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => onNavigate(today)} className={cn(buttonClasses("outline", "sm"), "min-h-11")}>
-              Oggi
-            </button>
-            <AgendaNavLink iso={prevMonth} view="month" label="Mese precedente" className={navButton} onNavigate={(iso) => onNavigate(iso)}>
-              <ChevronLeft aria-hidden="true" className="size-5" />
-            </AgendaNavLink>
-            <AgendaNavLink iso={nextMonth} view="month" label="Mese successivo" className={navButton} onNavigate={(iso) => onNavigate(iso)}>
-              <ChevronRight aria-hidden="true" className="size-5" />
-            </AgendaNavLink>
-          </div>
-        </header>
+        {showHeader && (
+          <header className="flex flex-wrap items-center justify-between gap-x-2 gap-y-3">
+            <h1 className="min-w-0 break-words font-serif text-3xl leading-tight">{title}</h1>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => onNavigate(today)} className={cn(buttonClasses("outline", "sm"), "min-h-11")}>
+                Oggi
+              </button>
+              <AgendaNavLink iso={prevMonth} view="month" label="Mese precedente" className={navButton} onNavigate={(iso) => onNavigate(iso)}>
+                <ChevronLeft aria-hidden="true" className="size-5" />
+              </AgendaNavLink>
+              <AgendaNavLink iso={nextMonth} view="month" label="Mese successivo" className={navButton} onNavigate={(iso) => onNavigate(iso)}>
+                <ChevronRight aria-hidden="true" className="size-5" />
+              </AgendaNavLink>
+            </div>
+          </header>
+        )}
 
         <div className="grid grid-cols-7 text-center">
           {days.slice(0, 7).map((day) => (

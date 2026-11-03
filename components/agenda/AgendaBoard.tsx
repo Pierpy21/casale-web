@@ -2,9 +2,8 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { StatusLegend, cn } from "@/components/ui";
+import { PinnedBar, StatusLegend, cn } from "@/components/ui";
 import type { BookingListItem, NextEventBrief, Room } from "@/lib/types";
-import { AgendaKindSwitch } from "./AgendaKindSwitch";
 import { AgendaToolbar } from "./AgendaToolbar";
 import { MobileAgenda } from "./MobileAgenda";
 import { MonthView } from "./MonthView";
@@ -17,7 +16,6 @@ import {
   isRangeInside,
   monthGridDates,
   monthGridRange,
-  periodTitle,
   toDate,
   weekDates,
   type AgendaKindFilter,
@@ -43,6 +41,9 @@ export interface AgendaBoardProps {
   /** Primo evento oltre la griglia caricata (null se non c'è). */
   nextEventAfterRange: NextEventBrief | null;
 }
+
+/** Stessa barra delle statistiche: bordo inferiore sottile, padding come le pagine. */
+const AGENDA_BAR = "border-b border-sand px-4 pb-2 pt-1 sm:px-6 desk:px-10 desk:pb-3 desk:pt-3";
 
 /**
  * Stato dell'agenda lato client. Selezione del giorno, vista e filtro per tipo cambiano in locale (istantanei);
@@ -92,62 +93,29 @@ export function AgendaBoard({
     [kind, loadedRange, router],
   );
 
-  const title = periodTitle(view, selected);
+  const onKindChange = (next: AgendaKindFilter) => navigate(selected, view, next);
 
   return (
     <div
       aria-busy={isPending}
       className={cn("transition-opacity duration-200", isPending && "pointer-events-none opacity-60")}
     >
-      <div className="hidden desk:block">
-        <AgendaToolbar
-          view={view}
-          selected={selected}
-          today={today}
-          title={title}
-          isAdmin={isAdmin}
-          kind={kind}
-          onNavigate={navigate}
-        />
-        <StatusLegend className="mb-5" />
-        {/* Vista giorno: non c'è griglia, il filtro resta sopra l'elenco. Negli altri casi sta sotto il calendario. */}
-        {view === "day" && (
-          <div className="mb-5 flex justify-start">
-            <AgendaKindSwitch value={kind} onChange={(next) => navigate(selected, view, next)} />
+      {/* Telefono e tablet: barra fissa sotto l'header (come le statistiche). Il periodo è il mese. */}
+      <div className="-mt-2 flex min-w-0 flex-col gap-6 desk:hidden">
+        <PinnedBar className={AGENDA_BAR}>
+          <div className="optouch:mx-auto optouch:max-w-[56rem] optouch:px-8">
+            <AgendaToolbar
+              compact
+              view={view}
+              selected={selected}
+              today={today}
+              isAdmin={isAdmin}
+              kind={kind}
+              onNavigate={navigate}
+              onKindChange={onKindChange}
+            />
           </div>
-        )}
-
-        {view === "month" && (
-          <MonthView
-            monthDate={toDate(selected)}
-            days={monthGridDates(selected)}
-            today={today}
-            byDate={byDate}
-            isAdmin={isAdmin}
-            onOpenDay={(iso) => navigate(iso, "day")}
-          />
-        )}
-        {view === "week" && <WeekView days={weekDates(selected)} today={today} byDate={byDate} />}
-        {view === "day" && (
-          <DayView
-            items={byDate.get(selected) ?? []}
-            rooms={rooms}
-            canAssignRooms={canAssignRooms}
-            canDeleteBookings={isAdmin}
-            selected={selected}
-            kind={kind}
-            nextEvent={nextEvent}
-            onOpenNextEvent={(iso) => navigate(iso, "day")}
-          />
-        )}
-        {view !== "day" && (
-          <div className="mt-5 flex justify-start">
-            <AgendaKindSwitch value={kind} onChange={(next) => navigate(selected, view, next)} />
-          </div>
-        )}
-      </div>
-
-      <div className="desk:hidden">
+        </PinnedBar>
         <MobileAgenda
           selected={selected}
           today={today}
@@ -157,11 +125,53 @@ export function AgendaBoard({
           canAssignRooms={canAssignRooms}
           canDeleteBookings={isAdmin}
           kind={kind}
-          onKindChange={(next) => navigate(selected, view, next)}
           onNavigate={(iso) => navigate(iso, view)}
           nextEvent={nextEvent}
           onOpenNextEvent={(iso) => navigate(iso, view)}
         />
+      </div>
+
+      {/* Desktop: barra sticky in cima, come le statistiche; sotto legenda e vista. */}
+      <div className="hidden desk:-mt-4 desk:flex desk:min-w-0 desk:flex-col desk:gap-6">
+        <PinnedBar className={AGENDA_BAR}>
+          <AgendaToolbar
+            view={view}
+            selected={selected}
+            today={today}
+            isAdmin={isAdmin}
+            kind={kind}
+            onNavigate={navigate}
+            onKindChange={onKindChange}
+          />
+        </PinnedBar>
+
+        <div className="flex min-w-0 flex-col gap-5">
+          <StatusLegend />
+
+          {view === "month" && (
+            <MonthView
+              monthDate={toDate(selected)}
+              days={monthGridDates(selected)}
+              today={today}
+              byDate={byDate}
+              isAdmin={isAdmin}
+              onOpenDay={(iso) => navigate(iso, "day")}
+            />
+          )}
+          {view === "week" && <WeekView days={weekDates(selected)} today={today} byDate={byDate} />}
+          {view === "day" && (
+            <DayView
+              items={byDate.get(selected) ?? []}
+              rooms={rooms}
+              canAssignRooms={canAssignRooms}
+              canDeleteBookings={isAdmin}
+              selected={selected}
+              kind={kind}
+              nextEvent={nextEvent}
+              onOpenNextEvent={(iso) => navigate(iso, "day")}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

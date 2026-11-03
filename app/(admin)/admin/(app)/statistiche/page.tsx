@@ -33,7 +33,7 @@ export default async function StatistichePage({ searchParams }: { searchParams: 
   return (
     <div className="-mt-2 flex min-w-0 flex-col gap-6 lg:-mt-4">
       {/* Periodo e filtri sempre in cima, prima di tutto: su telefono/tablet barra fissa sotto l'header (PinnedBar). */}
-      <PinnedBar className="px-4 pb-2 pt-1 sm:px-6 desk:px-10 desk:pt-3">
+      <PinnedBar className="border-b border-sand px-4 pb-2 pt-1 sm:px-6 desk:px-10 desk:pt-3">
         <div className="optouch:mx-auto optouch:max-w-[56rem] optouch:px-4">
           <StatsControls
             periodo={periodo}
