@@ -1,10 +1,11 @@
 "use client";
 
-import { addMonths } from "date-fns";
+import { addMonths, getDaysInMonth } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { capitalize, formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
 import { cn } from "@/components/ui/cn";
+import { MonthYearPicker } from "./MonthYearPicker";
 import type { BookingListItem } from "@/lib/types";
 
 export interface DayStripProps {
@@ -136,6 +137,11 @@ export function DayStrip({
 
   // Frecce del mese: stesso giorno del mese precedente/successivo (date-fns accorcia a fine mese, es. 31 → 30).
   const shiftMonth = (delta: number) => onSelectDay(toISO(addMonths(toDate(selectedDay), delta)));
+  // Mese e anno scelti dal pannello: stesso giorno del mese, accorciato a fine mese (es. 31 → 30).
+  const pickMonth = (year: number, month: number) => {
+    const day = toDate(selectedDay).getDate();
+    onSelectDay(toISO(new Date(year, month, Math.min(day, getDaysInMonth(new Date(year, month, 1))))));
+  };
   // Frecce laterali: scorrono la striscia di circa una settimana, senza cambiare il giorno selezionato.
   const scrollWeek = (direction: number) => {
     const scroller = scrollRef.current;
@@ -146,14 +152,12 @@ export function DayStrip({
 
   return (
     <div className="flex min-w-0 flex-col gap-2 px-4 pt-2 sm:px-6 desk:px-10 desk:pt-1.5 optouch:px-8">
-      {/* Mese del giorno selezionato con frecce mese precedente / successivo. */}
+      {/* Mese del giorno selezionato con frecce mese precedente / successivo; toccandolo si scelgono mese e anno. */}
       <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-cream/70 p-1">
         <button type="button" onClick={() => shiftMonth(-1)} aria-label="Mese precedente" className={NAV_BUTTON}>
           <ChevronLeft aria-hidden="true" className="size-5" />
         </button>
-        <p aria-live="polite" className="min-w-0 truncate text-[16px] font-medium text-ink">
-          {capitalize(formatIt(toDate(selectedDay), "LLLL yyyy"))}
-        </p>
+        <MonthYearPicker value={toDate(selectedDay)} onPick={pickMonth} />
         <button type="button" onClick={() => shiftMonth(1)} aria-label="Mese successivo" className={NAV_BUTTON}>
           <ChevronRight aria-hidden="true" className="size-5" />
         </button>
