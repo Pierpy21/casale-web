@@ -135,8 +135,7 @@ export function DayStrip({
       onScroll={handleScroll}
       className="min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [overflow-anchor:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      {/* pt-3: spazio per il pallino sopra il giorno selezionato (assoluto, quindi nessuno spostamento dei giorni). */}
-      <ul aria-label="Giorni" className="flex w-max items-stretch gap-1.5 px-4 pt-3 sm:px-6 desk:px-10 optouch:px-8">
+      <ul aria-label="Giorni" className="flex w-max items-stretch gap-1.5 px-4 pt-2 sm:px-6 desk:px-10 desk:pt-1.5 optouch:px-8">
         {days.map((iso) => {
           const date = toDate(iso);
           const active = iso === selectedDay;
@@ -151,12 +150,6 @@ export function DayStrip({
               {/* Lineetta verde accennata a metà dello stacco tra due settimane (ml-3 + gap-1.5 = 18px). */}
               {startsWeek && (
                 <span aria-hidden="true" className="pointer-events-none absolute inset-y-3 -left-[9.5px] w-px rounded-full bg-success/45" />
-              )}
-              {active && (
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -top-2 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-petrol"
-                />
               )}
               <button
                 ref={active ? selectedRef : undefined}
