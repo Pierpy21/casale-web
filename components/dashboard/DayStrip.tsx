@@ -108,7 +108,7 @@ export function DayStrip({
 
   return (
     // Scorrimento orizzontale contenuto nella striscia (niente trascinamento della pagina su iOS), scrollbar nascosta.
-    // Attrito: ogni giorno è un punto di aggancio, il lunedì una sosta obbligata (snap-always): un fling avanza al massimo di una settimana.
+    // Attrito: ogni giorno è un punto di aggancio (snap); niente snap-always, che su iOS fa ricalcolare l'aggancio durante lo scroll della pagina.
     <div
       ref={scrollRef}
       onScroll={handleScroll}
@@ -126,7 +126,7 @@ export function DayStrip({
             count === 0 ? "nessun evento" : `${count} ${count === 1 ? "evento" : "eventi"}`
           }`;
           return (
-            <li key={iso} className={cn("relative shrink-0 snap-center", startsWeek && "ml-3 snap-always")}>
+            <li key={iso} className={cn("relative shrink-0 snap-center", startsWeek && "ml-3")}>
               {/* Lineetta verde accennata a metà dello stacco tra due settimane (ml-3 + gap-1.5 = 18px). */}
               {startsWeek && (
                 <span aria-hidden="true" className="pointer-events-none absolute inset-y-3 -left-[9.5px] w-px rounded-full bg-success/45" />

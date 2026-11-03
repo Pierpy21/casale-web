@@ -285,13 +285,22 @@ export function WeekOccupancy({
   return (
     <>
       {/* Su telefono titolo più piccolo perché "Dashboard · Domenica 28 marzo" resti su una riga; da sm in su invariato. */}
-      <div className="min-w-0 [&_h1]:text-xl sm:[&_h1]:text-3xl desk:[&_h1]:text-4xl">
+      {/* "Oggi" in alto a destra: torna a oggi (settimana corrente e giorno). pr-20 lascia spazio al pulsante accanto al titolo. */}
+      <div className="relative min-w-0 [&_h1]:pr-20 [&_h1]:text-xl sm:[&_h1]:text-3xl desk:[&_h1]:text-4xl">
         <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
+        <button
+          type="button"
+          onClick={() => pickDay(todayIso)}
+          disabled={selectedDay === todayIso}
+          className="absolute right-0 top-0 inline-flex min-h-11 items-center rounded-btn border border-petrol px-4 text-[12px] font-medium uppercase tracking-[0.12em] text-petrol transition-colors duration-200 hover:bg-petrol hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol disabled:cursor-default disabled:border-sand disabled:text-slate-dark disabled:hover:bg-transparent"
+        >
+          Oggi
+        </button>
       </div>
 
       {/* Giorni in cima su ogni dispositivo, sempre visibili mentre si scorre la pagina (margini come la ricerca della giacenza).
           Sfondo pieno (niente backdrop-blur: su mobile ricalcolarlo durante lo scroll fa tremare la barra) e 1px sotto l'header mobile. */}
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 -mx-4 min-w-0 border-b border-sand bg-paper pb-1.5 sm:-mx-6 desk:top-0 desk:-mx-10 optouch:-mx-8">
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 -mx-4 min-w-0 transform-gpu border-b border-sand bg-paper pb-1.5 sm:-mx-6 desk:top-0 desk:-mx-10 optouch:-mx-8">
         <DayStrip
           days={stripDays}
           selectedDay={selectedDay}
