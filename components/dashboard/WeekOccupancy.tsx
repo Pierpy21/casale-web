@@ -31,7 +31,9 @@ export interface WeekOccupancyProps {
   initialDays: string[];
   initialBookings: BookingListItem[];
   initialSelectedDay: string;
-  /** Sezioni successive della dashboard (indicatori, prossimi eventi, eliminazioni), già renderizzate dal server. */
+  /** Indicatori in cima, subito sotto il titolo (renderizzati dal server). */
+  indicators?: ReactNode;
+  /** Sezioni successive della dashboard (prossimi eventi, eliminazioni), già renderizzate dal server. */
   children?: ReactNode;
 }
 
@@ -50,8 +52,8 @@ function daysOf(weekStart: string): string[] {
 }
 
 /**
- * Intestazione della dashboard e sezione "Occupazione sale" (settimana, giorno selezionato, sale).
- * Possiede lo stato di settimana e giorno: per questo il titolo e le prenotazioni del giorno stanno qui.
+ * Intestazione della dashboard, indicatori, prenotazioni del giorno e sezione "Occupazione sale" (settimana,
+ * giorno selezionato, sale). Possiede lo stato di settimana e giorno: per questo titolo e prenotazioni del giorno stanno qui.
  */
 export function WeekOccupancy({
   rooms,
@@ -61,6 +63,7 @@ export function WeekOccupancy({
   initialDays,
   initialBookings,
   initialSelectedDay,
+  indicators,
   children,
 }: WeekOccupancyProps) {
   const [data, setData] = useState<WeekData>({
@@ -164,6 +167,10 @@ export function WeekOccupancy({
     <>
       <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
 
+      {indicators}
+
+      <DayBookingsDisclosure dayLabel={selectedDayLabel} bookings={selectedNormalBookings} className="min-w-0" />
+
       <section aria-labelledby="sale-settimana" className="flex min-w-0 flex-col gap-5">
         <div className="flex flex-col gap-4 border-b border-sand pb-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 flex-col gap-1">
@@ -229,8 +236,6 @@ export function WeekOccupancy({
           </SwipeDay>
         </div>
       </section>
-
-      <DayBookingsDisclosure dayLabel={selectedDayLabel} bookings={selectedNormalBookings} className="min-w-0" />
 
       {children}
     </>
