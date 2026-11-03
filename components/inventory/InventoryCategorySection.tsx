@@ -36,7 +36,7 @@ export interface InventoryCategorySectionProps {
   /** Solo modalità a fisarmonica. */
   onToggle?: () => void;
   /**
-   * Modalità incorporata (tablet, gruppo aperto): niente intestazione a fisarmonica, il titolo è nella pagina
+   * Modalità incorporata (gruppo aperto): niente intestazione a fisarmonica, il titolo è nella pagina
    * chiamante; restano righe prodotto e aggiunta di un prodotto nuovo.
    */
   embedded?: boolean;

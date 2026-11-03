@@ -19,10 +19,10 @@ export interface InventoryGroupGridProps {
   onSelect: (key: string) => void;
 }
 
-/** Griglia di bottoni quadrati, uno per categoria o fornitore: usata solo su tablet. */
+/** Griglia di bottoni quadrati, uno per categoria o fornitore: 2 colonne su telefono, 3 su tablet, 4 su desktop. */
 export function InventoryGroupGrid({ groups, onSelect }: InventoryGroupGridProps) {
   return (
-    <ul role="list" className="grid grid-cols-3 gap-3 desk:grid-cols-4">
+    <ul role="list" className="grid grid-cols-2 gap-3 sm:grid-cols-3 desk:grid-cols-4">
       {groups.map((group) => {
         const percent = group.total > 0 ? Math.min(100, Math.round((group.filled / group.total) * 100)) : 0;
         const hasFilled = group.filled > 0;
@@ -41,7 +41,7 @@ export function InventoryGroupGrid({ groups, onSelect }: InventoryGroupGridProps
             >
               {/* Striscia laterale del colore della categoria (decorativa: il nome è nel testo). */}
               {color && <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1.5", color.accent)} />}
-              <span className="line-clamp-3 wrap-anywhere font-serif text-2xl leading-tight text-ink">{group.label}</span>
+              <span className="line-clamp-3 wrap-anywhere font-serif text-xl leading-tight text-ink sm:text-2xl">{group.label}</span>
               <span className="flex flex-col gap-2">
                 <span className="text-[14px] tabular-nums text-slate-dark">
                   {group.total} {group.total === 1 ? "prodotto" : "prodotti"}

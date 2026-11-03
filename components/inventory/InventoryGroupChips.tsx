@@ -18,7 +18,7 @@ export interface InventoryGroupChipsProps {
 }
 
 /**
- * Barra orizzontale di pillole per cambiare gruppo senza tornare alla griglia (tablet, gruppo aperto).
+ * Barra orizzontale di pillole per cambiare gruppo senza tornare alla griglia (gruppo aperto).
  * La pillola attiva scorre al centro della barra; lo scroll resta dentro la barra, non sposta la pagina.
  */
 export function InventoryGroupChips({ groups, activeKey, allLabel, onShowAll, onSelect, disabled }: InventoryGroupChipsProps) {
