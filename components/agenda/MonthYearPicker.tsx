@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { capitalize, formatIt } from "@/components/agenda/agenda-utils";
+import { capitalize, formatIt } from "./agenda-utils";
 import { cn } from "@/components/ui/cn";
 
 export interface MonthYearPickerProps {
@@ -10,6 +10,10 @@ export interface MonthYearPickerProps {
   value: Date;
   /** Scelta di mese (0-11) e anno. */
   onPick: (year: number, month: number) => void;
+  /** Allineamento del pannello rispetto al pulsante (default centrato). */
+  align?: "center" | "start";
+  /** Classi del testo del pulsante (default 16px medio, come nella dashboard). */
+  labelClassName?: string;
 }
 
 const MONTHS = Array.from({ length: 12 }, (_, month) => capitalize(formatIt(new Date(2000, month, 1), "LLL")));
@@ -18,7 +22,7 @@ const MONTHS = Array.from({ length: 12 }, (_, month) => capitalize(formatIt(new 
  * Mese e anno cliccabili: aprono un pannello con l'anno (frecce) e i 12 mesi.
  * Si chiude scegliendo un mese, con Esc o con un clic fuori.
  */
-export function MonthYearPicker({ value, onPick }: MonthYearPickerProps) {
+export function MonthYearPicker({ value, onPick, align = "center", labelClassName }: MonthYearPickerProps) {
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(value.getFullYear());
   const rootRef = useRef<HTMLDivElement>(null);
@@ -62,9 +66,12 @@ export function MonthYearPicker({ value, onPick }: MonthYearPickerProps) {
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-label={`${capitalize(formatIt(value, "LLLL yyyy"))}: scegli mese e anno`}
-        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-lg px-3 text-[16px] font-medium text-ink transition-colors duration-200 hover:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol"
+        className={cn(
+          "inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-lg text-ink transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol",
+          align === "center" ? "px-3 hover:bg-paper" : "-ml-2 px-2 hover:bg-cream",
+        )}
       >
-        <span aria-live="polite" className="truncate">
+        <span aria-live="polite" className={cn("truncate", labelClassName ?? "text-[16px] font-medium")}>
           {capitalize(formatIt(value, "LLLL yyyy"))}
         </span>
         <ChevronDown aria-hidden="true" className={cn("size-4 shrink-0 text-petrol transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} />
@@ -75,7 +82,10 @@ export function MonthYearPicker({ value, onPick }: MonthYearPickerProps) {
           id={panelId}
           role="dialog"
           aria-label="Scegli mese e anno"
-          className="absolute left-1/2 top-full z-30 mt-2 w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-sand bg-paper p-3 shadow-lg shadow-ink/15"
+          className={cn(
+            "absolute top-full z-30 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-sand bg-paper p-3 shadow-lg shadow-ink/15",
+            align === "center" ? "left-1/2 -translate-x-1/2" : "left-0",
+          )}
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <button type="button" onClick={() => setYear((y) => y - 1)} aria-label="Anno precedente" className={YEAR_BUTTON}>

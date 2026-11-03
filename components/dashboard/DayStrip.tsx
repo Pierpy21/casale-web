@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { capitalize, formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
 import { cn } from "@/components/ui/cn";
-import { MonthYearPicker } from "./MonthYearPicker";
+import { MonthYearPicker } from "@/components/agenda/MonthYearPicker";
 import type { BookingListItem } from "@/lib/types";
 
 export interface DayStripProps {

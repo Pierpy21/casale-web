@@ -9,6 +9,7 @@ import {
   toDate,
   toISO,
 } from "@/components/agenda/agenda-utils";
+import { MonthYearPicker } from "@/components/agenda/MonthYearPicker";
 import { cn } from "@/components/ui";
 
 export interface BookingDatePickerProps {
@@ -32,7 +33,6 @@ export function BookingDatePicker({ value, today, onChange }: BookingDatePickerP
   // Mese mostrato: segue la data scelta, poi si sfoglia con le frecce (senza cambiare la data).
   const [month, setMonth] = useState(value);
   const monthDate = toDate(month);
-  const monthTitle = capitalize(formatIt(monthDate, "LLLL yyyy"));
   const prevMonth = shiftPeriod(month, "month", -1);
   const nextMonth = shiftPeriod(month, "month", 1);
   const days = monthGridDates(month);
@@ -87,9 +87,13 @@ export function BookingDatePicker({ value, today, onChange }: BookingDatePickerP
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <p aria-live="polite" className="min-w-0 font-serif text-xl leading-tight text-ink">
-            {monthTitle}
-          </p>
+          {/* Mese e anno cliccabili: pannello con anno e 12 mesi; sfoglia il calendario senza cambiare la data. */}
+          <MonthYearPicker
+            value={monthDate}
+            align="start"
+            labelClassName="font-serif text-xl leading-tight"
+            onPick={(year, monthIndex) => setMonth(toISO(new Date(year, monthIndex, 1)))}
+          />
           <div className="flex shrink-0 items-center gap-1">
             <button type="button" aria-label="Mese precedente" onClick={() => setMonth(prevMonth)} className={NAV_BUTTON}>
               <ChevronLeft aria-hidden="true" className="size-5" />
@@ -103,7 +107,10 @@ export function BookingDatePicker({ value, today, onChange }: BookingDatePickerP
         {/* Intestazione dei giorni: decorativa, il nome completo è nell'aria-label di ogni giorno. */}
         <div aria-hidden="true" className="grid grid-cols-7 text-center">
           {days.slice(0, 7).map((day) => (
-            <span key={toISO(day)} className="text-[11px] font-medium uppercase tracking-[0.06em] text-bronze">
+            <span
+              key={toISO(day)}
+              className={cn("text-[11px] font-medium uppercase tracking-[0.06em]", day.getDay() === 0 ? "text-danger" : "text-bronze")}
+            >
               {formatIt(day, "EEE")}
             </span>
           ))}
