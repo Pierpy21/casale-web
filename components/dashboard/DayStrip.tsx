@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { cn } from "@/components/ui/cn";
 import type { BookingListItem } from "@/lib/types";
@@ -15,26 +15,90 @@ export interface DayStripProps {
   bookings: BookingListItem[];
   /** Selezione di un giorno (se il giorno è di un'altra settimana, la settimana cambia). */
   onSelectDay: (iso: string) => void;
+  /** Ci sono altre settimane da caricare in testa / in coda (false al limite massimo). */
+  canExtendStart: boolean;
+  canExtendEnd: boolean;
+  /** Chiesta di altre settimane quando lo scorrimento si avvicina a un bordo. */
+  onReachEdge: (edge: "start" | "end") => void;
+}
+
+/** Posizione di un elemento nel contenuto della striscia: non cambia con lo scorrimento. */
+function contentX(el: HTMLElement, scroller: HTMLElement): number {
+  return el.getBoundingClientRect().left - scroller.getBoundingClientRect().left + scroller.scrollLeft;
+}
+
+function pillOf(scroller: HTMLElement, iso: string): HTMLElement | null {
+  return scroller.querySelector<HTMLElement>(`[data-iso="${iso}"]`);
 }
 
 /**
  * Striscia orizzontale dei giorni per telefono e tablet, sempre in cima alla dashboard.
- * Il giorno selezionato viene centrato; lo scorrimento è a scatti sui giorni (scroll-snap).
+ * Il giorno selezionato viene centrato solo in orizzontale (mai scrollIntoView, che può muovere la pagina su iOS).
+ * Scorrendo verso un bordo chiede altre settimane; quando arrivano, la posizione visiva resta la stessa.
  */
-export function DayStrip({ days, selectedDay, todayIso, bookings, onSelectDay }: DayStripProps) {
+export function DayStrip({
+  days,
+  selectedDay,
+  todayIso,
+  bookings,
+  onSelectDay,
+  canExtendStart,
+  canExtendEnd,
+  onReachEdge,
+}: DayStripProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
   const mounted = useRef(false);
+  // Richiesta di settimane in corso: evita richieste duplicate finché i giorni non cambiano.
+  const requesting = useRef(false);
+  // Primo giorno al commit precedente, con la sua posizione nel contenuto: ancora per il ripristino dopo un prepend.
+  const anchor = useRef<{ iso: string; x: number; selected: string } | null>(null);
 
-  // Centra il giorno selezionato. Al primo render nessuna animazione; con "prefers-reduced-motion" nemmeno dopo.
-  // La striscia è sticky, quindi block "nearest" non sposta la pagina in verticale.
+  // Centra il giorno selezionato solo in orizzontale. Al primo render nessuna animazione; con "prefers-reduced-motion" nemmeno dopo.
   useEffect(() => {
+    const scroller = scrollRef.current;
     const el = selectedRef.current;
-    if (!el) return;
+    if (!scroller || !el) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const behavior: ScrollBehavior = reduce || !mounted.current ? "auto" : "smooth";
     mounted.current = true;
-    el.scrollIntoView({ behavior, block: "nearest", inline: "center" });
+    const max = scroller.scrollWidth - scroller.clientWidth;
+    const center = contentX(el, scroller) + el.offsetWidth / 2 - scroller.clientWidth / 2;
+    scroller.scrollTo({ left: Math.min(Math.max(center, 0), max), behavior });
   }, [selectedDay]);
+
+  // Dopo ogni cambio di giorni: se sono state aggiunte settimane in testa, sposta lo scorrimento della stessa distanza
+  // (così il contenuto visibile non salta). Non tocca lo scorrimento quando cambia anche il giorno selezionato.
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const prev = anchor.current;
+    if (prev && prev.selected === selectedDay) {
+      const el = pillOf(scroller, prev.iso);
+      if (el) {
+        const delta = contentX(el, scroller) - prev.x;
+        if (delta !== 0) scroller.scrollLeft += delta;
+      }
+    }
+    const firstIso = days[0];
+    const first = firstIso ? pillOf(scroller, firstIso) : null;
+    anchor.current = firstIso && first ? { iso: firstIso, x: contentX(first, scroller), selected: selectedDay } : null;
+    requesting.current = false;
+  }, [days, selectedDay]);
+
+  /** Solo orizzontale e solo vicino a un bordo: non aggiorna lo stato a ogni scorrimento. */
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el || requesting.current) return;
+    const screen = el.clientWidth;
+    if (canExtendStart && el.scrollLeft < screen) {
+      requesting.current = true;
+      onReachEdge("start");
+    } else if (canExtendEnd && el.scrollWidth - el.clientWidth - el.scrollLeft < screen) {
+      requesting.current = true;
+      onReachEdge("end");
+    }
+  }
 
   const counts = new Map<string, number>();
   for (const booking of bookings) {
@@ -44,8 +108,14 @@ export function DayStrip({ days, selectedDay, todayIso, bookings, onSelectDay }:
 
   return (
     // Scorrimento orizzontale contenuto nella striscia (niente trascinamento della pagina su iOS), scrollbar nascosta.
-    <div className="min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <ul aria-label="Giorni" className="flex w-max items-stretch gap-1.5 px-4 sm:px-6 desk:px-10 optouch:px-8">
+    // Attrito: ogni giorno è un punto di aggancio, il lunedì una sosta obbligata (snap-always): un fling avanza al massimo di una settimana.
+    <div
+      ref={scrollRef}
+      onScroll={handleScroll}
+      className="min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [overflow-anchor:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {/* pt-3: spazio per il pallino sopra il giorno selezionato (assoluto, quindi nessuno spostamento dei giorni). */}
+      <ul aria-label="Giorni" className="flex w-max items-stretch gap-1.5 px-4 pt-3 sm:px-6 desk:px-10 optouch:px-8">
         {days.map((iso) => {
           const date = toDate(iso);
           const active = iso === selectedDay;
@@ -56,10 +126,17 @@ export function DayStrip({ days, selectedDay, todayIso, bookings, onSelectDay }:
             count === 0 ? "nessun evento" : `${count} ${count === 1 ? "evento" : "eventi"}`
           }`;
           return (
-            <li key={iso} className={cn("shrink-0 snap-center", startsWeek && "ml-3")}>
+            <li key={iso} className={cn("relative shrink-0 snap-center", startsWeek && "ml-3 snap-always")}>
+              {active && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -top-2 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-petrol"
+                />
+              )}
               <button
                 ref={active ? selectedRef : undefined}
                 type="button"
+                data-iso={iso}
                 aria-pressed={active}
                 aria-label={label}
                 onClick={() => onSelectDay(iso)}

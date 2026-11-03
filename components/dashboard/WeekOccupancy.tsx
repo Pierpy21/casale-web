@@ -2,7 +2,7 @@
 
 import { addDays, endOfWeek } from "date-fns";
 import Link from "next/link";
-import { useEffect, useReducer, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useTransition, type ReactNode } from "react";
 import { getWeekOccupancy } from "@/app/actions/dashboard";
 import { capitalize, formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
 import { SwipeDay } from "@/components/agenda/SwipeDay";
@@ -12,7 +12,7 @@ import { RoomDayView } from "@/components/dashboard/RoomDayView";
 import { RoomOccupancyMatrix } from "@/components/dashboard/RoomOccupancyMatrix";
 import { SelectedDayHeading } from "@/components/dashboard/SelectedDayHeading";
 import { WeekNav } from "@/components/dashboard/WeekNav";
-import { resolveWeekStart, weekLabel, weekRange } from "@/components/dashboard/week";
+import { addWeeksIso, resolveWeekStart, weekLabel, weekRange, weeksBetween } from "@/components/dashboard/week";
 import { PageHeader, StatusLegend } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import type { BookingListItem, Room } from "@/lib/types";
@@ -72,6 +72,36 @@ function daysOf(weekStart: string): string[] {
   return weekRange(resolveWeekStart(weekStart, weekStart)).days;
 }
 
+/** Settimane caricate nella striscia: da `from` a `to` (lunedì). `anchor` è la settimana su cui è stata centrata. */
+interface StripRange {
+  from: string;
+  to: string;
+  anchor: string;
+}
+
+/** Striscia centrata su una settimana: la precedente, quella e la successiva. */
+function stripAround(week: string): StripRange {
+  return { from: addWeeksIso(week, -1), to: addWeeksIso(week, 1), anchor: week };
+}
+
+/** Settimana dentro la striscia (confronto tra date ISO, ordinabili come stringhe). */
+function inStrip(range: StripRange, week: string): boolean {
+  return week >= range.from && week <= range.to;
+}
+
+function maxIso(a: string, b: string): string {
+  return a > b ? a : b;
+}
+
+function minIso(a: string, b: string): string {
+  return a < b ? a : b;
+}
+
+/** Quante settimane si aggiungono per volta quando lo scorrimento arriva a un bordo. */
+const STRIP_CHUNK_WEEKS = 4;
+/** Limite di scorrimento in ciascuna direzione, contato dalla settimana di ancoraggio. */
+const STRIP_MAX_WEEKS = 52;
+
 /**
  * Intestazione della dashboard, indicatori, prenotazioni del giorno e sezione "Occupazione sale" (settimana,
  * giorno selezionato, sale). Possiede lo stato di settimana e giorno: per questo titolo, indicatori, striscia
@@ -97,7 +127,7 @@ export function WeekOccupancy({
   const [selectedDay, setSelectedDay] = useState(initialSelectedDay);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  // Ri-render quando una settimana vicina arriva dal prefetch (la striscia mostra i pallini di tutte e tre).
+  // Ri-render quando una settimana della striscia arriva in background (i pallini si aggiornano).
   const [, bumpCache] = useReducer((n: number) => n + 1, 0);
   // Ultima settimana richiesta: le risposte arrivate in ritardo per altre settimane vengono scartate.
   const latestRequest = useRef(initialWeekStart);
@@ -106,29 +136,45 @@ export function WeekOccupancy({
   const [cache] = useState(
     () => new Map<string, WeekData>([[initialWeekStart, { weekStart: initialWeekStart, days: initialDays, bookings: initialBookings }]]),
   );
+  // Settimane della striscia (lunedì compresi) e ancora per il limite di scorrimento. Cresce solo scorrendo ai bordi.
+  const [strip, setStrip] = useState<StripRange>(() => stripAround(initialWeekStart));
+  // Settimane con una richiesta in corso: niente duplicati.
+  const inFlight = useRef(new Set<string>());
 
-  // Prefetch in background della settimana precedente e successiva di quella richiesta.
+  // Carica in background i dati (per i pallini) di tutte le settimane della striscia non ancora in cache.
   useEffect(() => {
-    let cancelled = false;
-    const base = toDate(requestedWeek);
-    const neighbours = [toISO(addDays(base, -7)), toISO(addDays(base, 7))];
-    for (const iso of neighbours) {
-      if (cache.has(iso)) continue;
+    for (const iso of weeksBetween(strip.from, strip.to)) {
+      if (cache.has(iso) || inFlight.current.has(iso)) continue;
+      inFlight.current.add(iso);
       getWeekOccupancy(iso)
         .then((result) => {
-          if (!cancelled && result.ok) {
+          if (result.ok) {
             cache.set(iso, result.data);
             bumpCache();
           }
         })
         .catch(() => {
-          // Il prefetch è opportunistico: gli errori vengono ignorati.
+          // Il caricamento dei pallini è opportunistico: gli errori vengono ignorati (riprova al prossimo ampliamento).
+        })
+        .finally(() => {
+          inFlight.current.delete(iso);
         });
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [requestedWeek, cache]);
+  }, [strip.from, strip.to, cache]);
+
+  /** Aggiunge settimane in un bordo della striscia, fino al limite dalla settimana di ancoraggio. */
+  function extendStrip(edge: "start" | "end") {
+    setStrip((prev) => {
+      if (edge === "start") {
+        const floor = addWeeksIso(prev.anchor, -STRIP_MAX_WEEKS);
+        const from = maxIso(addWeeksIso(prev.from, -STRIP_CHUNK_WEEKS), floor);
+        return from === prev.from ? prev : { ...prev, from };
+      }
+      const ceil = addWeeksIso(prev.anchor, STRIP_MAX_WEEKS);
+      const to = minIso(addWeeksIso(prev.to, STRIP_CHUNK_WEEKS), ceil);
+      return to === prev.to ? prev : { ...prev, to };
+    });
+  }
 
   /** Cambia settimana; `preferredDay` (se appartiene alla settimana) diventa il giorno selezionato. */
   function goToWeek(target: string, preferredDay?: string) {
@@ -138,6 +184,8 @@ export function WeekOccupancy({
     latestRequest.current = target;
     setRequestedWeek(target);
     setSelectedDay(nextDay);
+    // Settimana già nella striscia: la striscia resta com'è (niente salti). Altrimenti si ricentra su di essa.
+    setStrip((prev) => (inStrip(prev, target) ? prev : stripAround(target)));
     setError(null);
     writeUrl(target, nextDay);
 
@@ -161,6 +209,7 @@ export function WeekOccupancy({
         latestRequest.current = shown.week;
         setRequestedWeek(shown.week);
         setSelectedDay(shown.day);
+        setStrip((prev) => (inStrip(prev, shown.week) ? prev : stripAround(shown.week)));
         writeUrl(shown.week, shown.day);
         setError(result.error);
       }
@@ -224,25 +273,34 @@ export function WeekOccupancy({
     },
   ];
 
-  // Striscia dei giorni: settimana precedente, corrente e successiva, così scorre senza cambiare settimana a ogni bordo.
-  const windowWeeks = [-7, 0, 7].map((delta) => toISO(addDays(requestedStart, delta)));
-  const stripDays = windowWeeks.flatMap(daysOf);
-  const stripEvents = windowWeeks
+  // Striscia dei giorni: tutte le settimane caricate (si allarga scorrendo ai bordi), con i dati già in cache.
+  // Memoizzato: la striscia riallinea lo scorrimento solo quando cambiano davvero i giorni.
+  const stripDays = useMemo(() => weeksBetween(strip.from, strip.to).flatMap(daysOf), [strip.from, strip.to]);
+  const stripEvents = weeksBetween(strip.from, strip.to)
     .flatMap((iso) => (iso === data.weekStart ? data.bookings : (cache.get(iso)?.bookings ?? [])))
     .filter((b) => b.kind === "evento");
+  const canExtendStart = strip.from > addWeeksIso(strip.anchor, -STRIP_MAX_WEEKS);
+  const canExtendEnd = strip.to < addWeeksIso(strip.anchor, STRIP_MAX_WEEKS);
 
   return (
     <>
-      <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
+      {/* Su telefono titolo più piccolo perché "Dashboard · Domenica 28 marzo" resti su una riga; da sm in su invariato. */}
+      <div className="min-w-0 [&_h1]:text-xl sm:[&_h1]:text-3xl desk:[&_h1]:text-4xl">
+        <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
+      </div>
 
-      {/* Giorni in cima su ogni dispositivo, sempre visibili mentre si scorre la pagina (margini come la ricerca della giacenza). */}
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 -mx-4 min-w-0 border-b border-sand bg-paper/95 pb-1.5 pt-2 backdrop-blur sm:-mx-6 desk:top-0 desk:-mx-10 optouch:-mx-8">
+      {/* Giorni in cima su ogni dispositivo, sempre visibili mentre si scorre la pagina (margini come la ricerca della giacenza).
+          Sfondo pieno (niente backdrop-blur: su mobile ricalcolarlo durante lo scroll fa tremare la barra) e 1px sotto l'header mobile. */}
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 -mx-4 min-w-0 border-b border-sand bg-paper pb-1.5 sm:-mx-6 desk:top-0 desk:-mx-10 optouch:-mx-8">
         <DayStrip
           days={stripDays}
           selectedDay={selectedDay}
           todayIso={todayIso}
           bookings={stripEvents}
           onSelectDay={pickDay}
+          canExtendStart={canExtendStart}
+          canExtendEnd={canExtendEnd}
+          onReachEdge={extendStrip}
         />
       </div>
 
