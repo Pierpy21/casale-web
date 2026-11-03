@@ -50,7 +50,6 @@ export function MobileAgenda({
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      <StatusLegend />
       <MobileCalendar selected={selected} today={today} byDate={calendarByDate} onNavigate={onNavigate} showHeader={false} />
 
       <section aria-labelledby="giorno-titolo" className="flex flex-col gap-4">
@@ -69,6 +68,9 @@ export function MobileAgenda({
         </div>
 
         <DaySummary bookings={items} />
+
+        {/* Legenda degli stati sopra le schede del giorno (non sopra il calendario del mese). */}
+        <StatusLegend />
 
         <SwipeDay
           onPrev={() => onNavigate(shiftPeriod(selected, "day", -1))}

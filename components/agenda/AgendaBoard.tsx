@@ -144,7 +144,8 @@ export function AgendaBoard({
         </PinnedBar>
 
         <div className="flex min-w-0 flex-col gap-5">
-          <StatusLegend />
+          {/* Legenda degli stati solo in settimana e giorno: nel mese le celle mostrano solo i coperti. */}
+          {view !== "month" && <StatusLegend />}
 
           {view === "month" && (
             <MonthView
