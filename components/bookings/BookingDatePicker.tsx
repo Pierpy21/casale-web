@@ -1,6 +1,7 @@
 import { addDays, format, isSameMonth } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getBookingDayMarks } from "@/app/actions/bookings";
 import {
   capitalize,
   formatIt,
@@ -11,6 +12,7 @@ import {
 } from "@/components/agenda/agenda-utils";
 import { MonthYearPicker } from "@/components/agenda/MonthYearPicker";
 import { cn } from "@/components/ui";
+import type { BookingDayMark } from "@/lib/types";
 
 export interface BookingDatePickerProps {
   /** Data selezionata (YYYY-MM-DD). */
@@ -20,14 +22,46 @@ export interface BookingDatePickerProps {
   onChange: (iso: string) => void;
 }
 
+/** Conteggi di un giorno: eventi (pallino bronzo) e prenotazioni normali (pallino blu). */
+interface DayMarks {
+  events: number;
+  reservations: number;
+}
+
 const STEP_BUTTON =
   "grid size-11 shrink-0 place-items-center rounded-btn text-petrol transition-colors hover:bg-cream active:bg-sand/60";
 const NAV_BUTTON =
   "grid size-11 shrink-0 place-items-center rounded-btn text-petrol transition-colors hover:bg-cream";
 
+/** Raggruppa i record del server per giorno (ISO). */
+function marksByDate(items: BookingDayMark[]): Map<string, DayMarks> {
+  const map = new Map<string, DayMarks>();
+  for (const item of items) {
+    const current = map.get(item.event_date) ?? { events: 0, reservations: 0 };
+    if (item.kind === "evento") current.events += 1;
+    else current.reservations += 1;
+    map.set(item.event_date, current);
+  }
+  return map;
+}
+
+/**
+ * Pallini sotto il numero (come il calendario mobile dell'agenda). Sul giorno selezionato, dentro il cerchio petrol,
+ * usano i colori chiari (senape e carta) per restare visibili.
+ */
+function DayDots({ marks, onPetrol }: { marks: DayMarks; onPetrol: boolean }) {
+  return (
+    <>
+      {marks.events > 0 && <span className={cn("size-1 rounded-full", onPetrol ? "bg-mustard" : "bg-bronze")} />}
+      {marks.reservations > 0 && <span className={cn("size-1 rounded-full", onPetrol ? "bg-paper" : "bg-petrol")} />}
+    </>
+  );
+}
+
 /**
  * Selettore data per il foglio di creazione: stepper giorno per giorno (frecce ai lati della data)
  * e calendario mensile sotto, che segue la data scelta. Controllato: value/onChange.
+ * Pallini: eventi e prenotazioni del mese mostrato (caricati in background, niente pallini finché non arrivano).
  */
 export function BookingDatePicker({ value, today, onChange }: BookingDatePickerProps) {
   // Mese mostrato: segue la data scelta, poi si sfoglia con le frecce (senza cambiare la data).
@@ -36,8 +70,41 @@ export function BookingDatePicker({ value, today, onChange }: BookingDatePickerP
   const prevMonth = shiftPeriod(month, "month", -1);
   const nextMonth = shiftPeriod(month, "month", 1);
   const days = monthGridDates(month);
+  const gridFrom = toISO(days[0]);
+  const gridTo = toISO(days[days.length - 1]);
+  const monthKey = month.slice(0, 7);
   const isToday = value === today;
   const dayTitle = capitalize(formatIt(toDate(value), "EEE d MMMM"));
+
+  // Pallini già caricati per mese (il foglio si smonta alla chiusura: la cache vive per apertura).
+  const cache = useRef(new Map<string, Map<string, DayMarks>>());
+  // Ultimo mese caricato: i pallini valgono solo se corrispondono al mese mostrato.
+  const [loaded, setLoaded] = useState<{ key: string; byDate: Map<string, DayMarks> } | null>(null);
+  const byDate = loaded?.key === monthKey ? loaded.byDate : null;
+
+  useEffect(() => {
+    const cached = cache.current.get(monthKey);
+    if (cached) {
+      setLoaded({ key: monthKey, byDate: cached });
+      return;
+    }
+    // Risposte arrivate dopo il cambio di mese: salvate in cache ma non mostrate.
+    let active = true;
+    getBookingDayMarks(gridFrom, gridTo)
+      .then((result) => {
+        // Errori e offline: nessun pallino e nessun messaggio (il calendario resta utilizzabile).
+        if (!result.ok) return;
+        const next = marksByDate(result.data);
+        cache.current.set(monthKey, next);
+        if (active) setLoaded({ key: monthKey, byDate: next });
+      })
+      .catch(() => {
+        // Rete assente o server irraggiungibile: il caricamento dei pallini è opportunistico.
+      });
+    return () => {
+      active = false;
+    };
+  }, [monthKey, gridFrom, gridTo]);
 
   function select(iso: string) {
     onChange(iso);
@@ -116,27 +183,37 @@ export function BookingDatePicker({ value, today, onChange }: BookingDatePickerP
           ))}
         </div>
 
-        <div role="group" aria-label="Giorni del mese" className="grid grid-cols-7 gap-y-1">
+        <div role="group" aria-label="Giorni del mese" className="grid grid-cols-7">
           {days.map((day) => {
             const iso = toISO(day);
             const selected = iso === value;
             const isToday = iso === today;
             const isPast = iso < today;
             const inMonth = isSameMonth(day, monthDate);
+            const marks = byDate?.get(iso);
             // Date passate: attenuate ma selezionabili (un evento può essere registrato a posteriori).
             const tone = inMonth ? (isPast ? "text-slate/60" : "text-ink") : "text-slate/40";
+            const dotsLabel = marks
+              ? [
+                  marks.events > 0 ? `${marks.events} ${marks.events === 1 ? "evento" : "eventi"}` : "",
+                  marks.reservations > 0 ? `${marks.reservations} ${marks.reservations === 1 ? "prenotazione" : "prenotazioni"}` : "",
+                ]
+                  .filter(Boolean)
+                  .map((part) => `, ${part}`)
+                  .join("")
+              : "";
             return (
               <button
                 key={iso}
                 type="button"
                 aria-pressed={selected}
-                aria-label={`${capitalize(formatIt(day, "EEEE d MMMM yyyy"))}${isToday ? ", oggi" : ""}`}
+                aria-label={`${capitalize(formatIt(day, "EEEE d MMMM yyyy"))}${isToday ? ", oggi" : ""}${dotsLabel}`}
                 onClick={() => select(iso)}
-                className="grid h-11 w-full place-items-center"
+                className="flex h-12 w-full flex-col items-center gap-0.5 pt-0.5"
               >
                 <span
                   className={cn(
-                    "grid size-10 place-items-center rounded-full text-[15px] tabular-nums transition-colors duration-200",
+                    "relative grid size-9 place-items-center rounded-full text-[15px] tabular-nums transition-colors duration-200",
                     selected
                       ? "bg-petrol font-medium text-paper"
                       : isToday
@@ -145,7 +222,18 @@ export function BookingDatePicker({ value, today, onChange }: BookingDatePickerP
                   )}
                 >
                   {format(day, "d")}
+                  {/* Sul giorno selezionato i pallini stanno dentro il cerchio petrol, per restare visibili. */}
+                  {selected && marks && (
+                    <span aria-hidden="true" className="absolute inset-x-0 bottom-1 flex items-center justify-center gap-0.5">
+                      <DayDots marks={marks} onPetrol />
+                    </span>
+                  )}
                 </span>
+                {!selected && (
+                  <span aria-hidden="true" className={cn("flex h-1.5 items-center gap-0.5", !inMonth && "opacity-40")}>
+                    {marks && <DayDots marks={marks} onPetrol={false} />}
+                  </span>
+                )}
               </button>
             );
           })}

@@ -1,14 +1,16 @@
 "use server";
 
 import type PocketBase from "pocketbase";
+import { differenceInDays, isValid, parseISO } from "date-fns";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
+import { toISO } from "@/components/agenda/agenda-utils";
 import { BookingAllergiesInput, BookingInput, BookingNoteBody, CoversInput, DishesInput, type DishInputType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } from "@/lib/action-utils";
 import { createQuote } from "@/lib/rpc/quotes";
 import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canSeeAppointments, isAdmin } from "@/lib/permissions";
-import { fetchOne } from "@/lib/pocketbase/queries";
-import { nn, type PbRecord } from "@/lib/pocketbase/helpers";
+import { fetchOne, listAll } from "@/lib/pocketbase/queries";
+import { dayEndPb, dayStartPb, nn, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
 import { loadBookingBrief, notifyBookingDeleted, notifyBookingEvent } from "@/lib/notify";
 import { checkConflict, withMutation } from "@/lib/mutations";
 import type { MutationOptions } from "@/lib/offline/contract";
@@ -25,7 +27,7 @@ import {
   upsertBooking,
 } from "@/lib/rpc/bookings";
 import { eventStatusFor } from "@/lib/booking-status";
-import type { ActionResult, BookingAllergyDraft, BookingKind, BookingStatus } from "@/lib/types";
+import type { ActionResult, BookingAllergyDraft, BookingDayMark, BookingKind, BookingStatus } from "@/lib/types";
 
 function revalidateBooking(id?: string, clientId?: string): void {
   revalidatePath("/admin/agenda");
@@ -64,6 +66,51 @@ async function withLegacyGuest(db: PocketBase, raw: unknown, previous: PbRecord 
     return { ...o, guest_name: nn(previous.guest_name) ?? "", guest_phone: o.guest_phone ?? nn(previous.guest_phone) ?? "" };
   }
   return raw;
+}
+
+/** Data YYYY-MM-DD valida (calendario reale), altrimenti null. */
+function parseIsoDay(iso: unknown): Date | null {
+  if (typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const parsed = parseISO(iso);
+  return isValid(parsed) && toISO(parsed) === iso ? parsed : null;
+}
+
+/**
+ * Pallini del calendario di creazione: un record per evento o prenotazione normale non annullata nell'intervallo.
+ * Solo data e tipo (payload minimo). Gli appuntamenti non compaiono mai, né per admin né per sala: come in agenda, la sala non li vede.
+ * Chi può creare prenotazioni (admin e sala attiva) è anche chi vede il pulsante +.
+ */
+export async function getBookingDayMarks(fromIso: string, toIso: string): Promise<ActionResult<BookingDayMark[]>> {
+  const auth = await authorize(canCreateAnyBooking);
+  if (!auth.ok) return auth;
+
+  const from = parseIsoDay(fromIso);
+  const to = parseIsoDay(toIso);
+  // Il calendario mostra al massimo una griglia di 6 settimane: intervalli più ampi sono errori.
+  if (!from || !to || from > to || differenceInDays(to, from) > 62) return fail("Intervallo non valido.");
+
+  try {
+    const records = await listAll(
+      auth.db,
+      "bookings",
+      auth.db.filter("event_date >= {:from} && event_date <= {:to} && status != {:s} && kind != {:k}", {
+        from: dayStartPb(fromIso),
+        to: dayEndPb(toIso),
+        s: "annullato",
+        k: "appuntamento",
+      }),
+      { fields: "event_date,kind" },
+    );
+    return {
+      ok: true,
+      data: records.map((r): BookingDayMark => ({
+        event_date: toDateOnly(r.event_date),
+        kind: kindOf(r) === "normale" ? "normale" : "evento",
+      })),
+    };
+  } catch (err) {
+    return dbFail(err, "Impossibile caricare il calendario.");
+  }
 }
 
 type CreatedBooking = { id: string; quote_id: string | null; warnings: string[] };

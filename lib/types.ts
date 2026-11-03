@@ -87,7 +87,9 @@ export interface BookingListItem extends Booking {
   dishes: BookingDish[];            // per mostrare il menù a colpo d'occhio
   allergies: BookingAllergy[];
 }
-export type ClientOption = Pick<Client, "id" | "first_name" | "last_name" | "phone">;
+/** Pallino del calendario di creazione: giorno e tipo di una prenotazione non annullata (mai appuntamenti). */
+export interface BookingDayMark { event_date: string; kind: "evento" | "normale"; }
+export type ClientOption =Pick<Client, "id" | "first_name" | "last_name" | "phone">;
 /** Suggerimento di ricerca cliente (campo Nome nelle prenotazioni). `email` è null per il ruolo sala. */
 export interface ClientSuggestion { id: string; first_name: string; last_name: string; phone: string; email: string | null; }
 /** Prossimo evento dopo un giorno (giorno vuoto dell'agenda, tutti i ruoli). `event_date` YYYY-MM-DD, `meal` pranzo o cena o null. */
