@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { formatIt, toDate, toISO, todayISO, capitalize } from "@/components/agenda/agenda-utils";
+import { toISO, todayISO } from "@/components/agenda/agenda-utils";
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { formatChangeTimestamp } from "@/components/bookings/change-labels";
 import { WeekOccupancy } from "@/components/dashboard/WeekOccupancy";
 import { resolveWeekStart, weekRange } from "@/components/dashboard/week";
-import { Card, EmptyState, cn, type StatProps } from "@/components/ui";
+import { Card, EmptyState } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import {
   getBookingsInRange,
@@ -26,7 +25,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
 
   const params = await searchParams;
   const today = todayISO();
-  const todayDate = toDate(today);
   const currentWeekStart = resolveWeekStart(undefined, today);
   const weekStart = resolveWeekStart(params.week, today);
   const week = weekRange(weekStart);
@@ -46,38 +44,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
     getDeletionLog(5),
   ]);
 
-  // Ogni indicatore è un link alla vista che lo spiega.
-  const tiles: (StatProps & { href: string })[] = [
-    {
-      label: "Eventi oggi",
-      value: stats.eventsToday,
-      hint: capitalize(formatIt(todayDate, "EEEE d MMMM")),
-      href: `/admin/agenda?date=${today}&view=day`,
-    },
-    {
-      label: "Eventi nel mese",
-      value: stats.eventsThisMonth,
-      hint: capitalize(formatIt(todayDate, "LLLL yyyy")),
-      href: "/admin/statistiche?periodo=mese&tipo=evento",
-    },
-    {
-      label: "Coperti · 7 giorni",
-      value: stats.coversNext7Days,
-      hint: "Adulti e bambini nei prossimi sette giorni",
-      href: "/admin/statistiche?periodo=mese",
-    },
-    {
-      label: "Senza acconto",
-      value: stats.pendingOptions,
-      hint: stats.pendingOptions > 0 ? "In attesa del primo acconto" : "Tutti gli eventi hanno un acconto",
-      highlight: stats.pendingOptions > 0,
-      href: "/admin/da-confermare",
-    },
-  ];
-
   const activeRooms = rooms.filter((room) => room.active);
 
-  // Ordine: intestazione con il giorno → indicatori → prenotazioni del giorno → occupazione sale → prossimi eventi → eliminazioni.
+  // Ordine: intestazione con il giorno → striscia giorni (telefono) → indicatori → prenotazioni del giorno → occupazione sale → prossimi eventi → eliminazioni.
+  // Eventi e coperti del giorno li calcola WeekOccupancy dal giorno selezionato; qui solo i valori del mese e i link.
   return (
     <div className="-mt-2 flex min-w-0 flex-col gap-6 lg:-mt-4">
       <WeekOccupancy
@@ -89,28 +59,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         initialDays={weekDays}
         initialBookings={weekBookings}
         initialSelectedDay={selectedDay}
-        indicators={
-          // Una riga sola a 4 colonne, senza riquadri: separatori verticali tra gli indicatori.
-          <section aria-label="Indicatori principali" className="grid min-w-0 grid-cols-4 divide-x divide-sand border-y border-sand">
-            {tiles.map((tile) => (
-              <Link
-                key={tile.label}
-                href={tile.href}
-                aria-label={`${tile.label}: ${tile.value}`}
-                className={cn(
-                  "flex min-w-0 flex-col gap-1 px-2 py-3 transition-colors duration-200 first:pl-0 hover:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-petrol sm:px-4",
-                  tile.highlight && "bg-warning/10 first:pl-2 sm:first:pl-4",
-                )}
-              >
-                <span className="text-[10px] font-medium uppercase leading-tight tracking-[0.1em] text-bronze sm:text-[11px] sm:tracking-[0.14em]">
-                  {tile.label}
-                </span>
-                <span className="font-serif text-xl leading-none tabular-nums text-ink sm:text-2xl">{tile.value}</span>
-                <span className="hidden truncate text-[12px] text-slate-dark sm:block">{tile.hint}</span>
-              </Link>
-            ))}
-          </section>
-        }
+        indicators={{
+          eventsThisMonth: stats.eventsThisMonth,
+          pendingOptions: stats.pendingOptions,
+          eventsThisMonthHref: "/admin/statistiche?periodo=mese&tipo=evento",
+          pendingOptionsHref: "/admin/da-confermare",
+        }}
       >
         <section aria-labelledby="prossimi-eventi" className="flex min-w-0 flex-col gap-5">
           <div className="flex items-end justify-between gap-4 border-b border-sand pb-3">

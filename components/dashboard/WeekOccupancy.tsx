@@ -1,12 +1,13 @@
 "use client";
 
 import { addDays, endOfWeek } from "date-fns";
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import Link from "next/link";
+import { useEffect, useReducer, useRef, useState, useTransition, type ReactNode } from "react";
 import { getWeekOccupancy } from "@/app/actions/dashboard";
 import { capitalize, formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
 import { SwipeDay } from "@/components/agenda/SwipeDay";
 import { DayBookingsDisclosure } from "@/components/dashboard/DayBookingsDisclosure";
-import { DaySelector } from "@/components/dashboard/DaySelector";
+import { DayStrip } from "@/components/dashboard/DayStrip";
 import { RoomDayView } from "@/components/dashboard/RoomDayView";
 import { RoomOccupancyMatrix } from "@/components/dashboard/RoomOccupancyMatrix";
 import { SelectedDayHeading } from "@/components/dashboard/SelectedDayHeading";
@@ -22,6 +23,16 @@ interface WeekData {
   bookings: BookingListItem[];
 }
 
+/** Indicatori che non dipendono dal giorno selezionato: valori calcolati dal server, con il link alla pagina che li spiega. */
+export interface DashboardIndicatorValues {
+  /** Eventi non annullati del mese corrente. */
+  eventsThisMonth: number;
+  /** Eventi senza acconto (stato "opzione") da oggi in poi. */
+  pendingOptions: number;
+  eventsThisMonthHref: string;
+  pendingOptionsHref: string;
+}
+
 export interface WeekOccupancyProps {
   rooms: Room[];
   todayIso: string;
@@ -31,10 +42,20 @@ export interface WeekOccupancyProps {
   initialDays: string[];
   initialBookings: BookingListItem[];
   initialSelectedDay: string;
-  /** Indicatori in cima, subito sotto il titolo (renderizzati dal server). */
-  indicators?: ReactNode;
+  /** Indicatori in cima: "Eventi" e "Coperti" seguono il giorno selezionato, gli altri restano valori del server. */
+  indicators: DashboardIndicatorValues;
   /** Sezioni successive della dashboard (prossimi eventi, eliminazioni), già renderizzate dal server. */
   children?: ReactNode;
+}
+
+interface IndicatorTile {
+  label: string;
+  /** null mentre la settimana del giorno selezionato si sta caricando. */
+  value: number | null;
+  /** Riga sotto il valore: il giorno ("Oggi", "Gio 5 nov") oppure lo stato. */
+  sub: string;
+  href: string;
+  highlight?: boolean;
 }
 
 /** Sostituisce il solo parametro di query senza navigazione Next, senza scroll. */
@@ -53,7 +74,8 @@ function daysOf(weekStart: string): string[] {
 
 /**
  * Intestazione della dashboard, indicatori, prenotazioni del giorno e sezione "Occupazione sale" (settimana,
- * giorno selezionato, sale). Possiede lo stato di settimana e giorno: per questo titolo e prenotazioni del giorno stanno qui.
+ * giorno selezionato, sale). Possiede lo stato di settimana e giorno: per questo titolo, indicatori, striscia
+ * dei giorni e prenotazioni del giorno stanno qui.
  */
 export function WeekOccupancy({
   rooms,
@@ -75,6 +97,8 @@ export function WeekOccupancy({
   const [selectedDay, setSelectedDay] = useState(initialSelectedDay);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Ri-render quando una settimana vicina arriva dal prefetch (la striscia mostra i pallini di tutte e tre).
+  const [, bumpCache] = useReducer((n: number) => n + 1, 0);
   // Ultima settimana richiesta: le risposte arrivate in ritardo per altre settimane vengono scartate.
   const latestRequest = useRef(initialWeekStart);
   // Settimana e giorno effettivamente mostrati (dati applicati): base per il ripristino in caso di errore.
@@ -92,7 +116,10 @@ export function WeekOccupancy({
       if (cache.has(iso)) continue;
       getWeekOccupancy(iso)
         .then((result) => {
-          if (!cancelled && result.ok) cache.set(iso, result.data);
+          if (!cancelled && result.ok) {
+            cache.set(iso, result.data);
+            bumpCache();
+          }
         })
         .catch(() => {
           // Il prefetch è opportunistico: gli errori vengono ignorati.
@@ -146,6 +173,12 @@ export function WeekOccupancy({
     writeUrl(requestedWeek, iso);
   }
 
+  /** Selezione dalla striscia: un giorno di una settimana vicina cambia anche la settimana. */
+  function pickDay(iso: string) {
+    if (daysOf(requestedWeek).includes(iso)) selectDay(iso);
+    else goToWeek(toISO(resolveWeekStart(iso, iso)), iso);
+  }
+
   const requestedStart = toDate(requestedWeek);
   const requestedEnd = endOfWeek(requestedStart, { weekStartsOn: 1 });
   const isCurrentWeek = requestedWeek === currentWeekIso;
@@ -163,11 +196,76 @@ export function WeekOccupancy({
   const selectedDayShort = capitalize(formatIt(toDate(selectedDay), "EEE d MMMM"));
   const selectedDayLabel = capitalize(formatIt(toDate(selectedDay), "EEEE d MMMM"));
 
+  // Dati del giorno: validi solo quando la settimana richiesta è quella caricata (altrimenti "–" invece di zeri falsi).
+  const dataReady = data.weekStart === requestedWeek;
+  const dayEvents = dataReady
+    ? eventBookings.filter((b) => b.event_date === selectedDay && b.status !== "annullato").length
+    : null;
+  // Coperti: adulti e bambini di eventi e prenotazioni normali (appuntamenti esclusi), non annullati.
+  const dayCovers = dataReady
+    ? data.bookings
+        .filter((b) => b.event_date === selectedDay && b.kind !== "appuntamento" && b.status !== "annullato")
+        .reduce((sum, b) => sum + b.adults + b.children, 0)
+    : null;
+  const dayTag = selectedDay === todayIso ? "Oggi" : capitalize(formatIt(toDate(selectedDay), "EEE d MMM"));
+  const monthName = capitalize(formatIt(toDate(todayIso), "LLLL"));
+
+  const dayHref = `/admin/agenda?date=${selectedDay}&view=day`;
+  const tiles: IndicatorTile[] = [
+    { label: "Eventi", value: dayEvents, sub: dayTag, href: dayHref },
+    { label: "Eventi nel mese", value: indicators.eventsThisMonth, sub: monthName, href: indicators.eventsThisMonthHref },
+    { label: "Coperti", value: dayCovers, sub: dayTag, href: dayHref },
+    {
+      label: "Senza acconto",
+      value: indicators.pendingOptions,
+      sub: indicators.pendingOptions > 0 ? "In attesa" : "Nessuno",
+      href: indicators.pendingOptionsHref,
+      highlight: indicators.pendingOptions > 0,
+    },
+  ];
+
+  // Striscia dei giorni: settimana precedente, corrente e successiva, così scorre senza cambiare settimana a ogni bordo.
+  const windowWeeks = [-7, 0, 7].map((delta) => toISO(addDays(requestedStart, delta)));
+  const stripDays = windowWeeks.flatMap(daysOf);
+  const stripEvents = windowWeeks
+    .flatMap((iso) => (iso === data.weekStart ? data.bookings : (cache.get(iso)?.bookings ?? [])))
+    .filter((b) => b.kind === "evento");
+
   return (
     <>
       <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
 
-      {indicators}
+      {/* Telefono e tablet: giorni in cima, sempre visibili mentre si scorre la pagina. */}
+      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 -mx-4 min-w-0 border-b border-sand bg-paper/95 py-2 backdrop-blur sm:-mx-6 desk:hidden">
+        <DayStrip
+          days={stripDays}
+          selectedDay={selectedDay}
+          todayIso={todayIso}
+          bookings={stripEvents}
+          onSelectDay={pickDay}
+        />
+      </div>
+
+      {/* Indicatori: una riga sola a 4 colonne, senza riquadri: separatori verticali tra gli indicatori. */}
+      <section aria-label="Indicatori principali" className="grid min-w-0 grid-cols-4 divide-x divide-sand border-y border-sand">
+        {tiles.map((tile) => (
+          <Link
+            key={tile.label}
+            href={tile.href}
+            aria-label={`${tile.label}, ${tile.sub}: ${tile.value ?? "caricamento"}`}
+            className={cn(
+              "flex min-w-0 flex-col gap-1 px-2 py-3 transition-colors duration-200 first:pl-0 hover:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-petrol sm:px-4",
+              tile.highlight && "bg-warning/10 first:pl-2 sm:first:pl-4",
+            )}
+          >
+            <span className="min-h-7 text-[10px] font-medium uppercase leading-tight tracking-[0.1em] text-bronze sm:min-h-0 sm:text-[11px] sm:tracking-[0.14em]">
+              {tile.label}
+            </span>
+            <span className="font-serif text-xl leading-none tabular-nums text-ink sm:text-2xl">{tile.value ?? "–"}</span>
+            <span className="truncate text-[11px] text-slate-dark sm:text-[12px]">{tile.sub}</span>
+          </Link>
+        ))}
+      </section>
 
       <DayBookingsDisclosure dayLabel={selectedDayLabel} bookings={selectedNormalBookings} className="min-w-0" />
 
@@ -213,16 +311,6 @@ export function WeekOccupancy({
         <div className={cn("flex min-w-0 flex-col transition-opacity duration-200", isPending && "opacity-60")}>
           <SwipeDay onPrev={() => shiftDay(-1)} onNext={() => shiftDay(1)}>
             <div className="flex min-w-0 flex-col gap-5">
-              <div className="desk:hidden">
-                <DaySelector
-                  days={data.days}
-                  selectedDay={selectedDay}
-                  todayIso={todayIso}
-                  bookings={eventBookings}
-                  onSelectDay={selectDay}
-                />
-              </div>
-
               <SelectedDayHeading selectedDay={selectedDay} todayIso={todayIso} rooms={rooms} bookings={eventBookings} />
 
               <div className="hidden min-w-0 desk:block">
