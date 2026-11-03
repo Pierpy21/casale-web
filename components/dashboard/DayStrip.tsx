@@ -20,6 +20,8 @@ export interface DayStripProps {
   canExtendEnd: boolean;
   /** Chiesta di altre settimane quando lo scorrimento si avvicina a un bordo. */
   onReachEdge: (edge: "start" | "end") => void;
+  /** Cambia per chiedere di ricentrare il giorno selezionato anche se non è cambiato (tasto "Oggi"). */
+  recenterKey?: number;
 }
 
 /** Posizione di un elemento nel contenuto della striscia: non cambia con lo scorrimento. */
@@ -45,6 +47,7 @@ export function DayStrip({
   canExtendStart,
   canExtendEnd,
   onReachEdge,
+  recenterKey = 0,
 }: DayStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -65,7 +68,25 @@ export function DayStrip({
     const max = scroller.scrollWidth - scroller.clientWidth;
     const center = contentX(el, scroller) + el.offsetWidth / 2 - scroller.clientWidth / 2;
     scroller.scrollTo({ left: Math.min(Math.max(center, 0), max), behavior });
-  }, [selectedDay]);
+  }, [selectedDay, recenterKey]);
+
+  // Rotazione o ridimensionamento: il giorno selezionato torna al centro (senza animazione).
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    let width = scroller.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (scroller.clientWidth === width) return;
+      width = scroller.clientWidth;
+      const el = selectedRef.current;
+      if (!el) return;
+      const max = scroller.scrollWidth - scroller.clientWidth;
+      const center = contentX(el, scroller) + el.offsetWidth / 2 - scroller.clientWidth / 2;
+      scroller.scrollTo({ left: Math.min(Math.max(center, 0), max), behavior: "auto" });
+    });
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, []);
 
   // Dopo ogni cambio di giorni: se sono state aggiunte settimane in testa, sposta lo scorrimento della stessa distanza
   // (così il contenuto visibile non salta). Non tocca lo scorrimento quando cambia anche il giorno selezionato.

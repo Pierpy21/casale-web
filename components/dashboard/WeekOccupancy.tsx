@@ -11,7 +11,7 @@ import { RoomDayView } from "@/components/dashboard/RoomDayView";
 import { RoomOccupancyMatrix } from "@/components/dashboard/RoomOccupancyMatrix";
 import { SelectedDayHeading } from "@/components/dashboard/SelectedDayHeading";
 import { addWeeksIso, resolveWeekStart, weekLabel, weekRange, weeksBetween } from "@/components/dashboard/week";
-import { PageHeader, StatusLegend } from "@/components/ui";
+import { PageHeader, PinnedBar, StatusLegend } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import type { BookingListItem, Room } from "@/lib/types";
 
@@ -221,6 +221,14 @@ export function WeekOccupancy({
   }
 
   /** Selezione dalla striscia: un giorno di una settimana vicina cambia anche la settimana. */
+  // Incrementato da "Oggi": la striscia si ricentra anche se il giorno selezionato non cambia.
+  const [recenterKey, setRecenterKey] = useState(0);
+
+  function goToday() {
+    pickDay(todayIso);
+    setRecenterKey((k) => k + 1);
+  }
+
   function pickDay(iso: string) {
     if (daysOf(requestedWeek).includes(iso)) selectDay(iso);
     else goToWeek(toISO(resolveWeekStart(iso, iso)), iso);
@@ -275,23 +283,8 @@ export function WeekOccupancy({
 
   return (
     <>
-      {/* Su telefono titolo più piccolo perché "Dashboard · Domenica 28 marzo" resti su una riga; da sm in su invariato. */}
-      {/* "Oggi" in alto a destra: torna a oggi (settimana corrente e giorno). pr-20 lascia spazio al pulsante accanto al titolo. */}
-      <div className="relative min-w-0 [&_h1]:pr-20 [&_h1]:text-xl sm:[&_h1]:text-3xl desk:[&_h1]:text-4xl">
-        <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
-        <button
-          type="button"
-          onClick={() => pickDay(todayIso)}
-          disabled={selectedDay === todayIso}
-          className="absolute right-0 top-0 inline-flex min-h-11 items-center rounded-btn border border-petrol px-4 text-[12px] font-medium uppercase tracking-[0.12em] text-petrol transition-colors duration-200 hover:bg-petrol hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol disabled:cursor-default disabled:border-sand disabled:text-slate-dark disabled:hover:bg-transparent"
-        >
-          Oggi
-        </button>
-      </div>
-
-      {/* Giorni in cima su ogni dispositivo, sempre visibili mentre si scorre la pagina (margini come la ricerca della giacenza).
-          Sfondo pieno (niente backdrop-blur: su mobile ricalcolarlo durante lo scroll fa tremare la barra) e 1px sotto l'header mobile. */}
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 -mx-4 min-w-0 border-b border-sand bg-paper pb-1.5 sm:-mx-6 desk:top-0 desk:-mx-10 optouch:-mx-8">
+      {/* Giorni in cima su ogni dispositivo, prima di tutto: su telefono/tablet barra fissa sotto l'header (PinnedBar). */}
+      <PinnedBar aria-label="Scegli il giorno" className="border-b border-sand pb-1.5">
         <DayStrip
           days={stripDays}
           selectedDay={selectedDay}
@@ -301,8 +294,24 @@ export function WeekOccupancy({
           canExtendStart={canExtendStart}
           canExtendEnd={canExtendEnd}
           onReachEdge={extendStrip}
+          recenterKey={recenterKey}
         />
+      </PinnedBar>
+
+      {/* Su telefono titolo più piccolo perché "Dashboard · Domenica 28 marzo" resti su una riga; da sm in su invariato. */}
+      {/* "Oggi" in alto a destra: torna a oggi (settimana corrente e giorno). pr-20 lascia spazio al pulsante accanto al titolo. */}
+      <div className="relative min-w-0 [&_h1]:pr-20 desk:[&_h1]:pr-28 [&_h1]:text-xl sm:[&_h1]:text-3xl desk:[&_h1]:text-4xl">
+        <PageHeader compact eyebrow="Direzione" title={`Dashboard · ${selectedDayShort}`} />
+        <button
+          type="button"
+          // Sempre attivo: anche con oggi già selezionato riporta la striscia su oggi dopo averla scorsa.
+          onClick={goToday}
+          className="absolute right-0 top-0 inline-flex min-h-11 items-center rounded-btn border border-petrol px-4 text-[12px] font-medium uppercase tracking-[0.12em] text-petrol transition-colors duration-200 hover:bg-petrol hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol desk:min-h-12 desk:px-6 desk:text-[14px]"
+        >
+          Oggi
+        </button>
       </div>
+
 
       {/* Indicatori: una riga sola a 4 colonne, senza riquadri: separatori verticali tra gli indicatori. */}
       <section aria-label="Indicatori principali" className="grid min-w-0 grid-cols-4 divide-x divide-sand border-y border-sand">

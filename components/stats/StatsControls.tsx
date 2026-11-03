@@ -26,18 +26,17 @@ const CHIP =
   "inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-[14px] font-medium transition-colors duration-200 sm:px-4";
 
 /**
- * Unica barra sticky della pagina: periodo (frecce + nome + "Oggi"), granularità (tab) e tipo (pillole).
+ * Barra della pagina, sempre in cima (dentro PinnedBar): periodo (frecce + nome + "Oggi"), granularità (tab) e tipo (pillole).
  * Telefono: tre righe (periodo, tab a tutta larghezza, pillole). Da sm: due righe. Da 2xl: una riga.
- * Deve restare figlio diretto del contenitore della pagina perché sia sticky.
  * Solo link: lo stato sta nell'URL.
  */
 export function StatsControls({ periodo, tipo, anchor, prevAnchor, nextAnchor, label, current }: StatsControlsProps) {
   return (
     <section
       aria-label="Periodo e filtri"
-      // Sfondo pieno (niente backdrop-blur: su mobile ricalcolarlo durante lo scroll fa tremare la barra) e
-      // 1px sotto l'header mobile, come la ricerca della giacenza: nessuna giunzione con i pixel frazionari.
-      className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-20 flex min-w-0 flex-col gap-1.5 rounded-btn border border-sand bg-paper p-1.5 shadow-sm shadow-ink/5 sm:gap-2 sm:p-2 lg:top-3 2xl:flex-row 2xl:items-center 2xl:justify-between 2xl:gap-4 2xl:p-2.5"
+      // Sfondo pieno (niente backdrop-blur: su mobile ricalcolarlo durante lo scroll fa tremare la barra).
+      // La posizione fissa in cima la dà PinnedBar nella pagina.
+      className="flex min-w-0 flex-col gap-1.5 rounded-btn border border-sand bg-paper p-1.5 shadow-sm shadow-ink/5 sm:gap-2 sm:p-2 2xl:flex-row 2xl:items-center 2xl:justify-between 2xl:gap-4 2xl:p-2.5"
     >
       <div className="flex min-w-0 items-center gap-2 2xl:shrink-0">
         <Link href={statsHref(periodo, tipo, prevAnchor)} aria-label="Periodo precedente" className={cn(ARROW, FOCUS)}>

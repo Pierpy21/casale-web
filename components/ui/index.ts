@@ -15,3 +15,4 @@ export { StatusDot, StatusLegend, type StatusDotProps } from "./StatusDot";
 export { Switch, type SwitchProps } from "./Switch";
 export { DocumentDownload } from "./DocumentDownload";
 export { PhoneLink, type PhoneLinkProps } from "./PhoneLink";
+export { PinnedBar, type PinnedBarProps } from "./PinnedBar";

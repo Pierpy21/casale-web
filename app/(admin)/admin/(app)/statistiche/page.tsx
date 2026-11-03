@@ -4,7 +4,7 @@ import { SectionHeading } from "@/components/stats/SectionHeading";
 import { StatsControls } from "@/components/stats/StatsControls";
 import { StatsSummary } from "@/components/stats/StatsSummary";
 import { WeeklyBreakdown } from "@/components/stats/WeeklyBreakdown";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, PinnedBar } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getCoversStats } from "@/lib/data/bookings";
 import { parseStatsKind, parseStatsPeriod, resolveStatsRange } from "@/lib/stats-period";
@@ -32,18 +32,22 @@ export default async function StatistichePage({ searchParams }: { searchParams: 
 
   return (
     <div className="-mt-2 flex min-w-0 flex-col gap-6 lg:-mt-4">
-      <PageHeader compact eyebrow="Direzione" title="Statistiche" description="Coperti, eventi e menù consumati." />
+      {/* Periodo e filtri sempre in cima, prima di tutto: su telefono/tablet barra fissa sotto l'header (PinnedBar). */}
+      <PinnedBar className="px-4 pb-2 pt-1 sm:px-6 desk:px-10 desk:pt-3">
+        <div className="optouch:mx-auto optouch:max-w-[56rem] optouch:px-4">
+          <StatsControls
+            periodo={periodo}
+            tipo={tipo}
+            anchor={range.from}
+            prevAnchor={range.prevAnchor}
+            nextAnchor={range.nextAnchor}
+            label={range.label}
+            current={current}
+          />
+        </div>
+      </PinnedBar>
 
-      {/* Unico elemento sticky: deve restare figlio diretto del contenitore della pagina. */}
-      <StatsControls
-        periodo={periodo}
-        tipo={tipo}
-        anchor={range.from}
-        prevAnchor={range.prevAnchor}
-        nextAnchor={range.nextAnchor}
-        label={range.label}
-        current={current}
-      />
+      <PageHeader compact eyebrow="Direzione" title="Statistiche" description="Coperti, eventi e menù consumati." />
 
       <section aria-labelledby="riepilogo-titolo" className="flex min-w-0 flex-col gap-3">
         <SectionHeading id="riepilogo-titolo" title="Riepilogo" />
