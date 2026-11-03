@@ -322,15 +322,16 @@ export function WeekOccupancy({
             href={tile.href}
             aria-label={`${tile.label}, ${tile.sub}: ${tile.value ?? "caricamento"}`}
             className={cn(
-              "flex min-w-0 flex-col gap-1 px-2 py-3 transition-colors duration-200 first:pl-0 hover:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-petrol sm:px-4",
-              tile.highlight && "bg-warning/10 first:pl-2 sm:first:pl-4",
+              // Contenuto centrato in ogni colonna (etichetta, numero, giorno).
+              "flex min-w-0 flex-col items-center gap-1 px-2 py-3 text-center transition-colors duration-200 hover:bg-cream/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-petrol sm:px-4",
+              tile.highlight && "bg-warning/10",
             )}
           >
             <span className="min-h-7 text-[10px] font-medium uppercase leading-tight tracking-[0.1em] text-bronze sm:min-h-0 sm:text-[11px] sm:tracking-[0.14em]">
               {tile.label}
             </span>
             <span className="font-serif text-xl leading-none tabular-nums text-ink sm:text-2xl">{tile.value ?? "–"}</span>
-            <span className="truncate text-[11px] text-slate-dark sm:text-[12px]">{tile.sub}</span>
+            <span className="max-w-full truncate text-[11px] text-slate-dark sm:text-[12px]">{tile.sub}</span>
           </Link>
         ))}
       </section>
