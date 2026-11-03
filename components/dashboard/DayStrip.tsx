@@ -64,7 +64,7 @@ export function DayStrip({ days, selectedDay, todayIso, bookings, onSelectDay }:
                 aria-label={label}
                 onClick={() => onSelectDay(iso)}
                 className={cn(
-                  "flex min-h-11 w-14 flex-col items-center gap-0.5 rounded-btn border py-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
+                  "flex min-h-11 w-14 flex-col items-center gap-0.5 rounded-btn border pb-1 pt-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
                   active
                     ? "border-petrol bg-petrol text-paper"
                     : isToday
@@ -82,7 +82,7 @@ export function DayStrip({ days, selectedDay, todayIso, bookings, onSelectDay }:
                   {formatIt(date, "MMM")}
                 </span>
                 {/* Riga fissa: "Oggi" e pallino dei giorni con eventi, così tutti i giorni hanno la stessa altezza. */}
-                <span aria-hidden="true" className="flex h-3 items-center gap-1 text-[9px] font-semibold uppercase leading-none tracking-[0.06em]">
+                <span aria-hidden="true" className="flex h-2.5 items-center gap-1 text-[9px] font-semibold uppercase leading-none tracking-[0.06em]">
                   {isToday && <span className={active ? undefined : "text-bronze"}>Oggi</span>}
                   {count > 0 && <span className={cn("size-1.5 rounded-full", active ? "bg-paper" : "bg-bronze")} />}
                 </span>
