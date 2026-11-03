@@ -13,7 +13,6 @@ import {
   toISO,
 } from "./agenda-utils";
 
-const MAX_DOTS = 3;
 
 export interface MobileCalendarProps {
   selected: string;
@@ -65,8 +64,10 @@ export function MobileCalendar({ selected, today, byDate, onNavigate }: MobileCa
         <div className="grid grid-cols-7">
           {days.map((day) => {
             const iso = toISO(day);
-            const count = (byDate.get(iso) ?? []).filter((b) => b.kind === "evento").length;
-            const dots = Math.min(count, MAX_DOTS);
+            const dayItems = (byDate.get(iso) ?? []).filter((b) => b.status !== "annullato");
+            const count = dayItems.filter((b) => b.kind === "evento").length;
+            // Un pallino per tipo: bronzo se ci sono eventi, blu se ci sono prenotazioni.
+            const hasReservations = dayItems.some((b) => b.kind === "normale");
             const inMonth = isSameMonth(day, selectedDate);
             const isSelected = iso === selected;
             const isToday = iso === today;
@@ -97,9 +98,8 @@ export function MobileCalendar({ selected, today, byDate, onNavigate }: MobileCa
                   aria-hidden="true"
                   className={cn("flex h-1.5 items-center gap-0.5", !inMonth && "opacity-40")}
                 >
-                  {Array.from({ length: dots }, (_, i) => (
-                    <span key={i} className="size-1 rounded-full bg-bronze" />
-                  ))}
+                  {count > 0 && <span className="size-1 rounded-full bg-bronze" />}
+                  {hasReservations && <span className="size-1 rounded-full bg-petrol" />}
                 </span>
               </button>
             );

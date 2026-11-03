@@ -14,7 +14,7 @@ export interface DayStripProps {
   /** Giorno selezionato (YYYY-MM-DD), appartenente a `days`. Viene centrato nella striscia. */
   selectedDay: string;
   todayIso: string;
-  /** Solo eventi: il pallino indica i giorni con almeno un evento non annullato. */
+  /** Eventi e prenotazioni: pallino bronzo se c'è almeno un evento, blu se c'è almeno una prenotazione (non annullati). */
   bookings: BookingListItem[];
   /** Selezione di un giorno (se il giorno è di un'altra settimana, la settimana cambia). */
   onSelectDay: (iso: string) => void;
@@ -130,9 +130,11 @@ export function DayStrip({
   }
 
   const counts = new Map<string, number>();
+  const withReservations = new Set<string>();
   for (const booking of bookings) {
     if (booking.status === "annullato") continue;
-    counts.set(booking.event_date, (counts.get(booking.event_date) ?? 0) + 1);
+    if (booking.kind === "normale") withReservations.add(booking.event_date);
+    else if (booking.kind === "evento") counts.set(booking.event_date, (counts.get(booking.event_date) ?? 0) + 1);
   }
 
   // Frecce del mese: stesso giorno del mese precedente/successivo (date-fns accorcia a fine mese, es. 31 → 30).
@@ -181,12 +183,13 @@ export function DayStrip({
               const active = iso === selectedDay;
               const isToday = iso === todayIso;
               const count = counts.get(iso) ?? 0;
+              const reservations = withReservations.has(iso);
               const startsWeek = date.getDay() === 1;
               // Solo l'etichetta "Dom" in rosso (tranne quando selezionata: lì vale il testo chiaro sul blu).
               const sunday = date.getDay() === 0;
               const label = `${capitalize(formatIt(date, "EEEE d MMMM"))}${isToday ? ", oggi" : ""}, ${
                 count === 0 ? "nessun evento" : `${count} ${count === 1 ? "evento" : "eventi"}`
-              }`;
+              }${reservations ? ", con prenotazioni" : ""}`;
               return (
                 <li key={iso} className={cn("relative shrink-0 snap-center", startsWeek && "ml-2.5")}>
                   {/* Lineetta verde accennata a metà dello stacco tra due settimane (ml-2.5 + gap-1 = 14px). */}
@@ -220,7 +223,8 @@ export function DayStrip({
                     {/* Riga fissa: "Oggi" e pallino dei giorni con eventi, così tutti i giorni hanno la stessa altezza. */}
                     <span aria-hidden="true" className="flex h-2.5 items-center gap-1 text-[9px] font-semibold uppercase leading-none tracking-[0.06em]">
                       {isToday && <span className={active ? undefined : "text-bronze"}>Oggi</span>}
-                      {count > 0 && <span className={cn("size-1.5 rounded-full", active ? "bg-paper" : "bg-bronze")} />}
+                      {count > 0 && <span className={cn("size-1.5 rounded-full", active ? "bg-mustard" : "bg-bronze")} />}
+                      {reservations && <span className={cn("size-1.5 rounded-full", active ? "bg-paper" : "bg-petrol")} />}
                     </span>
                   </button>
                 </li>

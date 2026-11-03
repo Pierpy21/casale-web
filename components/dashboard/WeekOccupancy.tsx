@@ -275,9 +275,10 @@ export function WeekOccupancy({
   // Striscia dei giorni: tutte le settimane caricate (si allarga scorrendo ai bordi), con i dati già in cache.
   // Memoizzato: la striscia riallinea lo scorrimento solo quando cambiano davvero i giorni.
   const stripDays = useMemo(() => weeksBetween(strip.from, strip.to).flatMap(daysOf), [strip.from, strip.to]);
-  const stripEvents = weeksBetween(strip.from, strip.to)
+  // Eventi e prenotazioni: la striscia mostra un pallino per tipo.
+  const stripBookings = weeksBetween(strip.from, strip.to)
     .flatMap((iso) => (iso === data.weekStart ? data.bookings : (cache.get(iso)?.bookings ?? [])))
-    .filter((b) => b.kind === "evento");
+    .filter((b) => b.kind === "evento" || b.kind === "normale");
   const canExtendStart = strip.from > addWeeksIso(strip.anchor, -STRIP_MAX_WEEKS);
   const canExtendEnd = strip.to < addWeeksIso(strip.anchor, STRIP_MAX_WEEKS);
 
@@ -289,7 +290,7 @@ export function WeekOccupancy({
           days={stripDays}
           selectedDay={selectedDay}
           todayIso={todayIso}
-          bookings={stripEvents}
+          bookings={stripBookings}
           onSelectDay={pickDay}
           canExtendStart={canExtendStart}
           canExtendEnd={canExtendEnd}
