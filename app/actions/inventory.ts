@@ -5,36 +5,55 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authorize, dbFail, fail, invalidInput, isRecordId } from "@/lib/action-utils";
 import { canManageInventory, canUseInventory, isAdmin } from "@/lib/permissions";
-import { getInventoryProducts, getInventoryReport, getInventoryReports } from "@/lib/data/inventory";
-import { formatToOrderSummary } from "@/lib/inventory-utils";
+import { getInventoryProducts, getInventoryReport, getInventoryReports, getInventorySuppliers } from "@/lib/data/inventory";
+import { formatToOrderSummary, type InventoryToOrderCount } from "@/lib/inventory-utils";
 import { checkConflictById, withMutation } from "@/lib/mutations";
 import type { MutationOptions } from "@/lib/offline/contract";
 import { fetchOne } from "@/lib/pocketbase/queries";
 import { notify } from "@/lib/notify";
 import {
   InventoryNameTakenError,
+  createSupplier,
   deactivateProduct,
   ensureProduct,
   markReportSeen,
+  removeSupplier,
+  renameSupplier,
+  reorderSuppliers,
   submitInventoryReport as writeInventoryReport,
   updateProduct,
+  updateSupplierActive,
   type InventoryProductRef,
 } from "@/lib/rpc/inventory";
-import { InventoryProductInput, InventoryProductUpdateInput, InventoryReportInput } from "@/lib/validation";
+import {
+  InventoryProductInput,
+  InventoryProductUpdateInput,
+  InventoryReportInput,
+  InventorySupplierInput,
+  InventorySupplierOrderInput,
+  InventorySupplierUpdateInput,
+} from "@/lib/validation";
 import type { ActionResult, InventoryProduct, InventoryReport, InventorySupplier } from "@/lib/types";
 
 // Giacenza: admin e cucina. Solo l'admin modifica il catalogo (fornitore, categoria, ordine, attivo),
-// disattiva prodotti e segna i report come visti. La cucina non modifica prenotazioni.
+// gestisce i fornitori, disattiva prodotti e segna i report come visti. La cucina non modifica prenotazioni.
 
 type SubmittedReport = {
   id: string;
   to_order: number;
   present: number;
-  to_order_by_supplier: Partial<Record<InventorySupplier, number>>;
+  /** Prodotti da ordinare per fornitore, nell'ordine dei fornitori (solo quelli con almeno un prodotto). */
+  to_order_by_supplier: InventoryToOrderCount[];
 };
 
 function revalidateInventory(): void {
   revalidatePath("/admin/giacenza");
+  revalidatePath("/admin/giacenza/prodotti");
+}
+
+/** Modifica ai fornitori: cambiano anche il raggruppamento e l'ordine dei report, quindi si rivalida tutto il percorso. */
+function revalidateSuppliers(): void {
+  revalidatePath("/admin/giacenza", "layout");
 }
 
 /** Elenco prodotti attivi (admin puo' chiedere anche i disattivati). Ordine: categoria, ordine manuale, nome. */
@@ -46,9 +65,16 @@ export async function listInventoryProducts(opts?: {
   return { ok: true, data: await getInventoryProducts({ includeInactive: opts?.includeInactive }) };
 }
 
+/** Fornitori in ordine di visualizzazione (admin puo' chiedere anche i disattivati). */
+export async function listInventorySuppliers(opts?: { includeInactive?: boolean }): Promise<ActionResult<InventorySupplier[]>> {
+  const auth = await authorize(canUseInventory, "Non sei autorizzato alla giacenza.");
+  if (!auth.ok) return auth;
+  return { ok: true, data: await getInventorySuppliers({ includeInactive: opts?.includeInactive }) };
+}
+
 /**
  * Crea un prodotto (o lo riattiva se esiste gia' con lo stesso nome). Il fornitore lo sceglie solo l'admin;
- * per la cucina resta "altro". Categoria vuota → altro.
+ * per la cucina si usa il fornitore predefinito. Categoria vuota → altro.
  */
 export async function createInventoryProduct(input: unknown, opts?: MutationOptions): Promise<ActionResult<InventoryProductRef>> {
   const auth = await authorize(canUseInventory, "Non sei autorizzato alla giacenza.");
@@ -65,7 +91,7 @@ export async function createInventoryProduct(input: unknown, opts?: MutationOpti
           name: parsed.data.name,
           unit: parsed.data.unit ?? null,
           category: parsed.data.category ?? null,
-          supplier: isAdmin(auth.profile) ? (parsed.data.supplier ?? null) : null,
+          supplier_id: isAdmin(auth.profile) ? (parsed.data.supplier_id ?? null) : null,
         },
         { id: auth.profile.id, full_name: auth.profile.full_name },
       );
@@ -122,6 +148,119 @@ export async function deactivateInventoryProduct(id: string, opts?: MutationOpti
     }
     revalidateInventory();
     return { ok: true, data: undefined };
+  });
+}
+
+/** Crea un fornitore attivo, in fondo all'elenco. Solo admin. Nome già usato → fieldErrors.name. */
+export async function createInventorySupplier(input: unknown, opts?: MutationOptions): Promise<ActionResult<{ id: string }>> {
+  const auth = await authorize(canManageInventory, "Solo l'amministratore può gestire i fornitori.");
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "inventory.createInventorySupplier", auth.profile.id, async (): Promise<ActionResult<{ id: string }>> => {
+    const parsed = InventorySupplierInput.safeParse(input);
+    if (!parsed.success) return invalidInput(parsed.error);
+
+    try {
+      const id = await createSupplier(auth.db, parsed.data.name);
+      revalidateSuppliers();
+      return { ok: true, data: { id } };
+    } catch (err) {
+      if (err instanceof InventoryNameTakenError) {
+        return { ok: false, error: err.message, fieldErrors: { name: [err.message] } };
+      }
+      return dbFail(err);
+    }
+  });
+}
+
+/** Rinomina un fornitore (solo admin). Le righe dei report storici mantengono il nome di allora. */
+export async function updateInventorySupplier(id: string, input: unknown, opts?: MutationOptions): Promise<ActionResult> {
+  if (!isRecordId(id)) return fail("Fornitore non valido.");
+  const auth = await authorize(canManageInventory, "Solo l'amministratore può gestire i fornitori.");
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "inventory.updateInventorySupplier", auth.profile.id, async (): Promise<ActionResult> => {
+    const parsed = InventorySupplierUpdateInput.safeParse(input);
+    if (!parsed.success) return invalidInput(parsed.error);
+
+    const conflict = await checkConflictById(auth.db, "inventory_suppliers", id, opts);
+    if (conflict) return conflict;
+
+    try {
+      await renameSupplier(auth.db, id, parsed.data.name);
+    } catch (err) {
+      if (err instanceof InventoryNameTakenError) {
+        return { ok: false, error: err.message, fieldErrors: { name: [err.message] } };
+      }
+      return dbFail(err);
+    }
+    revalidateSuppliers();
+    return { ok: true, data: undefined };
+  });
+}
+
+/** Attiva o disattiva un fornitore (solo admin). Disattivato: non è più scelta per i nuovi prodotti. */
+export async function setInventorySupplierActive(id: string, active: boolean, opts?: MutationOptions): Promise<ActionResult> {
+  if (!isRecordId(id)) return fail("Fornitore non valido.");
+  const flag = z.boolean({ message: "Stato non valido" }).safeParse(active);
+  if (!flag.success) return invalidInput(flag.error);
+  const auth = await authorize(canManageInventory, "Solo l'amministratore può gestire i fornitori.");
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "inventory.setInventorySupplierActive", auth.profile.id, async (): Promise<ActionResult> => {
+    const conflict = await checkConflictById(auth.db, "inventory_suppliers", id, opts);
+    if (conflict) return conflict;
+
+    try {
+      await updateSupplierActive(auth.db, id, flag.data);
+    } catch (err) {
+      return dbFail(err);
+    }
+    revalidateSuppliers();
+    return { ok: true, data: undefined };
+  });
+}
+
+/** Nuovo ordine dei fornitori (id di tutti, nell'ordine di visualizzazione). Solo admin. */
+export async function reorderInventorySuppliers(ids: unknown, opts?: MutationOptions): Promise<ActionResult> {
+  const auth = await authorize(canManageInventory, "Solo l'amministratore può gestire i fornitori.");
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "inventory.reorderInventorySuppliers", auth.profile.id, async (): Promise<ActionResult> => {
+    const parsed = InventorySupplierOrderInput.safeParse(ids);
+    if (!parsed.success) return invalidInput(parsed.error);
+
+    try {
+      await reorderSuppliers(auth.db, parsed.data);
+    } catch (err) {
+      return dbFail(err);
+    }
+    revalidateSuppliers();
+    return { ok: true, data: undefined };
+  });
+}
+
+/**
+ * Elimina un fornitore non usato da prodotti o da righe di report. Se è in uso, lo disattiva: `deleted: false`.
+ * Solo admin. Coda offline: fornitore già eliminato (solo nel reinvio) = successo.
+ */
+export async function deleteInventorySupplier(id: string, opts?: MutationOptions): Promise<ActionResult<{ deleted: boolean }>> {
+  if (!isRecordId(id)) return fail("Fornitore non valido.");
+  const auth = await authorize(canManageInventory, "Solo l'amministratore può gestire i fornitori.");
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "inventory.deleteInventorySupplier", auth.profile.id, async (): Promise<ActionResult<{ deleted: boolean }>> => {
+    if (opts?.replay === true && !(await fetchOne(auth.db, "inventory_suppliers", id))) return { ok: true, data: { deleted: true } };
+    const conflict = await checkConflictById(auth.db, "inventory_suppliers", id, opts);
+    if (conflict) return conflict;
+
+    try {
+      const result = await removeSupplier(auth.db, id);
+      revalidateSuppliers();
+      return { ok: true, data: result };
+    } catch (err) {
+      return dbFail(err);
+    }
   });
 }
 

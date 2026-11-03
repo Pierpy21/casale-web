@@ -3,8 +3,17 @@
 import Link from "next/link";
 import { Check, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Button, ButtonLink, Disclosure, Field, Input, cn } from "@/components/ui";
-import { SETUP_COLORS, SETUP_COLOR_HEX, type ClientOption, type ClientSuggestion } from "@/lib/types";
+import { Button, ButtonLink, Disclosure, Field, Input, PhoneLink, cn } from "@/components/ui";
+import { normalizePhoneInput } from "@/lib/phone";
+import {
+  BOOKING_MEALS,
+  BOOKING_MEAL_LABELS,
+  SETUP_COLORS,
+  SETUP_COLOR_HEX,
+  type BookingMeal,
+  type ClientOption,
+  type ClientSuggestion,
+} from "@/lib/types";
 import {
   describedBy,
   first,
@@ -100,6 +109,46 @@ export function ChoiceChip({
       {selected && <Check aria-hidden="true" className="size-4 shrink-0" />}
       <span className="min-w-0 break-words">{children}</span>
     </label>
+  );
+}
+
+/**
+ * Pasto di evento e prenotazione normale: pranzo o cena, facoltativo (sostituisce l'orario).
+ * Gruppo radio con le pillole; "Togli" azzera la scelta, perché la radio non si deseleziona da sola.
+ */
+export function MealChoice({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: BookingMeal | null;
+  onChange: (meal: BookingMeal | null) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <span id="booking-meal-label" className="text-[13px] font-medium text-ink">
+        Pasto
+      </span>
+      <div role="radiogroup" aria-labelledby="booking-meal-label" className="flex flex-wrap items-center gap-2">
+        {BOOKING_MEALS.map((meal) => (
+          <ChoiceChip key={meal} name="meal" selected={value === meal} onSelect={() => onChange(meal)}>
+            {BOOKING_MEAL_LABELS[meal]}
+          </ChoiceChip>
+        ))}
+        {value && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(null)}
+            className="min-h-11 rounded-btn px-3 text-[14px] text-slate-dark underline-offset-2 hover:text-ink hover:underline disabled:opacity-50"
+          >
+            Togli
+          </button>
+        )}
+      </div>
+      <span className="text-[13px] text-slate-dark">Facoltativo</span>
+    </div>
   );
 }
 
@@ -395,7 +444,7 @@ export function GuestFields({
           invalid={!!phoneError}
           aria-describedby={describedBy("guest-phone", !!phoneError, true)}
           value={value.phone}
-          onChange={(e) => onChange({ phone: e.target.value })}
+          onChange={(e) => onChange({ phone: normalizePhoneInput(e.target.value, { trim: false }) })}
         />
       </Field>
     </div>
@@ -459,7 +508,7 @@ export function NewClientFields({
           invalid={!!phoneError}
           aria-describedby={describedBy("client-phone", !!phoneError, true)}
           value={value.phone}
-          onChange={(e) => onChange({ phone: e.target.value })}
+          onChange={(e) => onChange({ phone: normalizePhoneInput(e.target.value, { trim: false }) })}
         />
       </Field>
       <Field label="Email" htmlFor="client-email" error={emailError}>
@@ -530,6 +579,7 @@ export function ClientPicker({
           {options.map((c) => {
             const active = c.id === selectedId;
             return (
+              // Il telefono sta fuori dal pulsante di scelta (un link dentro un pulsante non è valido).
               <li key={c.id}>
                 <button
                   type="button"
@@ -540,14 +590,16 @@ export function ClientPicker({
                     active && "bg-petrol/5",
                   )}
                 >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="wrap-anywhere font-medium text-ink">
-                      {c.first_name} {c.last_name}
-                    </span>
-                    {c.phone && <span className="text-[13px] text-slate-dark">{c.phone}</span>}
+                  <span className="wrap-anywhere font-medium text-ink">
+                    {c.first_name} {c.last_name}
                   </span>
                   {active && <Check aria-hidden="true" className="size-5 shrink-0 text-petrol" />}
                 </button>
+                {c.phone && (
+                  <div className="px-4 pb-2">
+                    <PhoneLink phone={c.phone} className="text-[13px]" />
+                  </div>
+                )}
               </li>
             );
           })}
@@ -618,7 +670,7 @@ export function ClientSection({
             <p className="wrap-anywhere font-medium text-ink">
               {selected.first_name} {selected.last_name}
             </p>
-            {selected.phone && <p className="text-[14px] text-slate-dark">{selected.phone}</p>}
+            {selected.phone && <PhoneLink phone={selected.phone} className="text-[14px]" />}
           </div>
           <Button variant="outline" size="sm" onClick={() => setPicking(true)} disabled={disabled}>
             Cambia cliente

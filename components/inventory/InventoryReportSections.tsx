@@ -16,7 +16,9 @@ interface ReportSection {
   label: string;
   rows: InventoryOrderRow[];
   /** Presente solo nel raggruppamento per fornitore: serve per il PDF della lista d'ordine. */
-  supplier?: InventorySupplier;
+  supplierId?: string;
+  /** Nome del fornitore nel report (snapshot): per il nome del file. */
+  supplierName?: string;
 }
 
 const quantity = (value: number | null): string =>
@@ -24,14 +26,15 @@ const quantity = (value: number | null): string =>
 
 const byName = (a: InventoryOrderRow, b: InventoryOrderRow) => a.name.localeCompare(b.name, "it");
 
-function buildSections(report: InventoryReport, grouping: InventoryReportGrouping): ReportSection[] {
+function buildSections(report: InventoryReport, grouping: InventoryReportGrouping, suppliers: InventorySupplier[]): ReportSection[] {
   const rows = mergeReportLines(report.lines);
   if (grouping === "supplier") {
-    return groupOrderRowsBySupplier(rows).map((group) => ({
+    return groupOrderRowsBySupplier(rows, suppliers).map((group) => ({
       id: `fornitore-${group.key}`,
       label: group.label,
       rows: group.items,
-      supplier: group.key,
+      supplierId: group.key,
+      supplierName: group.label,
     }));
   }
   return INVENTORY_CATEGORIES.map((category) => ({
@@ -41,9 +44,17 @@ function buildSections(report: InventoryReport, grouping: InventoryReportGroupin
   })).filter((section) => section.rows.length > 0);
 }
 
-/** Corpo del report: una tabella per fornitore (admin) o per categoria (cucina). */
-export function InventoryReportSections({ report, grouping }: { report: InventoryReport; grouping: InventoryReportGrouping }) {
-  const sections = buildSections(report, grouping);
+/** Corpo del report: una tabella per fornitore (admin) o per categoria (cucina). `suppliers` dà l'ordine dei fornitori. */
+export function InventoryReportSections({
+  report,
+  grouping,
+  suppliers,
+}: {
+  report: InventoryReport;
+  grouping: InventoryReportGrouping;
+  suppliers: InventorySupplier[];
+}) {
+  const sections = buildSections(report, grouping, suppliers);
 
   if (sections.length === 0) {
     return <p className="text-[16px] text-slate-dark">Nessun prodotto in questo report.</p>;
@@ -66,10 +77,10 @@ export function InventoryReportSections({ report, grouping }: { report: Inventor
                   {section.rows.length} {section.rows.length === 1 ? "prodotto" : "prodotti"}
                 </p>
               </div>
-              {section.supplier && (
+              {section.supplierId && (
                 <DocumentDownload
-                  href={inventoryPdfHref(report.id, section.supplier)}
-                  fileName={inventoryPdfFileName(report.report_date, section.supplier)}
+                  href={inventoryPdfHref(report.id, section.supplierId)}
+                  fileName={inventoryPdfFileName(report.report_date, section.supplierName)}
                   mimeType="application/pdf"
                   className={buttonClasses("outline", "sm", "min-h-11")}
                 >

@@ -1,3 +1,4 @@
+import { normalizePhoneInput } from "@/lib/phone";
 import { EVENT_TYPES, type BookingDetail, type ClientSuggestion, type Room, type RoomBookingSlot } from "@/lib/types";
 
 // Modello puro (senza React) dei form prenotazione: validazione lato client, mappa errori del server, avvisi di sala.
@@ -104,7 +105,7 @@ export function validateAllergies(rows: AllergyRow[]): Errors {
 
 /** Stessa regola di lib/validation.ts (phoneChecks): 6-30 caratteri, cifre + spazi ( ) -, almeno 6 cifre. Null = valido. */
 export function phoneError(raw: string): string | null {
-  const phone = raw.trim();
+  const phone = normalizePhoneInput(raw);
   if (phone.length < 6) return "Telefono troppo corto (minimo 6 caratteri)";
   if (phone.length > 30) return "Telefono troppo lungo";
   if (!/^[+0-9 ()-]+$/.test(phone)) return "Formato telefono non valido";
@@ -120,7 +121,7 @@ export function phoneError(raw: string): string | null {
 export function validateNewClient(c: NewClientDraft): Errors {
   const errors: Errors = {};
   if (!c.full_name.trim()) errors["new_client.full_name"] = ["Inserisci il nome del cliente"];
-  const phone = c.phone.trim();
+  const phone = normalizePhoneInput(c.phone);
   if (!phone) errors["new_client.phone"] = ["Inserisci il cellulare del cliente"];
   else {
     const message = phoneError(phone);
@@ -143,7 +144,7 @@ export function validateGuest(g: GuestDraft): Errors {
   const errors: Errors = {};
   if (!g.name.trim()) errors["guest_name"] = ["Inserisci il nome dell'ospite"];
   // Il cellulare è facoltativo: controllo del formato solo se compilato.
-  if (g.phone.trim()) {
+  if (normalizePhoneInput(g.phone)) {
     const message = phoneError(g.phone);
     if (message) errors["guest_phone"] = [message];
   }
@@ -153,7 +154,7 @@ export function validateGuest(g: GuestDraft): Errors {
 export function guestPayload(g: GuestDraft) {
   return {
     guest_name: g.name.trim(),
-    guest_phone: g.phone.trim() || null,
+    guest_phone: normalizePhoneInput(g.phone) || null,
   };
 }
 
@@ -174,7 +175,7 @@ export function draftFromSuggestion(c: ClientSuggestion, current: NewClientDraft
 export function newClientPayload(c: NewClientDraft) {
   return {
     full_name: c.full_name.trim(),
-    phone: c.phone.trim(),
+    phone: normalizePhoneInput(c.phone),
     email: c.email.trim() || null,
   };
 }

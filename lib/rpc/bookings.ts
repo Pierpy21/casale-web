@@ -172,6 +172,7 @@ export async function countPayments(db: PocketBase, bookingId: string): Promise<
 /**
  * Campi della prenotazione. Normali: cliente vuoto, ospite (nome e cellulare) sulla prenotazione.
  * Evento e appuntamento: cliente di rubrica, ospite vuoto. Il cambio di tipo in modifica azzera ciò che non serve.
+ * Pasto (evento e normale) e orario (appuntamento) si escludono: l'altro campo resta vuoto.
  */
 function bookingRecordFields(
   input: BookingInputType,
@@ -182,6 +183,7 @@ function bookingRecordFields(
   status: BookingStatus,
 ) {
   const normal = input.kind === "normale";
+  const appointment = input.kind === "appuntamento";
   return {
     client: normal ? "" : (clientId ?? ""),
     guest_name: normal ? (input.guest_name ?? "") : "",
@@ -189,7 +191,8 @@ function bookingRecordFields(
     kind: input.kind,
     event_type: input.event_type ?? "",
     event_date: dayStartPb(input.event_date),
-    event_time: input.event_time ?? "",
+    meal: appointment ? "" : (input.meal ?? ""),
+    event_time: appointment ? (input.event_time ?? "") : "",
     room: input.room_id ?? "",
     // Tavolo: solo per le prenotazioni normali (0 = nessuno). Assente nel payload: non si tocca.
     ...(input.table_number !== undefined || input.kind !== "normale"
@@ -268,6 +271,7 @@ export async function upsertBooking(
       kind: input.kind,
       event_type: input.event_type ?? null,
       event_date: input.event_date,
+      meal: input.meal ?? null,
       event_time: input.event_time ?? null,
       room_id: input.room_id ?? null,
       adults: input.adults,

@@ -5,14 +5,13 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { createInventoryProduct, updateInventoryProduct } from "@/app/actions/inventory";
 import { useOptimisticActive } from "@/components/catalog/useOptimisticActive";
-import { Alert, Button, Field, Input, Modal, Select, Switch, cn } from "@/components/ui";
+import { Alert, Badge, Button, Field, Input, Modal, Select, Switch, cn } from "@/components/ui";
 import { isBrowserOnline } from "@/lib/offline/network";
 import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
+import { defaultInventorySupplier, sortSuppliers } from "@/lib/inventory-utils";
 import {
   INVENTORY_CATEGORIES,
   INVENTORY_CATEGORY_LABELS,
-  INVENTORY_SUPPLIERS,
-  INVENTORY_SUPPLIER_LABELS,
   type InventoryCategory,
   type InventoryProduct,
   type InventorySupplier,
@@ -22,12 +21,14 @@ import { normalizeSearchText } from "./inventory-search";
 export interface InventoryProductListProps {
   /** Tutti i prodotti (anche disattivati), già in ordine di catalogo. */
   products: InventoryProduct[];
+  /** Tutti i fornitori (anche disattivati), in ordine di visualizzazione. */
+  suppliers: InventorySupplier[];
 }
 
 type Notice = { tone: "success" | "danger"; text: string };
 
 /** Catalogo prodotti della giacenza (solo admin): raggruppato per fornitore, con ricerca, attivazione, modifica e nuovi prodotti. */
-export function InventoryProductList({ products }: InventoryProductListProps) {
+export function InventoryProductList({ products, suppliers }: InventoryProductListProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<InventoryProduct | null>(null);
@@ -44,13 +45,15 @@ export function InventoryProductList({ products }: InventoryProductListProps) {
     );
   }, [products, normalizedQuery, searching]);
 
-  const sections = INVENTORY_SUPPLIERS.map((supplier) => ({
-    supplier,
-    label: INVENTORY_SUPPLIER_LABELS[supplier],
-    items: filtered.filter((p) => p.supplier === supplier),
-    total: products.filter((p) => p.supplier === supplier).length,
-    active: products.filter((p) => p.supplier === supplier && p.active).length,
-  })).filter((section) => !searching || section.items.length > 0);
+  const sections = sortSuppliers(suppliers)
+    .map((supplier) => ({
+      supplier,
+      label: supplier.name,
+      items: filtered.filter((p) => p.supplier_id === supplier.id),
+      total: products.filter((p) => p.supplier_id === supplier.id).length,
+      active: products.filter((p) => p.supplier_id === supplier.id && p.active).length,
+    }))
+    .filter((section) => !searching || section.items.length > 0);
 
   const openNew = () => {
     setEditing(null);
@@ -102,11 +105,14 @@ export function InventoryProductList({ products }: InventoryProductListProps) {
       )}
 
       {sections.map((section) => (
-        <section key={section.supplier} aria-labelledby={`fornitore-${section.supplier}`} className="flex min-w-0 flex-col gap-3">
+        <section key={section.supplier.id} aria-labelledby={`fornitore-${section.supplier.id}`} className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-end justify-between gap-2 border-b border-sand pb-2">
-            <h2 id={`fornitore-${section.supplier}`} className="text-2xl leading-tight">
-              {section.label}
-            </h2>
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <h2 id={`fornitore-${section.supplier.id}`} className="text-2xl leading-tight wrap-anywhere">
+                {section.label}
+              </h2>
+              {!section.supplier.active && <Badge tone="neutral">Disattivato</Badge>}
+            </div>
             <p className="text-[13px] tabular-nums text-slate-dark">
               {section.active} attivi su {section.total}
             </p>
@@ -127,7 +133,15 @@ export function InventoryProductList({ products }: InventoryProductListProps) {
       ))}
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? "Modifica prodotto" : "Nuovo prodotto"}>
-        {formOpen && <ProductForm key={editing?.id ?? "new"} product={editing} onSaved={handleSaved} onCancel={() => setFormOpen(false)} />}
+        {formOpen && (
+          <ProductForm
+            key={editing?.id ?? "new"}
+            product={editing}
+            suppliers={suppliers}
+            onSaved={handleSaved}
+            onCancel={() => setFormOpen(false)}
+          />
+        )}
       </Modal>
     </div>
   );
@@ -190,10 +204,12 @@ function ProductRow({
 
 function ProductForm({
   product,
+  suppliers,
   onSaved,
   onCancel,
 }: {
   product: InventoryProduct | null;
+  suppliers: InventorySupplier[];
   onSaved: (message: string) => void;
   onCancel: () => void;
 }) {
@@ -201,6 +217,9 @@ function ProductForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const idPrefix = product ? `prodotto-${product.id}` : "prodotto-new";
+  // Disattivati esclusi, salvo quello già assegnato al prodotto (altrimenti non si vedrebbe nel modulo).
+  const choices = sortSuppliers(suppliers).filter((s) => s.active || s.id === product?.supplier_id);
+  const defaultSupplierId = product?.supplier_id ?? defaultInventorySupplier(suppliers)?.id ?? "";
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -208,7 +227,7 @@ function ProductForm({
     const name = String(form.get("name") ?? "").trim();
     const unit = String(form.get("unit") ?? "").trim();
     const category = String(form.get("category") ?? "altro") as InventoryCategory;
-    const supplier = String(form.get("supplier") ?? "altro") as InventorySupplier;
+    const supplierId = String(form.get("supplier_id") ?? defaultSupplierId);
 
     setFormError(null);
     setErrors({});
@@ -223,7 +242,7 @@ function ProductForm({
                 name,
                 unit,
                 category,
-                supplier,
+                supplier_id: supplierId,
                 sort: Number(form.get("sort") ?? product.sort),
               },
             ],
@@ -233,7 +252,7 @@ function ProductForm({
               expectedUpdated: updatedAtOf(product),
             },
           )
-        : await submitMutation("inventory.createInventoryProduct", createInventoryProduct, [{ name, unit, category, supplier }], {
+        : await submitMutation("inventory.createInventoryProduct", createInventoryProduct, [{ name, unit, category, supplier_id: supplierId }], {
             label: `Nuovo prodotto · ${name}`,
             createsTempId: true,
           });
@@ -289,11 +308,11 @@ function ProductForm({
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Fornitore" htmlFor={`${idPrefix}-supplier`} error={errors.supplier}>
-          <Select id={`${idPrefix}-supplier`} name="supplier" defaultValue={product?.supplier ?? "altro"} invalid={!!errors.supplier} disabled={pending}>
-            {INVENTORY_SUPPLIERS.map((s) => (
-              <option key={s} value={s}>
-                {INVENTORY_SUPPLIER_LABELS[s]}
+        <Field label="Fornitore" htmlFor={`${idPrefix}-supplier`} error={errors.supplier_id}>
+          <Select id={`${idPrefix}-supplier`} name="supplier_id" defaultValue={defaultSupplierId} invalid={!!errors.supplier_id} disabled={pending}>
+            {choices.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.active ? s.name : `${s.name} (disattivato)`}
               </option>
             ))}
           </Select>

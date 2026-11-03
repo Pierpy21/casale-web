@@ -88,7 +88,8 @@ export function BookingNumbers({ tiles, panels, initialPanel }: BookingNumbersPr
               <span className="break-words text-[10px] font-medium uppercase leading-snug tracking-[0.12em] text-bronze sm:text-[11px] sm:tracking-[0.14em]">
                 {tile.label}
               </span>
-              <span className="font-serif text-xl leading-none tabular-nums text-ink break-words sm:text-3xl">{tile.value}</span>
+              {/* Importi (es. "12.345,00 €") su una riga: su tablet a 4 colonne il carattere scende di una misura. */}
+              <span className="whitespace-nowrap font-serif text-xl leading-none tabular-nums text-ink sm:text-2xl xl:text-3xl">{tile.value}</span>
               {tile.hint !== undefined && tile.hint !== null && tile.hint !== false && (
                 <span className="break-words text-[12px] leading-snug text-slate-dark">{tile.hint}</span>
               )}

@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { normalBookingStatus } from "./booking-status";
+import { normalizePhoneInput } from "./phone";
 import {
   BOOKING_KINDS,
+  BOOKING_MEALS,
   INVENTORY_CATEGORIES,
   INVENTORY_STATES,
-  INVENTORY_SUPPLIERS,
   PAYMENT_METHODS,
   SETUP_COLORS,
 } from "./types";
@@ -124,14 +125,17 @@ const phoneChecks = z
   .refine((s) => s.replace(/\D/g, "").length >= 6, "Formato telefono non valido (servono almeno 6 cifre)");
 
 /** Cellulare facoltativo (ospite della prenotazione normale): vuoto → null; se compilato deve avere formato valido. */
-const optPhone = z.preprocess(emptyToNull, phoneChecks.nullable());
+/** Numero incollato da WhatsApp/rubrica: via caratteri invisibili, spazi speciali, punti e barre prima dei controlli. */
+const cleanPhone = (v: unknown): unknown => emptyToNull(typeof v === "string" ? normalizePhoneInput(v) : v);
+
+const optPhone = z.preprocess(cleanPhone, phoneChecks.nullable());
 
 /**
  * Cellulare obbligatorio del cliente di rubrica (evento e appuntamento: identifica il cliente).
  * Vuoto → "Inserisci il cellulare del cliente".
  */
 const requiredPhone = z.preprocess(
-  emptyToNull,
+  cleanPhone,
   z.string({ message: "Inserisci il cellulare del cliente" }).pipe(phoneChecks),
 );
 
@@ -263,6 +267,28 @@ const guestNameSchema = z.preprocess(
   z.string().max(MAX_TEXT, "Nome troppo lungo (max 200 caratteri)").nullable(),
 );
 
+/** Pasto (evento e prenotazione normale): pranzo o cena, facoltativo. Vuoto → null. */
+const mealSchema = z.preprocess(
+  emptyToNull,
+  z.enum(BOOKING_MEALS, { message: "Pasto non valido (pranzo o cena)" }).nullable(),
+);
+
+/**
+ * Payload con l'orario dei client precedenti (coda offline): evento e prenotazione normale non hanno più l'orario.
+ * Se manca il pasto si ricava dall'orario (prima delle 16:00 pranzo, altrimenti cena) e l'orario si scarta.
+ * L'appuntamento non si tocca.
+ */
+function legacyMealFromTime(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const o = raw as Record<string, unknown>;
+  if (o.kind === "appuntamento") return raw;
+  const time = typeof o.event_time === "string" ? o.event_time.trim() : "";
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return raw;
+  const hasMeal = typeof o.meal === "string" && o.meal.trim() !== "";
+  const meal = hasMeal ? o.meal : Number(time.slice(0, 2)) < 16 ? "pranzo" : "cena";
+  return { ...o, meal, event_time: null };
+}
+
 /**
  * Payload di una prenotazione normale inviato dal vecchio client (coda offline): il "cliente nuovo" diventa l'ospite.
  * Solo se manca guest_name: nome da full_name (o nome + cognome), cellulare da new_client.phone.
@@ -303,6 +329,9 @@ const BookingObject = z
     guest_phone: optPhone.optional(),
     event_type: eventTypeSchema,
     event_date: dateSchema,
+    /** Pasto: evento e prenotazione normale (facoltativo). L'appuntamento non lo usa (vedi transform). */
+    meal: mealSchema,
+    /** Orario: solo appuntamento (facoltativo). Evento e prenotazione normale non lo usano (vedi transform). */
     event_time: z.preprocess(emptyToNull, timeSchema.nullable()),
     room_id: optUuid,
     /** Tavolo (solo prenotazioni normali), 1-9999. Assente = non modificare; null = nessun tavolo. */
@@ -360,8 +389,12 @@ const BookingObject = z
   })
   .transform((v) => {
     const normal = v.kind === "normale";
+    const appointment = v.kind === "appuntamento";
     return {
       ...v,
+      // Evento e normale: pasto, niente orario. Appuntamento: orario, niente pasto.
+      meal: appointment ? null : (v.meal ?? null),
+      event_time: appointment ? (v.event_time ?? null) : null,
       // Normali: nessun cliente di rubrica, ospite sulla prenotazione. Altri tipi: nessun ospite.
       client_id: normal ? null : (v.client_id ?? null),
       new_client: normal ? null : (v.new_client ?? null),
@@ -372,8 +405,11 @@ const BookingObject = z
     };
   });
 
-/** Prenotazione (evento, normale, appuntamento). Accetta anche i payload normali del vecchio client (vedi legacyNormalGuest). */
-export const BookingInput = z.preprocess(legacyNormalGuest, BookingObject);
+/**
+ * Prenotazione (evento, normale, appuntamento). Accetta anche i payload del vecchio client (coda offline):
+ * prenotazioni normali senza cliente (legacyNormalGuest) ed eventi/normali con orario (legacyMealFromTime).
+ */
+export const BookingInput = z.preprocess((raw) => legacyNormalGuest(legacyMealFromTime(raw)), BookingObject);
 export type BookingInputType = z.infer<typeof BookingInput>;
 
 /** Testo di una nota interna sulla prenotazione (cucina e admin). */
@@ -389,16 +425,18 @@ export const EventFinalTotalInput = finalTotalSchema;
 // ---------------------------------------------------------------------
 // Giacenza
 // ---------------------------------------------------------------------
-const inventorySupplierSchema = z.enum(INVENTORY_SUPPLIERS, { message: "Fornitore non valido" });
 const inventoryCategorySchema = z.enum(INVENTORY_CATEGORIES, { message: "Categoria non valida" });
+/** Id di un fornitore (id record PocketBase). L'esistenza e lo stato attivo si verificano nel write layer. */
+const inventorySupplierIdSchema = z.string().regex(/^[a-z0-9]{15}$/, "Fornitore non valido");
+const inventorySupplierName = z.string().trim().min(1, "Nome fornitore obbligatorio").max(80, "Nome troppo lungo (massimo 80 caratteri)");
 
 export const InventoryProductInput = z.object({
   name: z.string().trim().min(1, "Nome prodotto obbligatorio").max(200, "Nome troppo lungo"),
   unit: z.preprocess(emptyToNull, z.string().max(40, "Unità troppo lunga").nullable()).optional(),
   /** Vuoto → altro. */
   category: z.preprocess(emptyToNull, inventoryCategorySchema.nullable()).optional(),
-  /** Solo admin (per la cucina viene ignorato e si usa altro). */
-  supplier: z.preprocess(emptyToNull, inventorySupplierSchema.nullable()).optional(),
+  /** Solo admin (per la cucina viene ignorato). Vuoto → fornitore predefinito. */
+  supplier_id: z.preprocess(emptyToNull, inventorySupplierIdSchema.nullable()).optional(),
 });
 export type InventoryProductInputType = z.infer<typeof InventoryProductInput>;
 
@@ -407,11 +445,27 @@ export const InventoryProductUpdateInput = z.object({
   name: z.string().trim().min(1, "Nome prodotto obbligatorio").max(200, "Nome troppo lungo").optional(),
   unit: z.preprocess(emptyToNull, z.string().max(40, "Unità troppo lunga").nullable()).optional(),
   category: inventoryCategorySchema.optional(),
-  supplier: inventorySupplierSchema.optional(),
+  supplier_id: inventorySupplierIdSchema.optional(),
   sort: intMin0.optional(),
   active: z.boolean().optional(),
 });
 export type InventoryProductUpdateInputType = z.infer<typeof InventoryProductUpdateInput>;
+
+/** Nuovo fornitore (solo admin). */
+export const InventorySupplierInput = z.object({ name: inventorySupplierName });
+export type InventorySupplierInputType = z.infer<typeof InventorySupplierInput>;
+
+/** Rinomina fornitore (solo admin). Ordine e attivo hanno le loro azioni. */
+export const InventorySupplierUpdateInput = z.object({ name: inventorySupplierName });
+export type InventorySupplierUpdateInputType = z.infer<typeof InventorySupplierUpdateInput>;
+
+/** Nuovo ordine dei fornitori: id di tutti i fornitori, nell'ordine di visualizzazione, senza ripetizioni. */
+export const InventorySupplierOrderInput = z
+  .array(inventorySupplierIdSchema, { message: "Ordine dei fornitori non valido" })
+  .min(1, "Nessun fornitore da ordinare")
+  .max(100, "Troppi fornitori")
+  .refine((ids) => new Set(ids).size === ids.length, "Fornitore ripetuto nell'ordine");
+export type InventorySupplierOrderInputType = z.infer<typeof InventorySupplierOrderInput>;
 
 /** Quantità di giacenza/ordine: vuota o assente = nessuna (0). */
 const inventoryQuantity = z

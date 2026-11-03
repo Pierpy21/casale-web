@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { formatIt, toDate } from "@/components/agenda/agenda-utils";
-import { ButtonLink, Button, EmptyState, Field, Input, PageHeader } from "@/components/ui";
+import { ButtonLink, Button, EmptyState, Field, Input, PageHeader, PhoneLink } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getClients } from "@/lib/data/clients";
 import type { ClientWithStats } from "@/lib/types";
@@ -117,7 +117,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                         {fullName(c)}
                       </Link>
                     </th>
-                    <td className="px-4 py-3 tabular-nums text-slate-dark">{c.phone || "—"}</td>
+                    <td className="px-4 py-3 tabular-nums text-slate-dark">
+                      {c.phone ? <PhoneLink phone={c.phone} /> : "—"}
+                    </td>
                     <td className="px-4 py-3 text-slate-dark">{c.email ?? "—"}</td>
                     <td className="px-4 py-3 font-mono text-[13px] text-slate-dark">{taxIds(c)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{c.bookings_count}</td>
@@ -128,23 +130,27 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             </table>
           </div>
 
+          {/* Tutta la card apre la scheda (link del nome allargato); il telefono sta sopra, con il suo pulsante copia. */}
           <ul className="grid gap-3 lg:hidden">
             {clients.map((c) => (
-              <li key={c.id}>
+              <li
+                key={c.id}
+                className="relative flex flex-col gap-2 border border-sand bg-paper p-4 transition-colors duration-200 hover:border-petrol/60 hover:bg-cream/40 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-petrol"
+              >
                 <Link
                   href={`/admin/clienti/${c.id}`}
-                  className="flex flex-col gap-2 border border-sand bg-paper p-4 transition-colors duration-200 hover:border-petrol/60 hover:bg-cream/40"
+                  className="font-serif text-xl leading-tight text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
                 >
-                  <span className="font-serif text-xl leading-tight text-ink">{fullName(c)}</span>
-                  {c.phone && <span className="text-[14px] tabular-nums text-slate-dark">{c.phone}</span>}
-                  {c.email && <span className="truncate text-[14px] text-slate-dark">{c.email}</span>}
-                  <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 border-t border-sand pt-2 text-[12px] font-medium uppercase tracking-[0.12em] text-bronze">
-                    <span>
-                      {c.bookings_count} {c.bookings_count === 1 ? "evento" : "eventi"}
-                    </span>
-                    <span>Prossimo: {nextEvent(c)}</span>
-                  </span>
+                  {fullName(c)}
                 </Link>
+                {c.phone && <PhoneLink phone={c.phone} className="relative z-10 text-[14px]" />}
+                {c.email && <span className="truncate text-[14px] text-slate-dark">{c.email}</span>}
+                <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 border-t border-sand pt-2 text-[12px] font-medium uppercase tracking-[0.12em] text-bronze">
+                  <span>
+                    {c.bookings_count} {c.bookings_count === 1 ? "evento" : "eventi"}
+                  </span>
+                  <span>Prossimo: {nextEvent(c)}</span>
+                </span>
               </li>
             ))}
           </ul>

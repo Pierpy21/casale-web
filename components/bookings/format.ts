@@ -1,14 +1,49 @@
 import {
+  BOOKING_MEAL_LABELS,
   COURSE_LABELS,
   COURSE_ORDER,
   type BookingDish,
   type BookingListItem,
   type Course,
 } from "@/lib/types";
+import { normalizePhoneInput } from "@/lib/phone";
 
 /** "19:30:00" -> "19:30". */
 export function formatTime(time: string | null): string | null {
   return time ? time.slice(0, 5) : null;
+}
+
+/** Campi che dicono quando si svolge una prenotazione: pasto (evento e normale) oppure orario (appuntamento). */
+export interface BookingWhenSource {
+  kind?: string | null;
+  meal?: string | null;
+  event_time?: string | null;
+}
+
+/** "Pranzo" / "Cena" per il valore salvato; null se vuoto o sconosciuto. */
+export function mealLabel(meal: string | null | undefined): string | null {
+  return meal === "pranzo" || meal === "cena" ? BOOKING_MEAL_LABELS[meal] : null;
+}
+
+/**
+ * Quando si svolge: "Pranzo" o "Cena" per evento e prenotazione normale, "HH:MM" per l'appuntamento.
+ * Null se non indicato.
+ */
+export function bookingWhen(b: BookingWhenSource): string | null {
+  if (b.kind === "appuntamento") return formatTime(b.event_time ?? null);
+  return mealLabel(b.meal);
+}
+
+/**
+ * Chiave per ordinare le prenotazioni di uno stesso giorno: pranzo e cena valgono come 12:30 e 20:00, così gli
+ * appuntamenti si intercalano per orario (mattina prima del pranzo); in fondo quelle senza pasto né orario.
+ * Stringhe confrontabili con < e >.
+ */
+export function bookingTimeSortKey(b: BookingWhenSource): string {
+  if (b.kind === "appuntamento") return b.event_time ? `0${b.event_time.slice(0, 5)}1` : "1";
+  if (b.meal === "pranzo") return "012:300";
+  if (b.meal === "cena") return "020:000";
+  return "1";
 }
 
 /** Notazione del Casale: A = adulti, B = bambini. */
@@ -49,6 +84,29 @@ export function bookingPersonName(b: BookingPersonSource): string {
 export function bookingPhone(b: BookingPersonSource): string | null {
   const own = b.kind === "normale" ? (b.guest_phone ?? "").trim() : "";
   return own || (b.client?.phone ?? "").trim() || null;
+}
+
+/** Numero WhatsApp in formato internazionale senza simboli (per wa.me). Default prefisso Italia. Vuoto se non ci sono cifre. */
+export function whatsappNumber(phone: string): string {
+  // Prima la normalizzazione: le cifre a tutta larghezza e gli spazi invisibili sarebbero altrimenti scartati.
+  const normalized = normalizePhoneInput(phone);
+  let digits = normalized.replace(/\D/g, "");
+  // Con "+" o "00" il prefisso c'è già. Fino a 10 cifre è un numero italiano (anche 393…): si mette 39.
+  // In Italia lo zero dei fissi resta nel numero internazionale (095… → 39095…).
+  if (normalized.startsWith("+")) return digits;
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  else if (digits.length <= 10) digits = `39${digits}`;
+  return digits;
+}
+
+/**
+ * Link wa.me con testo facoltativo. Senza numero (o con un numero senza cifre) apre la scelta del contatto:
+ * https://wa.me/?text=...
+ */
+export function whatsappUrl(phone: string | null, text?: string): string {
+  const number = phone ? whatsappNumber(phone) : "";
+  const base = number ? `https://wa.me/${number}` : "https://wa.me/";
+  return text ? `${base}?text=${encodeURIComponent(text)}` : base;
 }
 
 export interface DishGroup {

@@ -4,7 +4,7 @@ import type PocketBase from "pocketbase";
 import { getAdminPb } from "@/lib/pocketbase/admin";
 import { isRecordId, dayEndPb, dayStartPb, nn, num, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
 
-import { mapChange } from "@/lib/pocketbase/mappers";
+import { mapChange, mealOf } from "@/lib/pocketbase/mappers";
 import { listAll, listByParents, fetchOne } from "@/lib/pocketbase/queries";
 import { addDaysISO, monthBounds, romeToday } from "@/lib/dates";
 import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, isAdmin } from "@/lib/permissions";
@@ -30,7 +30,7 @@ import {
   type StatsKind,
   type WeekStats,
 } from "@/lib/types";
-import { bookingPersonName, bookingPhone, groupDishes } from "@/components/bookings/format";
+import { bookingPersonName, bookingPhone, bookingTimeSortKey, groupDishes } from "@/components/bookings/format";
 import { getBookingNotesFor } from "./notes";
 import {
   BOOKING_DETAIL_EXPAND,
@@ -139,7 +139,7 @@ function tableOf(record: PbRecord): number | null {
 
 /**
  * Foglio prenotazioni di un giorno (export PDF/DOCX): prenotazioni normali non annullate.
- * Ordine: sala (ordine della sala, poi nome; senza sala in fondo), tavolo crescente (senza tavolo in fondo), orario, nome.
+ * Ordine: sala (ordine della sala, poi nome; senza sala in fondo), tavolo crescente (senza tavolo in fondo), pasto (pranzo, cena), nome.
  * Null se non loggato o se non admin / sala attiva. I dati mancanti restano null (non bloccano l'export).
  */
 export async function getReservationSheet(date: string): Promise<ReservationSheet | null> {
@@ -178,9 +178,9 @@ export async function getReservationSheet(date: string): Promise<ReservationShee
     const tb = tableOf(b);
     if ((ta === null) !== (tb === null)) return ta === null ? 1 : -1;
     if (ta !== null && tb !== null && ta !== tb) return ta - tb;
-    const timeA = a.event_time ? String(a.event_time).slice(0, 5) : "99:99";
-    const timeB = b.event_time ? String(b.event_time).slice(0, 5) : "99:99";
-    if (timeA !== timeB) return timeA < timeB ? -1 : 1;
+    const mealA = bookingTimeSortKey({ meal: nn(a.meal) });
+    const mealB = bookingTimeSortKey({ meal: nn(b.meal) });
+    if (mealA !== mealB) return mealA < mealB ? -1 : 1;
     return nameOf(a).localeCompare(nameOf(b), "it");
   });
 
@@ -190,7 +190,7 @@ export async function getReservationSheet(date: string): Promise<ReservationShee
       name: nameOf(r),
       room: room?.name ? String(room.name) : null,
       table: tableOf(r),
-      time: r.event_time ? String(r.event_time).slice(0, 5) : null,
+      meal: mealOf(r),
       phone: bookingPhone(personOf(r)),
     };
   });
@@ -199,7 +199,7 @@ export async function getReservationSheet(date: string): Promise<ReservationShee
 
 /**
  * Foglio eventi di un giorno (export PDF/DOCX per la cucina): solo banchetti (kind evento) non annullati,
- * in ordine di orario. Stessi dati della scheda cucina (getBookingsInRange + note cucina), senza telefono e prezzi.
+ * in ordine di pasto (pranzo, poi cena). Stessi dati della scheda cucina (getBookingsInRange + note cucina), senza telefono e prezzi.
  * Null se non loggato o se non admin / cucina attivi.
  */
 export async function getEventSheet(date: string): Promise<EventSheet | null> {
@@ -228,7 +228,7 @@ export async function getEventSheet(date: string): Promise<EventSheet | null> {
     if (b.kids_menu) addMenu(`kids:${b.kids_menu.id}`, b.kids_menu.name, "kids", b.kids_menus);
 
     return {
-      time: b.event_time ? b.event_time.slice(0, 5) : null,
+      meal: b.meal,
       client_name: bookingPersonName(b),
       room: b.room?.name ?? null,
       adults: b.adults,
@@ -271,8 +271,7 @@ export async function getNextEventAfter(date: string): Promise<NextEventBrief | 
     const me = await getCurrentProfile();
     if (!me || !me.active) return null;
     const db = await getAdminPb();
-    // Primi eventi per data; l'ordine per ora (senza ora in fondo) si applica in memoria come nell'agenda:
-    // in PocketBase un orario vuoto verrebbe prima degli altri.
+    // Primi eventi per data; l'ordine per pasto (pranzo, cena, poi senza pasto) si applica in memoria come nell'agenda.
     const page = await db.collection("bookings").getList(1, 50, {
       filter: db.filter("kind = {:k} && status != {:s} && event_date > {:after}", {
         k: "evento",
@@ -288,7 +287,7 @@ export async function getNextEventAfter(date: string): Promise<NextEventBrief | 
     return {
       id: r.id,
       event_date: toDateOnly(r.event_date),
-      event_time: nn(r.event_time),
+      meal: mealOf(r),
       // Stessa regola del titolo in agenda (bookingPersonName, components/bookings/format.ts): nome del cliente.
       title: bookingPersonName(bookingPersonOf(r)) || "Evento",
     };

@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import type { ReservationSheet } from "@/lib/types";
+import { BOOKING_MEAL_LABELS, type ReservationSheet } from "@/lib/types";
 
 // Vista del foglio prenotazioni: testi e valori già formattati in italiano. Modulo puro (senza @react-pdf),
 // usato dai renderer PDF e DOCX e dalle route.
@@ -11,7 +11,8 @@ export interface ReservationPdfRow {
   name: string;
   room: string;
   table: string;
-  time: string;
+  /** Pasto: "Pranzo", "Cena" o "—". */
+  meal: string;
   phone: string;
 }
 
@@ -46,7 +47,7 @@ export function buildReservationSheetView(sheet: ReservationSheet): ReservationS
       name: row.name || DASH,
       room: row.room || DASH,
       table: row.table === null ? DASH : String(row.table),
-      time: row.time || DASH,
+      meal: row.meal ? BOOKING_MEAL_LABELS[row.meal] : DASH,
       phone: row.phone || DASH,
     })),
   };

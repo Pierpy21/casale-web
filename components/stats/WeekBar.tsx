@@ -1,10 +1,12 @@
 import { cn } from "@/components/ui/cn";
-import type { WeekStats } from "@/lib/types";
+import type { StatsKind, WeekStats } from "@/lib/types";
 import { formatNumber, shareOfPeriod, vsAverage, weekTotal, type WeekScale } from "./week-format";
 
 export interface WeekBarProps {
   week: WeekStats;
   scale: WeekScale;
+  /** Filtro tipo della pagina: mostra solo il conteggio pertinente. Default: tutti. */
+  kind?: StatsKind;
   className?: string;
 }
 
@@ -14,7 +16,7 @@ export interface WeekBarProps {
  * Usa solo elementi inline/block (span) perché può stare dentro un pulsante.
  * La barra è decorativa (aria-hidden): i valori sono scritti accanto.
  */
-export function WeekBar({ week, scale, className }: WeekBarProps) {
+export function WeekBar({ week, scale, kind = "tutti", className }: WeekBarProps) {
   const total = weekTotal(week);
   const width = scale.max > 0 ? Math.min(100, (total / scale.max) * 100) : 0;
   const eventShare = total > 0 ? (week.event_covers / total) * 100 : 0;
@@ -31,18 +33,22 @@ export function WeekBar({ week, scale, className }: WeekBarProps) {
       </span>
 
       <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-[12px] leading-snug tabular-nums text-ink">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-mustard" />
-          <span>
-            Eventi <strong className="font-medium text-mustard">{formatNumber(week.event_covers)}</strong>
+        {kind !== "normale" && (
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-mustard" />
+            <span>
+              Eventi <strong className="font-medium text-mustard">{formatNumber(week.event_covers)}</strong>
+            </span>
           </span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-petrol" />
-          <span>
-            Prenotazioni <strong className="font-medium text-petrol">{formatNumber(week.normal_covers)}</strong>
+        )}
+        {kind !== "evento" && (
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-petrol" />
+            <span>
+              Prenotazioni <strong className="font-medium text-petrol">{formatNumber(week.normal_covers)}</strong>
+            </span>
           </span>
-        </span>
+        )}
       </span>
 
       <span className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[12px] leading-snug text-slate-dark">

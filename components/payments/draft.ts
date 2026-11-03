@@ -1,8 +1,8 @@
 import { isValid, parseISO } from "date-fns";
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/lib/types";
+import type { PaymentMethod } from "@/lib/types";
 import { todayISO } from "@/components/agenda/agenda-utils";
 
-/** Bozza di un acconto nei form (prenotazione e pannello Pagamenti). Tutto testo tranne la ricevuta. */
+/** Bozza di un acconto nei form (creazione evento e pannello Pagamenti). Tutto testo tranne la ricevuta. */
 export interface PaymentDraft {
   amount: string;
   paid_at: string;
@@ -18,7 +18,8 @@ export const PAYMENT_MAX_AMOUNT = 1_000_000;
 export const PAYMENT_NOTES_MAX = 2000;
 export const RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
 export const RECEIPT_ACCEPT = "image/*,application/pdf";
-export const PAYMENT_METHOD_OPTIONS = Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[];
+/** Metodi offerti per un nuovo acconto: POS, contanti, bonifico. Assegno e altro restano leggibili nei record vecchi. */
+export const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = ["carta", "contanti", "bonifico"];
 
 const ALLOWED_RECEIPT_TYPES = [
   "image/jpeg",
@@ -76,6 +77,8 @@ export function validateDraft(d: PaymentDraft): DraftErrors {
     errors.paid_at = "Data non valida";
   }
 
+  if (!d.method) errors.method = "Scegli POS, contanti o bonifico";
+
   if (d.notes.length > PAYMENT_NOTES_MAX) errors.notes = `Massimo ${PAYMENT_NOTES_MAX} caratteri`;
 
   if (d.receipt) {
@@ -85,6 +88,11 @@ export function validateDraft(d: PaymentDraft): DraftErrors {
     }
   }
   return errors;
+}
+
+/** Etichetta della voce in "Modifiche in attesa" per un acconto nuovo, es. "Nuovo acconto · 150 €". */
+export function newPaymentLabel(d: PaymentDraft): string {
+  return `Nuovo acconto · ${d.amount.trim()} €`;
 }
 
 /** FormData per addPayment(bookingId, formData): campi attesi dal contratto. */

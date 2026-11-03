@@ -63,6 +63,11 @@ export const ACTION_REGISTRY: Record<string, RegisteredAction> = {
   "inventory.createInventoryProduct": inventory.createInventoryProduct,
   "inventory.updateInventoryProduct": inventory.updateInventoryProduct,
   "inventory.deactivateInventoryProduct": inventory.deactivateInventoryProduct,
+  "inventory.createInventorySupplier": inventory.createInventorySupplier,
+  "inventory.updateInventorySupplier": inventory.updateInventorySupplier,
+  "inventory.setInventorySupplierActive": inventory.setInventorySupplierActive,
+  "inventory.reorderInventorySuppliers": inventory.reorderInventorySuppliers,
+  "inventory.deleteInventorySupplier": inventory.deleteInventorySupplier,
   "inventory.submitInventoryReport": inventory.submitInventoryReport,
   "inventory.markInventoryReportSeen": inventory.markInventoryReportSeen,
 };

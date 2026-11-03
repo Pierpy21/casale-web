@@ -1,6 +1,13 @@
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { STATUS_LABELS, type BookingKind, type BookingStatus, type NotificationType } from "./types";
+import {
+  BOOKING_MEAL_LABELS,
+  STATUS_LABELS,
+  type BookingKind,
+  type BookingMeal,
+  type BookingStatus,
+  type NotificationType,
+} from "./types";
 
 // Testi delle notifiche (puri). Il menù è il dato in evidenza nel titolo.
 
@@ -9,6 +16,9 @@ export interface BookingBrief {
   id: string;
   kind: BookingKind;
   event_type: string | null;
+  /** Pasto (evento e prenotazione normale). */
+  meal: BookingMeal | null;
+  /** Orario HH:MM (solo appuntamento). */
   event_time: string | null;
   event_date: string; // YYYY-MM-DD
   status: BookingStatus;
@@ -60,7 +70,7 @@ export function buildBookingNotice(
       if (b.kind === "appuntamento") {
         title = `Nuovo appuntamento · ${b.client_name || "senza titolo"}`;
       } else if (b.kind === "normale") {
-        title = b.event_time ? `Nuova prenotazione · ${b.event_time.slice(0, 5)}` : "Nuova prenotazione";
+        title = b.meal ? `Nuova prenotazione · ${BOOKING_MEAL_LABELS[b.meal]}` : "Nuova prenotazione";
       } else {
         title = menu ? `Nuovo banchetto · ${menu}` : "Nuovo banchetto";
       }

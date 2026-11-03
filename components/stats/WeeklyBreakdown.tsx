@@ -1,5 +1,5 @@
 import { Disclosure, EmptyState } from "@/components/ui";
-import type { WeekStats } from "@/lib/types";
+import type { StatsKind, WeekStats } from "@/lib/types";
 import { WeekBar } from "./WeekBar";
 import { WeekCard } from "./WeekCard";
 import { WeekDetails } from "./WeekDetails";
@@ -7,6 +7,8 @@ import { buildWeekScale, formatNumber, isEmptyWeek, rangeLabel, weekTotal } from
 
 export interface WeeklyBreakdownProps {
   weeks: WeekStats[];
+  /** Filtro tipo della pagina: decide quali conteggi mostrare in ogni settimana. */
+  kind?: StatsKind;
 }
 
 type MobileRow = { kind: "week"; week: WeekStats } | { kind: "empty"; from: WeekStats; to: WeekStats };
@@ -29,25 +31,13 @@ function buildMobileRows(weeks: WeekStats[]): MobileRow[] {
   return rows;
 }
 
-/** Legenda sempre visibile sopra l'elenco: colori, significato delle percentuali e media del periodo. */
-function WeekLegend({ average }: { average: number }) {
+/** Nota unica sopra l'elenco: come si legge la barra e la media del periodo (i colori sono nel riepilogo). */
+function WeekNote({ average }: { average: number }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2 rounded-btn bg-cream/60 px-3 py-2.5 text-[12px] leading-snug text-ink">
-      <ul aria-label="Legenda" className="flex min-w-0 flex-wrap gap-x-4 gap-y-2">
-        <li className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-mustard" />
-          Coperti eventi
-        </li>
-        <li className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm bg-petrol" />
-          Coperti prenotazioni
-        </li>
-      </ul>
-      <p className="text-slate-dark">
-        La percentuale è la quota della settimana sul totale del periodo. Media del periodo:{" "}
-        <span className="font-medium tabular-nums text-ink">{formatNumber(average)} coperti a settimana</span>.
-      </p>
-    </div>
+    <p className="text-[13px] leading-snug text-slate-dark">
+      La barra mostra la quota di ogni settimana sul totale del periodo. Media:{" "}
+      <span className="font-medium tabular-nums text-ink">{formatNumber(average)} coperti a settimana</span>.
+    </p>
   );
 }
 
@@ -56,7 +46,7 @@ function WeekLegend({ average }: { average: number }) {
  * Desktop (lg+): griglia di card, numeri sempre visibili sulle barre, dettagli su hover/focus o al click.
  * Mobile/tablet: lista compatta, ogni settimana si espande al tocco.
  */
-export function WeeklyBreakdown({ weeks }: WeeklyBreakdownProps) {
+export function WeeklyBreakdown({ weeks, kind = "tutti" }: WeeklyBreakdownProps) {
   if (weeks.length === 0) {
     return <EmptyState title="Nessuna settimana nel periodo" description="Cambia periodo per vedere i coperti." />;
   }
@@ -65,10 +55,10 @@ export function WeeklyBreakdown({ weeks }: WeeklyBreakdownProps) {
   const rows = buildMobileRows(weeks);
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <WeekLegend average={scale.average} />
+    <div className="flex min-w-0 flex-col gap-3">
+      <WeekNote average={scale.average} />
 
-      <ol className="flex min-w-0 flex-col gap-2.5 lg:hidden">
+      <ol className="flex min-w-0 flex-col gap-2 lg:hidden">
         {rows.map((row) =>
           row.kind === "empty" ? (
             <li
@@ -81,10 +71,11 @@ export function WeeklyBreakdown({ weeks }: WeeklyBreakdownProps) {
             <li key={row.week.week_start} className="min-w-0">
               <Disclosure
                 className="rounded-btn border border-sand bg-paper shadow-sm shadow-ink/5"
-                summaryClassName="flex min-h-11 w-full min-w-0 flex-col gap-3 p-4 text-left"
+                summaryClassName="min-h-11 items-start p-4"
                 contentClassName="px-4 pb-4"
                 summary={
-                  <>
+                  // Colonna dentro il riepilogo: la barra occupa tutta la larghezza e la freccia resta a destra.
+                  <span className="flex min-w-0 flex-col gap-3">
                     <span className="flex min-w-0 items-baseline justify-between gap-3">
                       <span className="min-w-0 break-words text-[14px] font-medium text-ink">{rangeLabel(row.week, row.week)}</span>
                       <span className="shrink-0 font-serif text-2xl leading-none tabular-nums">
@@ -92,11 +83,11 @@ export function WeeklyBreakdown({ weeks }: WeeklyBreakdownProps) {
                         <span className="ml-1 font-sans text-[12px] text-slate-dark">coperti</span>
                       </span>
                     </span>
-                    <WeekBar week={row.week} scale={scale} />
-                  </>
+                    <WeekBar week={row.week} scale={scale} kind={kind} />
+                  </span>
                 }
               >
-                <WeekDetails week={row.week} />
+                <WeekDetails week={row.week} kind={kind} />
               </Disclosure>
             </li>
           ),
@@ -105,7 +96,7 @@ export function WeeklyBreakdown({ weeks }: WeeklyBreakdownProps) {
 
       <ol className="hidden min-w-0 gap-3 lg:grid lg:grid-cols-3 xl:grid-cols-4">
         {weeks.map((week) => (
-          <WeekCard key={week.week_start} week={week} scale={scale} />
+          <WeekCard key={week.week_start} week={week} scale={scale} kind={kind} />
         ))}
       </ol>
     </div>

@@ -3,6 +3,7 @@ import { it } from "date-fns/locale";
 import { computeQuoteTotals, formatEUR, round2 } from "@/lib/quote-utils";
 import { bookingPersonName, bookingPhone } from "@/components/bookings/format";
 import {
+  BOOKING_MEAL_LABELS,
   COURSE_LABELS,
   COURSE_ORDER,
   type Course,
@@ -57,7 +58,8 @@ export interface QuoteDocumentModel {
   };
   event: {
     dateLong: string;
-    time: string | null;
+    /** Pasto: "Pranzo" o "Cena", null se non indicato. */
+    meal: string | null;
     room: string;
     adults: number;
     children: number;
@@ -175,7 +177,7 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
     },
     event: {
       dateLong: formatDateLong(b.event_date),
-      time: b.event_time ? b.event_time.slice(0, 5) : null,
+      meal: b.meal ? BOOKING_MEAL_LABELS[b.meal] : null,
       room: b.room?.name ?? "Da definire",
       adults: b.adults,
       children: b.children,

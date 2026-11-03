@@ -10,7 +10,7 @@ const COLUMNS: SheetPreviewColumn[] = [
   { label: "Nome" },
   { label: "Sala", widthPt: 110 },
   { label: "Tavolo", widthPt: 60, align: "center", strong: true },
-  { label: "Orario", widthPt: 55, align: "center" },
+  { label: "Pasto", widthPt: 55, align: "center" },
   { label: "Cellulare", widthPt: 100 },
 ];
 
@@ -32,7 +32,7 @@ export function ReservationSheetButton({ date }: { date: string }) {
           footer={SHEET_PREVIEW_FOOTER}
           pxPerMm={pxPerMm ?? undefined}
           columns={COLUMNS}
-          rows={view.rows.map((row) => [row.name, row.room, row.table, row.time, row.phone])}
+          rows={view.rows.map((row) => [row.name, row.room, row.table, row.meal, row.phone])}
           emptyText="Nessuna prenotazione"
         />
       )}

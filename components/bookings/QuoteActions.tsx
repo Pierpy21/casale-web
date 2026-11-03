@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Download, ExternalLink, FilePlus, FileText } from "lucide-react";
+import { ChevronDown, Download, ExternalLink, FilePlus, FileText, MessageCircle } from "lucide-react";
 import { useEffect, useId, useRef, useState, useTransition, type FocusEvent } from "react";
 import { createQuoteFromBooking } from "@/app/actions/quotes";
+import { WhatsAppQuoteShare } from "@/components/quotes/WhatsAppQuoteShare";
 import { Alert, DocumentDownload, buttonClasses, cn } from "@/components/ui";
 import { isQueued, submitMutation } from "@/lib/offline/submit";
 import { DOCX_MIME, quoteFileName } from "@/lib/quote-utils";
@@ -15,6 +16,14 @@ export interface PreventivoMenuProps {
   latest: { id: string; number: string } | null;
   /** Numero totale di preventivi della prenotazione (per la nota nel menu). */
   quotesCount: number;
+  /** Cellulare del cliente per WhatsApp (null: si sceglie il contatto in WhatsApp). */
+  phone: string | null;
+  /** Nome del cliente per il saluto del messaggio WhatsApp. */
+  clientName: string;
+  /** Data dell'evento già formattata per il messaggio WhatsApp. */
+  eventDate: string;
+  /** Totale IVA inclusa dell'ultimo preventivo (per il messaggio WhatsApp). */
+  total: number | null;
 }
 
 const ITEM =
@@ -23,11 +32,11 @@ const ICON = "size-4 shrink-0 text-bronze";
 
 /**
  * Pulsante "Preventivo" accanto al nome dell'evento (solo admin, solo eventi), compatto.
- * Con un preventivo: Scarica PDF, Scarica DOCX, Apri preventivo (il più recente).
+ * Con un preventivo: Scarica PDF, Scarica DOCX, Invia su WhatsApp, Apri preventivo (il più recente).
  * Senza preventivo: Crea preventivo. Si chiude con Esc, con un clic fuori o dopo una scelta.
  * Il menu è ancorato al bordo destro del pulsante, quindi resta sempre nello schermo.
  */
-export function PreventivoMenu({ bookingId, latest, quotesCount }: PreventivoMenuProps) {
+export function PreventivoMenu({ bookingId, latest, quotesCount, phone, clientName, eventDate, total }: PreventivoMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +155,19 @@ export function PreventivoMenu({ bookingId, latest, quotesCount }: PreventivoMen
                   <Download aria-hidden="true" className={ICON} />
                   Scarica DOCX
                 </DocumentDownload>
+                <WhatsAppQuoteShare
+                  quoteId={latest.id}
+                  number={latest.number}
+                  phone={phone}
+                  clientName={clientName}
+                  eventDate={eventDate}
+                  total={total}
+                  className={ITEM}
+                  onActivate={() => setOpen(false)}
+                >
+                  <MessageCircle aria-hidden="true" className={ICON} />
+                  Invia su WhatsApp
+                </WhatsAppQuoteShare>
                 <Link href={`/admin/preventivi/${latest.id}`} className={ITEM} onClick={() => setOpen(false)}>
                   <ExternalLink aria-hidden="true" className={ICON} />
                   Apri preventivo

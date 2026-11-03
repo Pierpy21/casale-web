@@ -36,7 +36,7 @@ function FieldRow({ field }: { field: EventFieldView }) {
 
 /**
  * Anteprima HTML del foglio eventi: riepilogo della giornata e una scheda per banchetto
- * (orario, nome, coperti, poi voci etichetta/valore). Layout di events-pdf.tsx, sullo stesso foglio A4 di SheetPreview.
+ * (pasto, nome, coperti, poi voci etichetta/valore). Layout di events-pdf.tsx, sullo stesso foglio A4 di SheetPreview.
  */
 export function EventSheetPreview({ view, pxPerMm }: EventSheetPreviewProps) {
   return (
@@ -67,7 +67,7 @@ export function EventSheetPreview({ view, pxPerMm }: EventSheetPreviewProps) {
         view.blocks.map((block, i) => (
           <section key={i} className={styles.block}>
             <div className={styles.blockHead}>
-              <p className={styles.blockTime}>{block.time}</p>
+              <p className={styles.blockTime}>{block.meal}</p>
               <h4 className={styles.blockHeading}>{block.heading}</h4>
               <p className={styles.blockCovers}>{block.covers}</p>
             </div>

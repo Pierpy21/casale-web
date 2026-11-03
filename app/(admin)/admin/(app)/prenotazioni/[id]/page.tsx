@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { MessageCircle, Phone } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
@@ -14,7 +15,7 @@ import { KindBadge } from "@/components/bookings/KindBadge";
 import { decodeWarnings } from "@/components/bookings/booking-form-model";
 import { PreventivoMenu } from "@/components/bookings/QuoteActions";
 import { CourseList } from "@/components/bookings/MenuPreview";
-import { bookingPersonName, bookingPhone, formatCovers, formatTime, totalCovers } from "@/components/bookings/format";
+import { bookingPersonName, bookingPhone, bookingWhen, formatCovers, totalCovers, whatsappUrl } from "@/components/bookings/format";
 import type { NameLookup } from "@/components/bookings/change-labels";
 import {
   BookingNumbers,
@@ -27,7 +28,7 @@ import { QuotesList } from "@/components/booking-detail/QuotesList";
 import { MenuBadge } from "@/components/menu/MenuBadge";
 import { PaymentsPanel } from "@/components/payments/PaymentsPanel";
 import { PendingChanges } from "@/components/offline/PendingChanges";
-import { Alert, Badge, ButtonLink, Card, Disclosure, StatusBadge, buttonClasses } from "@/components/ui";
+import { Alert, Badge, ButtonLink, Card, Disclosure, PhoneLink, StatusBadge, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
 import { canAddBookingNote, canEditAllergies, canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
 import { requireProfile } from "@/lib/auth";
@@ -35,25 +36,14 @@ import { getBooking, getBookingChanges, getBookingNotes } from "@/lib/data/booki
 import { getPayments } from "@/lib/data/payments";
 import { getDishes, getMenus, getRooms } from "@/lib/data/catalog";
 import { getQuotesForBooking } from "@/lib/data/quotes";
+import { telHref } from "@/lib/phone";
 import { getPaymentSummary } from "@/lib/payment-utils";
-import { estimateBookingPrice, formatEUR } from "@/lib/quote-utils";
+import { computeQuoteTotals, estimateBookingPrice, formatEUR } from "@/lib/quote-utils";
 import { SETUP_COLOR_HEX } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Prenotazione · Casale del Notaio",
 };
-
-/** Numero WhatsApp in formato internazionale senza simboli (wa.me). Default prefisso Italia. */
-function whatsappHref(phone: string): string {
-  let digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("00")) digits = digits.slice(2);
-  else if (!digits.startsWith("39") && digits.length <= 10) digits = `39${digits}`;
-  return `https://wa.me/${digits}`;
-}
-
-function telHref(phone: string): string {
-  return `tel:${phone.replace(/[^+0-9]/g, "")}`;
-}
 
 const CALL_BUTTON = buttonClasses("outline", "sm", "min-h-11");
 
@@ -102,7 +92,10 @@ export default async function BookingDetailPage({
   const personName = bookingPersonName(booking);
   const phone = bookingPhone(booking);
   const eventDate = toDate(booking.event_date);
-  const time = formatTime(booking.event_time);
+  // Appuntamento: orario ("Ora"). Evento e normale: pasto ("Pasto", pranzo o cena).
+  const isAppointment = booking.kind === "appuntamento";
+  const when = bookingWhen(booking);
+  const whenLabel = isAppointment ? "Ora" : "Pasto";
   const finance = financeVisible ? getPaymentSummary(booking, payments) : null;
   // Prezzo finale: quello del preventivo più recente (null = calcolo automatico).
   const latestQuote = [...quotes].sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
@@ -163,9 +156,9 @@ export default async function BookingDetailPage({
       panel: coversPanel,
       cta: "Modifica coperti",
     });
-    tiles.push({ key: "time", label: "Ora", value: time ?? "—" });
+    tiles.push({ key: "when", label: whenLabel, value: when ?? "—" });
   } else {
-    tiles.push({ key: "time", label: "Ora", value: time ?? "—" });
+    tiles.push({ key: "when", label: whenLabel, value: when ?? "—" });
     tiles.push({ key: "type", label: "Tipo evento", value: booking.event_type?.trim() || "—" });
   }
 
@@ -242,7 +235,7 @@ export default async function BookingDetailPage({
       </span>
       <span className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
         <SummaryItem label="Data">{capitalize(formatIt(eventDate, "EEE d MMM yyyy"))}</SummaryItem>
-        <SummaryItem label="Ora">{time ?? "Non indicata"}</SummaryItem>
+        <SummaryItem label={whenLabel}>{when ?? (isAppointment ? "Non indicata" : "Non indicato")}</SummaryItem>
         <SummaryItem label="Sala">
           {booking.room?.name ?? "Da assegnare"}
           {tableLabel && <span className="text-slate-dark"> · {tableLabel}</span>}
@@ -270,7 +263,7 @@ export default async function BookingDetailPage({
         <div className="flex flex-col gap-3">
           <p className="wrap-anywhere text-[12px] font-medium uppercase tracking-[0.14em] text-bronze">
             {capitalize(formatIt(eventDate, "EEEE d MMMM yyyy"))}
-            {time ? ` · ore ${time}` : ""}
+            {when ? (isAppointment ? ` · ore ${when}` : ` · ${when}`) : ""}
           </p>
           <div className="flex min-w-0 items-start justify-between gap-3">
             <h1 className="min-w-0 flex-1 text-3xl leading-tight wrap-anywhere sm:text-4xl desk:text-5xl">{personName}</h1>
@@ -279,9 +272,15 @@ export default async function BookingDetailPage({
                 bookingId={booking.id}
                 latest={latestQuote ? { id: latestQuote.id, number: latestQuote.number } : null}
                 quotesCount={quotes.length}
+                phone={phone}
+                clientName={personName}
+                eventDate={formatIt(eventDate, "EEEE d MMMM yyyy")}
+                total={latestQuote ? computeQuoteTotals(latestQuote).total : null}
               />
             )}
           </div>
+          {/* Telefono subito sotto il nome: chiamata, WhatsApp e copia senza scendere alla sezione Cliente. */}
+          {!kitchen && phone && <PhoneLink phone={phone} className="-my-1 text-[16px]" />}
           <div className="flex flex-wrap items-center gap-3">
             <KindBadge kind={booking.kind} />
             <StatusBadge status={booking.status} />
@@ -372,9 +371,8 @@ export default async function BookingDetailPage({
             <dl className="flex min-w-0 flex-col gap-4">
               {!kitchen && phone && (
                 <InfoRow label="Telefono">
-                  <a href={telHref(phone)} className="wrap-anywhere font-medium text-petrol underline-offset-4 hover:underline">
-                    {phone}
-                  </a>
+                  {/* -my-3: il link alto 44 px (tocco) resta sulla riga dell'etichetta. */}
+                  <PhoneLink phone={phone} whatsapp={false} className="-my-3" />
                 </InfoRow>
               )}
               {/* Email, codice fiscale, P.IVA e note esistono solo nella rubrica: il cliente (non l'ospite). */}
@@ -405,14 +403,11 @@ export default async function BookingDetailPage({
               {!kitchen && phone && (
                 <>
                   <a href={telHref(phone)} className={CALL_BUTTON}>
+                    <Phone aria-hidden="true" className="size-4" />
                     Chiama
                   </a>
-                  <a
-                    href={whatsappHref(phone)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonClasses("outline", "sm", "min-h-11 rounded-none")}
-                  >
+                  <a href={whatsappUrl(phone)} target="_blank" rel="noopener noreferrer" className={CALL_BUTTON}>
+                    <MessageCircle aria-hidden="true" className="size-4" />
                     WhatsApp
                   </a>
                 </>
@@ -434,7 +429,7 @@ export default async function BookingDetailPage({
             </div>
             <dl className="flex min-w-0 flex-col gap-4">
               <InfoRow label="Data">{capitalize(formatIt(eventDate, "EEEE d MMMM yyyy"))}</InfoRow>
-              <InfoRow label="Ora">{time ?? "Non indicata"}</InfoRow>
+              <InfoRow label={whenLabel}>{when ?? (isAppointment ? "Non indicata" : "Non indicato")}</InfoRow>
               <InfoRow label="Sala">
                 {booking.room?.name ?? "Da assegnare"}
                 {tableLabel && <span className="text-slate-dark"> · {tableLabel}</span>}

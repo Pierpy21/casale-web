@@ -4,6 +4,7 @@ import { getAdminPb } from "@/lib/pocketbase/admin";
 import { chunk, dayEndPb, dayStartPb, nn, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
 import { fetchOne, listAll, listByParents } from "@/lib/pocketbase/queries";
 import { bookingPersonName } from "@/components/bookings/format";
+import { mealOf } from "@/lib/pocketbase/mappers";
 import { buildBookingNotice, buildReminderNotice, type BookingBrief } from "@/lib/notify-text";
 import type { BookingKind, BookingStatus, NotificationType, Role } from "@/lib/types";
 
@@ -157,6 +158,7 @@ function toBrief(r: PbRecord, allergyCount: number): BookingBrief {
     id: r.id,
     kind: (String(r.kind || "evento")) as BookingBrief["kind"],
     event_type: r.event_type ? String(r.event_type) : null,
+    meal: mealOf(r),
     event_time: r.event_time ? String(r.event_time) : null,
     event_date: toDateOnly(r.event_date),
     status: r.status as BookingStatus,

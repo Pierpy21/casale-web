@@ -5,7 +5,7 @@ import { InventoryHistory, type InventoryHistoryRow } from "@/components/invento
 import { InventoryReportForm } from "@/components/inventory/InventoryReportForm";
 import { ButtonLink, PageHeader } from "@/components/ui";
 import { requireProfile } from "@/lib/auth";
-import { getInventoryProducts, getInventoryReport, getInventoryReports } from "@/lib/data/inventory";
+import { getInventoryProducts, getInventoryReport, getInventoryReports, getInventorySuppliers } from "@/lib/data/inventory";
 import { canManageInventory, canUseInventory } from "@/lib/permissions";
 import { countToOrderBySupplier, formatToOrderSummary, mergeReportLines } from "@/lib/inventory-utils";
 
@@ -27,8 +27,9 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
   const from = params.from && ISO_DATE.test(params.from) ? params.from : undefined;
   const to = params.to && ISO_DATE.test(params.to) ? params.to : undefined;
 
-  const [products, history] = await Promise.all([
+  const [products, suppliers, history] = await Promise.all([
     getInventoryProducts(),
+    getInventorySuppliers({ includeInactive: true }),
     getInventoryReports({ page, perPage: PER_PAGE, from, to }),
   ]);
 
@@ -40,7 +41,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
       report,
       toOrder: order.filter((row) => (row.to_order ?? 0) > 0).length,
       present: order.filter((row) => (row.stock ?? 0) > 0).length,
-      toOrderSummary: formatToOrderSummary(countToOrderBySupplier(order)),
+      toOrderSummary: formatToOrderSummary(countToOrderBySupplier(order, suppliers)),
     };
   });
 
@@ -52,9 +53,14 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
         title="Giacenza"
         actions={
           canManageInventory(profile) ? (
-            <ButtonLink href="/admin/giacenza/prodotti" variant="outline" size="sm">
-              Gestisci prodotti
-            </ButtonLink>
+            <>
+              <ButtonLink href="/admin/giacenza/prodotti" variant="outline" size="sm">
+                Gestisci prodotti
+              </ButtonLink>
+              <ButtonLink href="/admin/giacenza/fornitori" variant="outline" size="sm">
+                Fornitori
+              </ButtonLink>
+            </>
           ) : undefined
         }
       />
@@ -66,7 +72,12 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
             Nuova giacenza
           </h2>
         </div>
-        <InventoryReportForm products={products} today={todayISO()} groupBy={canManageInventory(profile) ? "supplier" : "category"} />
+        <InventoryReportForm
+          products={products}
+          suppliers={suppliers}
+          today={todayISO()}
+          groupBy={canManageInventory(profile) ? "supplier" : "category"}
+        />
       </section>
 
       <InventoryHistory

@@ -23,6 +23,10 @@ export type BookingKind = (typeof BOOKING_KINDS)[number];
 export const BOOKING_KIND_LABELS: Record<BookingKind, string> = { evento: "Evento", normale: "Prenotazione", appuntamento: "Appuntamento" };
 /** Suggerimenti per il tipo evento (testo libero, max 60 caratteri). */
 export const EVENT_TYPES = ["Matrimonio", "Battesimo", "Comunione", "Cresima", "Compleanno", "Anniversario", "Laurea", "Aziendale", "Altro"] as const;
+/** Pasto di un evento o di una prenotazione normale (facoltativo). Non c'è un orario: l'appuntamento ha event_time. */
+export const BOOKING_MEALS = ["pranzo", "cena"] as const;
+export type BookingMeal = (typeof BOOKING_MEALS)[number];
+export const BOOKING_MEAL_LABELS: Record<BookingMeal, string> = { pranzo: "Pranzo", cena: "Cena" };
 
 /**
  * Prenotazione. Evento e appuntamento hanno il cliente di rubrica (`client_id`); la prenotazione normale no:
@@ -30,13 +34,17 @@ export const EVENT_TYPES = ["Matrimonio", "Battesimo", "Comunione", "Cresima", "
  * Per nome e telefono da mostrare usare bookingPersonName / bookingPhone (components/bookings/format.ts).
  */
 export interface Booking {
-  id: string; client_id: string | null; guest_name: string | null; guest_phone: string | null; kind: BookingKind; event_type: string | null; event_date: string; event_time: string | null;
+  id: string; client_id: string | null; guest_name: string | null; guest_phone: string | null; kind: BookingKind; event_type: string | null; event_date: string;
+  /** Pasto (evento e prenotazione normale). Null per l'appuntamento e se non indicato. */
+  meal: BookingMeal | null;
+  /** Orario HH:MM: solo per l'appuntamento. Null per evento e prenotazione normale. */
+  event_time: string | null;
   room_id: string | null; /** Tavolo (solo prenotazioni normali): null se non assegnato. */ table_number: number | null; adults: number; children: number; kids_menus: number;
   menu_id: string | null; kids_menu_id: string | null; setup_colors: string[]; setup_notes: string | null;
   status: BookingStatus; notes: string | null; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string;
 }
 /** Riga del foglio prenotazioni (export PDF/DOCX): prenotazioni normali del giorno. */
-export interface ReservationSheetRow { name: string; room: string | null; table: number | null; time: string | null; /** HH:MM */ phone: string | null; }
+export interface ReservationSheetRow { name: string; room: string | null; table: number | null; meal: BookingMeal | null; phone: string | null; }
 /** Foglio prenotazioni di un giorno (`date` YYYY-MM-DD), già ordinato. */
 export interface ReservationSheet { date: string; rows: ReservationSheetRow[]; }
 /** Menù del giorno nel foglio eventi: adulti (menu) o bambini (kids), porzioni sommate sui banchetti. */
@@ -49,10 +57,10 @@ export interface EventSheetDishGroup { course: Course; label: string; items: str
 export interface EventSheetNote { author: string; body: string; created_at: string; }
 /**
  * Scheda di un banchetto nel foglio eventi (export PDF/DOCX per la cucina). Stessi dati della scheda cucina,
- * senza telefono del cliente né prezzi. `time` HH:MM, null se non indicato.
+ * senza telefono del cliente né prezzi. `meal` pranzo o cena, null se non indicato.
  */
 export interface EventSheetRow {
-  time: string | null;
+  meal: BookingMeal | null;
   client_name: string;
   room: string | null;
   adults: number;
@@ -68,7 +76,7 @@ export interface EventSheetRow {
   booking_notes: string | null;
   kitchen_notes: EventSheetNote[];
 }
-/** Foglio eventi di un giorno (`date` YYYY-MM-DD), già ordinato per orario. */
+/** Foglio eventi di un giorno (`date` YYYY-MM-DD), già ordinato per pasto (pranzo, poi cena). */
 export interface EventSheet { date: string; rows: EventSheetRow[]; totals: EventSheetTotals; }
 export interface BookingListItem extends Booking {
   /** Cliente di rubrica (evento e appuntamento). Null per le prenotazioni normali e nei dati senza cliente. */
@@ -82,8 +90,8 @@ export interface BookingListItem extends Booking {
 export type ClientOption = Pick<Client, "id" | "first_name" | "last_name" | "phone">;
 /** Suggerimento di ricerca cliente (campo Nome nelle prenotazioni). `email` è null per il ruolo sala. */
 export interface ClientSuggestion { id: string; first_name: string; last_name: string; phone: string; email: string | null; }
-/** Prossimo evento dopo un giorno (giorno vuoto dell'agenda, tutti i ruoli). `event_date` YYYY-MM-DD, `event_time` HH:MM:SS o null. */
-export interface NextEventBrief { id: string; event_date: string; event_time: string | null; title: string; }
+/** Prossimo evento dopo un giorno (giorno vuoto dell'agenda, tutti i ruoli). `event_date` YYYY-MM-DD, `meal` pranzo o cena o null. */
+export interface NextEventBrief { id: string; event_date: string; meal: BookingMeal | null; title: string; }
 /** Slot di occupazione sala per la vista agenda (select minima, senza annullati). */
 export interface RoomBookingSlot { id: string; event_date: string; room_id: string; client_name: string; adults: number; children: number; }
 export interface BookingDetail extends Booking {
@@ -139,7 +147,7 @@ export const STATUS_COLORS: Record<BookingStatus, string> = { opzione: "#A9792B"
 
 export const PAYMENT_METHODS = ["contanti", "bonifico", "carta", "assegno", "altro"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
-export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { contanti: "Contanti", bonifico: "Bonifico", carta: "Carta", assegno: "Assegno", altro: "Altro" };
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { contanti: "Contanti", bonifico: "Bonifico", carta: "POS", assegno: "Assegno", altro: "Altro" };
 export interface Payment { id: string; booking_id: string; amount: number; paid_at: string; method: PaymentMethod | null; receipt_path: string | null; receipt_name: string | null; receipt_type: string | null; notes: string | null; created_at: string; updated_at: string; }
 export interface PaymentSummary { expected_total: number; paid_total: number; balance: number; } // expected = adults*menu.price + kids_menus*kids_menu.price
 
@@ -153,10 +161,8 @@ export const INVENTORY_STATES = ["presente", "da_ordinare"] as const;
 export type InventoryState = (typeof INVENTORY_STATES)[number];
 export const INVENTORY_STATE_LABELS: Record<InventoryState, string> = { presente: "Presente", da_ordinare: "Da ordinare" };
 
-/** Fornitori della giacenza (ordine di visualizzazione = ordine dell'array). */
-export const INVENTORY_SUPPLIERS = ["viagrande", "amadori", "vegagel", "altro"] as const;
-export type InventorySupplier = (typeof INVENTORY_SUPPLIERS)[number];
-export const INVENTORY_SUPPLIER_LABELS: Record<InventorySupplier, string> = { viagrande: "Viagrande", amadori: "Amadori", vegagel: "Vegagel", altro: "Altro" };
+/** Fornitore della giacenza (collezione inventory_suppliers): lo gestisce l'admin. `sort` = ordine di visualizzazione. */
+export interface InventorySupplier { id: string; name: string; sort: number; active: boolean; }
 
 /** Categorie dei prodotti (ordine di visualizzazione = ordine dell'array). Per la cucina i prodotti si raggruppano così. */
 export const INVENTORY_CATEGORIES = ["ortofrutta", "latticini", "salumi", "carne_uova", "dispensa", "surgelati", "non_food", "altro"] as const;
@@ -172,8 +178,9 @@ export const INVENTORY_CATEGORY_LABELS: Record<InventoryCategory, string> = {
   altro: "Altro",
 };
 
-export interface InventoryProduct { id: string; name: string; unit: string | null; category: InventoryCategory; supplier: InventorySupplier; sort: number; active: boolean; updated_at: string; }
-export interface InventoryReportLine { id: string; report_id: string; product_id: string | null; product_name: string; unit: string | null; state: InventoryState; quantity: number; sort: number; supplier: InventorySupplier; category: InventoryCategory; }
+export interface InventoryProduct { id: string; name: string; unit: string | null; category: InventoryCategory; supplier_id: string; sort: number; active: boolean; updated_at: string; }
+/** Riga del report. `supplier_name` è lo snapshot del nome al momento dell'invio (resta anche se il fornitore cambia nome). */
+export interface InventoryReportLine { id: string; report_id: string; product_id: string | null; product_name: string; unit: string | null; state: InventoryState; quantity: number; sort: number; supplier_id: string; supplier_name: string; category: InventoryCategory; }
 export interface InventoryReport { id: string; created_by: string | null; created_by_name: string; report_date: string; notes: string | null; status: "inviato" | "visto"; seen_by: string | null; seen_at: string | null; created_at: string; lines: InventoryReportLine[]; }
 
 // ---------------------------------------------------------------------

@@ -4,7 +4,7 @@ import { ArrowLeft, CalendarPlus } from "lucide-react";
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { ClientForm } from "@/components/clients/ClientForm";
 import { DeleteClientButton } from "@/components/clients/DeleteClientButton";
-import { ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
+import { ButtonLink, Card, EmptyState, PageHeader, PhoneLink } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { getClient, getClientBookings } from "@/lib/data/clients";
 
@@ -24,14 +24,27 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
   const bookings = await getClientBookings(client.id);
   const name = `${client.first_name} ${client.last_name}`.trim();
   const newBookingHref = `/admin/prenotazioni/nuova?client=${client.id}`;
-  const contact = [client.phone ? `Telefono ${client.phone}` : null, client.email].filter(Boolean).join(" · ");
+  // Telefono cliccabile (con copia) e email nella stessa riga, separati da "·".
+  const contact =
+    client.phone || client.email ? (
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {client.phone && (
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <span>Telefono</span>
+            <PhoneLink phone={client.phone} />
+          </span>
+        )}
+        {client.phone && client.email && <span aria-hidden="true">·</span>}
+        {client.email && <span className="wrap-anywhere">{client.email}</span>}
+      </span>
+    ) : undefined;
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow="Scheda cliente"
         title={name}
-        description={contact || undefined}
+        description={contact}
         actions={
           <>
             <ButtonLink href="/admin/clienti" variant="ghost" size="sm">

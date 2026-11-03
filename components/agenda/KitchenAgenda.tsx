@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BookingCard } from "@/components/bookings/BookingCard";
+import { bookingTimeSortKey } from "@/components/bookings/format";
 import { cn } from "@/components/ui/cn";
 import type { BookingListItem, BookingNote, NextEventBrief } from "@/lib/types";
 import { AgendaKindSwitch } from "./AgendaKindSwitch";
@@ -94,10 +95,12 @@ export function KitchenAgenda({
     [kind, loadedRange, router],
   );
 
-  // Senza orario in fondo alla giornata (come nell'agenda).
-  const dayItems = [...(allByDate.get(selected) ?? [])].sort((a, b) =>
-    (a.event_time ?? "99:99").localeCompare(b.event_time ?? "99:99"),
-  );
+  // Pranzo, poi cena; appuntamenti per ora; senza pasto né orario in fondo alla giornata (come nell'agenda).
+  const dayItems = [...(allByDate.get(selected) ?? [])].sort((a, b) => {
+    const ka = bookingTimeSortKey(a);
+    const kb = bookingTimeSortKey(b);
+    return ka === kb ? 0 : ka < kb ? -1 : 1;
+  });
   const items = filterBookings(dayItems, kind);
   const events = items.filter((b) => b.kind === "evento");
   const others = items.filter((b) => b.kind !== "evento");

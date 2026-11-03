@@ -22,7 +22,7 @@ const ADMIN_OPTIONS: CreateOption[] = [
   {
     href: `${NEW_BOOKING_BASE}?tipo=normale`,
     label: "Prenotazione",
-    description: "Tavolo con orario e coperti.",
+    description: "Tavolo con pranzo o cena e coperti.",
     Icon: Armchair,
   },
   {

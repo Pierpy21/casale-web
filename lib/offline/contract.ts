@@ -79,7 +79,7 @@ export type QueuedStatus =
 
 /** Riferimento all'entità toccata: per mostrare "2 modifiche in attesa" sulla pagina giusta. */
 export interface EntityRef {
-  type: "booking" | "payment" | "quote" | "client" | "menu" | "dish" | "room" | "inventory_product" | "inventory_report" | "operator" | "note" | "notification";
+  type: "booking" | "payment" | "quote" | "client" | "menu" | "dish" | "room" | "inventory_product" | "inventory_supplier" | "inventory_report" | "operator" | "note" | "notification";
   /** Id reale o temporaneo (TEMP_ID_PREFIX). */
   id: string;
 }

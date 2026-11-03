@@ -6,6 +6,7 @@ import { createClient as createClientAction, updateClient } from "@/app/actions/
 import { Alert, Button, ButtonLink, Field, Input, Textarea, fieldIds } from "@/components/ui";
 import { isBrowserOnline } from "@/lib/offline/network";
 import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
+import { normalizePhoneInput } from "@/lib/phone";
 import type { Client } from "@/lib/types";
 
 export interface ClientFormProps {
@@ -65,7 +66,8 @@ export function ClientForm({ mode, client }: ClientFormProps) {
     const input = {
       first_name: text(form, "first_name"),
       last_name: text(form, "last_name"),
-      phone: text(form, "phone"),
+      // Il cellulare si incolla spesso con spazi invisibili o punti: normalizzato prima di validare.
+      phone: normalizePhoneInput(text(form, "phone")),
       email: text(form, "email"),
       tax_code: text(form, "tax_code"),
       vat_number: text(form, "vat_number"),
@@ -158,6 +160,9 @@ export function ClientForm({ mode, client }: ClientFormProps) {
             type="tel"
             inputMode="tel"
             defaultValue={client?.phone ?? ""}
+            onBlur={(e) => {
+              e.currentTarget.value = normalizePhoneInput(e.currentTarget.value);
+            }}
             autoComplete="tel"
             placeholder="+39 340 000 0000"
             invalid={!!fieldErrors.phone}

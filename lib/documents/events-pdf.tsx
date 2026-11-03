@@ -13,7 +13,7 @@ import type { EventSheet } from "@/lib/types";
 import { buildEventSheetView, type EventBlockView, type EventFieldView, type EventSheetView } from "@/lib/documents/events-view";
 
 // Foglio eventi del giorno in PDF: stessa impostazione tipografica del foglio prenotazioni (reservations-pdf.tsx).
-// Per ogni banchetto una scheda: intestazione (orario, nome) e voci etichetta/valore. I valori mancanti diventano "—".
+// Per ogni banchetto una scheda: intestazione (pasto, nome) e voci etichetta/valore. I valori mancanti diventano "—".
 
 const COLOR = {
   ink: "#1C2B2D",
@@ -116,7 +116,7 @@ function EventBlock({ block }: { block: EventBlockView }) {
   return (
     <View style={styles.block}>
       <View style={styles.blockHead} wrap={false}>
-        <Text style={styles.blockTime}>{block.time}</Text>
+        <Text style={styles.blockTime}>{block.meal}</Text>
         <Text style={styles.blockHeading}>{block.heading}</Text>
         <Text style={styles.blockCovers}>{block.covers}</Text>
       </View>

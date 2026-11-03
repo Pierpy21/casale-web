@@ -60,14 +60,17 @@ export function QuotePreview({ model }: QuotePreviewProps) {
             <p className={styles.issuerText}>{issuer.phone}</p>
             <p className={styles.issuerText}>{issuer.email}</p>
           </div>
-          <Image src="/logo-dark.svg" alt="Il Casale del Notaio" width={150} height={50} unoptimized className={styles.logo} />
+          {/* Logo e, sotto in piccolo, il numero del preventivo (come nel PDF) */}
+          <div className={styles.logoBlock}>
+            <Image src="/logo-dark.svg" alt="Il Casale del Notaio" width={150} height={50} unoptimized className={styles.logo} />
+            <p className={styles.logoNumber}>N. {meta.number}</p>
+          </div>
         </header>
         <div className={styles.rule} aria-hidden="true" />
 
         <div className={styles.titleRow}>
           <div className="min-w-0">
-            <p className={styles.eyebrow}>{model.title}</p>
-            <h2 className={styles.docTitle}>N. {meta.number}</h2>
+            <h2 className={styles.docTitle}>{model.title}</h2>
           </div>
           <div className={styles.meta}>
             <p className={styles.metaText}>Data di emissione: {meta.issuedAt}</p>
@@ -90,7 +93,7 @@ export function QuotePreview({ model }: QuotePreviewProps) {
             <p className={styles.eyebrow}>Evento</p>
             <dl>
               <KeyValue label="Data" value={event.dateLong} />
-              {event.time ? <KeyValue label="Ora" value={event.time} /> : null}
+              {event.meal ? <KeyValue label="Pasto" value={event.meal} /> : null}
               <KeyValue label="Sala" value={event.room} />
               <KeyValue label="Adulti" value={String(event.adults)} />
               <KeyValue label="Bambini" value={String(event.children)} />

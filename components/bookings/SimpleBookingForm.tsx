@@ -9,6 +9,7 @@ import {
   EVENT_TYPES,
   STATUS_LABELS,
   type BookingDetail,
+  type BookingMeal,
   type BookingStatus,
   type ClientOption,
   type ClientSuggestion,
@@ -48,6 +49,7 @@ import {
   ClientSection,
   FormCard,
   GuestFields,
+  MealChoice,
   SubmitBar,
   focusFirstInvalid,
   newAllergyRow,
@@ -76,7 +78,10 @@ export interface SimpleBookingFormProps {
 interface SimpleValues {
   event_date: string;
   eventType: EventTypeState;
+  /** Orario (solo appuntamento, facoltativo). */
   event_time: string;
+  /** Pasto (solo prenotazione normale, facoltativo): pranzo, cena o nessuno. */
+  meal: BookingMeal | null;
   status: BookingStatus;
   adults: number;
   children: number;
@@ -94,6 +99,7 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
       event_date: initialDate,
       eventType: { choice: "", custom: "" },
       event_time: "",
+      meal: null,
       status: "opzione",
       adults: 0,
       children: 0,
@@ -108,6 +114,7 @@ function initialValues(booking: BookingDetail | undefined, initialDate: string):
     event_date: booking.event_date,
     eventType: eventTypeState(booking.event_type),
     event_time: timeInputValue(booking.event_time),
+    meal: booking.meal,
     status: booking.status,
     adults: booking.adults,
     children: booking.children,
@@ -256,7 +263,9 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       ...personPayload,
       event_type: isAppointment ? eventType : null,
       event_date: eventDate,
-      event_time: values.event_time || null,
+      // Appuntamento: orario. Prenotazione normale: pasto (pranzo o cena), senza orario.
+      meal: isAppointment ? null : values.meal,
+      event_time: isAppointment ? values.event_time || null : null,
       // Le prenotazioni normali scelgono la sala; per l'appuntamento resta quella salvata (di norma nessuna).
       room_id: isAppointment ? (booking?.room_id ?? null) : values.room_id,
       // Tavolo solo per le prenotazioni normali; l'appuntamento non lo invia (resta com'è).
@@ -369,16 +378,20 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
 
       <FormCard label={isAppointment ? "Appuntamento" : "Prenotazione"}>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field label="Ora" htmlFor="booking-time" error={first(errors.event_time)} hint="Facoltativa">
-            <Input
-              id="booking-time"
-              type="time"
-              invalid={!!errors.event_time}
-              aria-describedby={describedBy("booking-time", !!errors.event_time, true)}
-              value={values.event_time}
-              onChange={(e) => change({ event_time: e.target.value })}
-            />
-          </Field>
+          {isAppointment ? (
+            <Field label="Ora" htmlFor="booking-time" error={first(errors.event_time)} hint="Facoltativa">
+              <Input
+                id="booking-time"
+                type="time"
+                invalid={!!errors.event_time}
+                aria-describedby={describedBy("booking-time", !!errors.event_time, true)}
+                value={values.event_time}
+                onChange={(e) => change({ event_time: e.target.value })}
+              />
+            </Field>
+          ) : (
+            <MealChoice value={values.meal} onChange={(meal) => change({ meal })} disabled={pending} />
+          )}
 
           {isAppointment && (
             <Field label="Tipo evento" htmlFor="appointment-type" error={first(errors.event_type)}>

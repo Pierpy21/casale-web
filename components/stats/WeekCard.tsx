@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { cn } from "@/components/ui/cn";
-import type { WeekStats } from "@/lib/types";
+import type { StatsKind, WeekStats } from "@/lib/types";
 import { FOCUS } from "./shared";
 import { WeekBar } from "./WeekBar";
 import { WeekDetails } from "./WeekDetails";
@@ -12,13 +12,14 @@ export interface WeekCardProps {
   week: WeekStats;
   /** Scala comune del periodo: massimo delle barre, totale e media. */
   scale: WeekScale;
+  kind?: StatsKind;
 }
 
 /**
  * Card di una settimana (vista desktop): intervallo, totale in grande, barra con numeri sempre visibili.
  * Hover/focus rivela i dettagli in un pannello; il click li fissa aperti (aria-expanded).
  */
-export function WeekCard({ week, scale }: WeekCardProps) {
+export function WeekCard({ week, scale, kind = "tutti" }: WeekCardProps) {
   const [expanded, setExpanded] = useState(false);
   const uid = useId();
   const buttonId = `${uid}-summary`;
@@ -55,7 +56,7 @@ export function WeekCard({ week, scale }: WeekCardProps) {
             <span className="ml-1 font-sans text-[12px] text-slate-dark">coperti</span>
           </span>
         </span>
-        <WeekBar week={week} scale={scale} />
+        <WeekBar week={week} scale={scale} kind={kind} />
       </button>
 
       <div
@@ -69,7 +70,7 @@ export function WeekCard({ week, scale }: WeekCardProps) {
             : "absolute inset-x-0 top-full z-20 mt-1.5 hidden group-focus-within:block group-hover:block",
         )}
       >
-        <WeekDetails week={week} />
+        <WeekDetails week={week} kind={kind} />
       </div>
     </li>
   );

@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { kidsMenuRowLabel } from "@/lib/quote-utils";
-import type { EventSheet, EventSheetRow } from "@/lib/types";
+import { BOOKING_MEAL_LABELS, type EventSheet, type EventSheetRow } from "@/lib/types";
 
 // Vista del foglio eventi: testi e valori già formattati in italiano. Modulo puro (senza @react-pdf),
 // usato dai renderer PDF e DOCX e dalle route. Stesso schema del foglio prenotazioni (reservations-view.ts).
@@ -16,7 +16,8 @@ export interface EventFieldView {
 
 /** Scheda di un banchetto già formattata. `heading` = nome del cliente. */
 export interface EventBlockView {
-  time: string;
+  /** Pasto: "Pranzo", "Cena" o "—". */
+  meal: string;
   heading: string;
   covers: string;
   fields: EventFieldView[];
@@ -77,7 +78,7 @@ function blockOf(row: EventSheetRow): EventBlockView {
   if (row.setup_notes) setupLines.push(...linesOf(row.setup_notes));
 
   return {
-    time: row.time ?? DASH,
+    meal: row.meal ? BOOKING_MEAL_LABELS[row.meal] : DASH,
     heading: orDash(row.client_name),
     covers: `${covers} coperti`,
     fields: [
