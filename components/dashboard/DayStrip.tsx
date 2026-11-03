@@ -127,6 +127,10 @@ export function DayStrip({
           }`;
           return (
             <li key={iso} className={cn("relative shrink-0 snap-center", startsWeek && "ml-3 snap-always")}>
+              {/* Lineetta verde accennata a metà dello stacco tra due settimane (ml-3 + gap-1.5 = 18px). */}
+              {startsWeek && (
+                <span aria-hidden="true" className="pointer-events-none absolute inset-y-3 -left-[9.5px] w-px rounded-full bg-success/45" />
+              )}
               {active && (
                 <span
                   aria-hidden="true"
