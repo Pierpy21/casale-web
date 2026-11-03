@@ -66,8 +66,6 @@
  * (sidebar desktop, header mobile). `html` con `hidden` viene propagato al viewport, quindi basta lì.
  */
 html {
-  /* Niente rimbalzo elastico verticale (iOS): le barre sticky lo seguivano e sembravano sobbalzare. */
-  overscroll-behavior-y: none;
   min-height: 100%;
   max-width: 100%;
   overflow-x: hidden;
