@@ -59,10 +59,10 @@ const ARROW =
 /* Tab: testo con sottolineatura, chiaramente diverso dalle pillole. */
 const TAB = "flex min-h-11 items-end justify-center border-b-2 px-2 pb-2.5 text-[14px] font-medium transition-colors duration-200 sm:px-3";
 
+/* Telefono: pillole più strette (13px, px-3) perché Tutti · Eventi · Prenotazioni · Oggi stiano su una riga a 360px. */
 const CHIP =
-  "inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-[14px] font-medium transition-colors duration-200 sm:px-4";
+  "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors duration-200 sm:gap-2 sm:px-4 sm:text-[14px]";
 
-const TODAY = "inline-flex min-h-11 items-center px-2 text-[13px] font-medium text-petrol underline underline-offset-4";
 
 /** Props del Link: `scroll={false}` sempre, perché la barra è fissa in cima e il click non deve riportare in cima alla pagina. */
 function linkProps(target: TopBarLink) {
@@ -99,7 +99,7 @@ export function TopBar({
   className,
 }: TopBarProps) {
   const Title = titleAs;
-  const hasSecondRow = Boolean(tabs || chips || action);
+  const hasSecondRow = Boolean(tabs || chips || action || today);
 
   return (
     <section
@@ -114,14 +114,10 @@ export function TopBar({
           <ChevronLeft aria-hidden="true" className="size-5" />
         </Link>
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-1 px-1 text-center 2xl:flex-none 2xl:px-3">
-          <Title aria-live="polite" className="min-w-0 break-words font-sans text-[16px] font-medium leading-tight text-ink">
+          {/* !font-sans / !font-medium: in agenda il titolo è un h1, e la regola globale h1 (serif, 400) non è in un layer, quindi batte le utility. */}
+          <Title aria-live="polite" className="min-w-0 break-words !font-sans text-[16px] !font-medium leading-tight text-ink">
             {title}
           </Title>
-          {today && (
-            <Link {...linkProps(today)} className={cn(TODAY, FOCUS)}>
-              Oggi
-            </Link>
-          )}
         </div>
         <Link {...linkProps(next)} aria-label={next.label} className={cn(ARROW, FOCUS)}>
           <ChevronRight aria-hidden="true" className="size-5" />
@@ -152,7 +148,7 @@ export function TopBar({
             </nav>
           )}
 
-          {(chips || action) && (
+          {(chips || action || today) && (
             <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:ml-auto sm:justify-end">
               {chips && (
                 <nav aria-label={chips.label} className="min-w-0">
@@ -170,13 +166,19 @@ export function TopBar({
                               : "border-field-edge bg-paper text-ink hover:border-field-edge-hover hover:bg-cream",
                           )}
                         >
-                          {option.dot && <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-full", option.dot)} />}
+                          {option.dot && <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full sm:size-2.5", option.dot)} />}
                           {option.label}
                         </Link>
                       </li>
                     ))}
                   </ul>
                 </nav>
+              )}
+              {/* "Oggi" accanto ai filtri, con lo stesso aspetto a pillola. */}
+              {today && (
+                <Link {...linkProps(today)} className={cn(CHIP, FOCUS, "border-petrol bg-paper text-petrol hover:bg-petrol hover:text-paper")}>
+                  Oggi
+                </Link>
               )}
               {action}
             </div>
