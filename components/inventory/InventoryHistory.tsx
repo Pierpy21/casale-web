@@ -42,14 +42,14 @@ export function InventoryHistory({ rows, page, totalPages, totalItems, from, to 
         </h2>
       </div>
 
-      <form method="get" action="/admin/giacenza" aria-label="Filtra per data" className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,12rem)_auto]">
+      <form method="get" action="/admin/giacenza" aria-label="Filtra per data" className="grid max-w-2xl grid-cols-2 items-end gap-x-4 gap-y-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <Field label="Dal" htmlFor="filter-from">
           <Input id="filter-from" type="date" name="from" defaultValue={from ?? ""} />
         </Field>
         <Field label="Al" htmlFor="filter-to">
           <Input id="filter-to" type="date" name="to" defaultValue={to ?? ""} />
         </Field>
-        <div className="flex gap-2">
+        <div className="col-span-2 flex gap-2 sm:col-span-1">
           <button type="submit" className={buttonClasses("outline", "md", "min-h-11 flex-1 sm:flex-none")}>
             Filtra
           </button>
