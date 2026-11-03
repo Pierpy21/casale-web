@@ -62,7 +62,10 @@ export function MonthView({ monthDate, days, today, byDate, isAdmin, onOpenDay }
         {weekdayLabels.map((label, index) => (
           <div
             key={`${label}-${index}`}
-            className="border-b border-r border-sand bg-cream px-2 py-2 text-center text-[11px] font-medium uppercase tracking-[0.14em] text-bronze"
+            className={cn(
+              "border-b border-r border-sand bg-cream px-2 py-2 text-center text-[11px] font-medium uppercase tracking-[0.14em]",
+              days[index]?.getDay() === 0 ? "text-danger" : "text-bronze",
+            )}
           >
             {label}
           </div>

@@ -34,7 +34,7 @@ export function WeekView({
               )}
             >
               <header className="flex items-baseline justify-between border-b border-sand pb-2">
-                <h2 className="text-[12px] font-medium uppercase tracking-[0.14em] text-bronze">
+                <h2 className={cn("text-[12px] font-medium uppercase tracking-[0.14em]", day.getDay() === 0 ? "text-danger" : "text-bronze")}>
                   {formatIt(day, "EEE")}
                 </h2>
                 <span

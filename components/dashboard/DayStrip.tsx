@@ -142,6 +142,8 @@ export function DayStrip({
           const isToday = iso === todayIso;
           const count = counts.get(iso) ?? 0;
           const startsWeek = date.getDay() === 1;
+          // Solo l'etichetta "dom" in rosso (tranne quando selezionata: lì vale il testo chiaro sul blu).
+          const sunday = date.getDay() === 0;
           const label = `${capitalize(formatIt(date, "EEEE d MMMM"))}${isToday ? ", oggi" : ""}, ${
             count === 0 ? "nessun evento" : `${count} ${count === 1 ? "evento" : "eventi"}`
           }`;
@@ -167,7 +169,13 @@ export function DayStrip({
                       : "border-sand bg-paper text-ink hover:bg-cream",
                 )}
               >
-                <span aria-hidden="true" className="text-[10px] font-medium uppercase leading-none tracking-[0.08em] opacity-80">
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "text-[10px] font-medium uppercase leading-none tracking-[0.08em]",
+                    sunday && !active ? "text-danger" : "opacity-80",
+                  )}
+                >
                   {formatIt(date, "EEE")}
                 </span>
                 <span aria-hidden="true" className="font-serif text-xl leading-none tabular-nums">

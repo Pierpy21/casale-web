@@ -53,7 +53,10 @@ export function MobileCalendar({ selected, today, byDate, onNavigate }: MobileCa
 
         <div className="grid grid-cols-7 text-center">
           {days.slice(0, 7).map((day) => (
-            <span key={toISO(day)} className="text-[11px] font-medium uppercase tracking-[0.06em] text-bronze">
+            <span
+              key={toISO(day)}
+              className={cn("text-[11px] font-medium uppercase tracking-[0.06em]", day.getDay() === 0 ? "text-danger" : "text-bronze")}
+            >
               {formatIt(day, "EEE")}
             </span>
           ))}
