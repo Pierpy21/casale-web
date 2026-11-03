@@ -1,7 +1,9 @@
 "use client";
 
+import { addMonths } from "date-fns";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef } from "react";
-import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
+import { capitalize, formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
 import { cn } from "@/components/ui/cn";
 import type { BookingListItem } from "@/lib/types";
 
@@ -23,6 +25,11 @@ export interface DayStripProps {
   /** Cambia per chiedere di ricentrare il giorno selezionato anche se non è cambiato (tasto "Oggi"). */
   recenterKey?: number;
 }
+
+const NAV_BUTTON =
+  "inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-paper text-ink shadow-sm shadow-ink/5 transition-colors duration-200 hover:text-petrol focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol";
+const SIDE_BUTTON =
+  "size-10 shrink-0 items-center justify-center rounded-lg border border-sand bg-paper text-ink transition-colors duration-200 hover:border-petrol hover:text-petrol focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol";
 
 /** Posizione di un elemento nel contenuto della striscia: non cambia con lo scorrimento. */
 function contentX(el: HTMLElement, scroller: HTMLElement): number {
@@ -127,73 +134,100 @@ export function DayStrip({
     counts.set(booking.event_date, (counts.get(booking.event_date) ?? 0) + 1);
   }
 
+  // Frecce del mese: stesso giorno del mese precedente/successivo (date-fns accorcia a fine mese, es. 31 → 30).
+  const shiftMonth = (delta: number) => onSelectDay(toISO(addMonths(toDate(selectedDay), delta)));
+  // Frecce laterali: scorrono la striscia di circa una settimana, senza cambiare il giorno selezionato.
+  const scrollWeek = (direction: number) => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scroller.scrollBy({ left: direction * Math.max(scroller.clientWidth - 64, 200), behavior: reduce ? "auto" : "smooth" });
+  };
+
   return (
-    // Scorrimento orizzontale contenuto nella striscia (niente trascinamento della pagina su iOS), scrollbar nascosta.
-    // Attrito: ogni giorno è un punto di aggancio (snap); niente snap-always, che su iOS fa ricalcolare l'aggancio durante lo scroll della pagina.
-    <div
-      ref={scrollRef}
-      onScroll={handleScroll}
-      className="min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [overflow-anchor:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      <ul aria-label="Giorni" className="flex w-max items-stretch gap-1.5 px-4 pt-2 sm:px-6 desk:px-10 desk:pt-1.5 optouch:px-8">
-        {days.map((iso) => {
-          const date = toDate(iso);
-          const active = iso === selectedDay;
-          const isToday = iso === todayIso;
-          const count = counts.get(iso) ?? 0;
-          const startsWeek = date.getDay() === 1;
-          // Solo l'etichetta "dom" in rosso (tranne quando selezionata: lì vale il testo chiaro sul blu).
-          const sunday = date.getDay() === 0;
-          const label = `${capitalize(formatIt(date, "EEEE d MMMM"))}${isToday ? ", oggi" : ""}, ${
-            count === 0 ? "nessun evento" : `${count} ${count === 1 ? "evento" : "eventi"}`
-          }`;
-          return (
-            <li key={iso} className={cn("relative shrink-0 snap-center", startsWeek && "ml-3")}>
-              {/* Lineetta verde accennata a metà dello stacco tra due settimane (ml-3 + gap-1.5 = 18px). */}
-              {startsWeek && (
-                <span aria-hidden="true" className="pointer-events-none absolute inset-y-3 -left-[9.5px] w-px rounded-full bg-success/45" />
-              )}
-              <button
-                ref={active ? selectedRef : undefined}
-                type="button"
-                data-iso={iso}
-                aria-pressed={active}
-                aria-label={label}
-                onClick={() => onSelectDay(iso)}
-                className={cn(
-                  "flex min-h-11 w-14 flex-col items-center gap-0.5 rounded-btn border pb-1 pt-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
-                  active
-                    ? "border-petrol bg-petrol text-paper"
-                    : isToday
-                      ? "border-bronze bg-paper text-ink hover:bg-cream"
-                      : "border-sand bg-paper text-ink hover:bg-cream",
-                )}
-              >
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "text-[10px] font-medium uppercase leading-none tracking-[0.08em]",
-                    sunday && !active ? "text-danger" : "opacity-80",
+    <div className="flex min-w-0 flex-col gap-2 px-4 pt-2 sm:px-6 desk:px-10 desk:pt-1.5 optouch:px-8">
+      {/* Mese del giorno selezionato con frecce mese precedente / successivo. */}
+      <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-cream/70 p-1">
+        <button type="button" onClick={() => shiftMonth(-1)} aria-label="Mese precedente" className={NAV_BUTTON}>
+          <ChevronLeft aria-hidden="true" className="size-5" />
+        </button>
+        <p aria-live="polite" className="min-w-0 truncate text-[16px] font-medium text-ink">
+          {capitalize(formatIt(toDate(selectedDay), "LLLL yyyy"))}
+        </p>
+        <button type="button" onClick={() => shiftMonth(1)} aria-label="Mese successivo" className={NAV_BUTTON}>
+          <ChevronRight aria-hidden="true" className="size-5" />
+        </button>
+      </div>
+
+      <div className="flex min-w-0 items-center gap-1">
+        <button type="button" onClick={() => scrollWeek(-1)} aria-label="Giorni precedenti" className={cn(SIDE_BUTTON, "inline-flex")}>
+          <ChevronLeft aria-hidden="true" className="size-4" />
+        </button>
+        {/* Scorrimento orizzontale contenuto nella striscia (niente trascinamento della pagina su iOS), scrollbar nascosta.
+            Attrito: ogni giorno è un punto di aggancio (snap); niente snap-always, che su iOS fa ricalcolare l'aggancio durante lo scroll della pagina.
+            Sfumatura ai bordi: i giorni tagliati a metà svaniscono invece di finire di netto. */}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="min-w-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [overflow-anchor:none] [scrollbar-width:none] [mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-16px),transparent)] [&::-webkit-scrollbar]:hidden"
+        >
+          <ul aria-label="Giorni" className="flex w-max items-stretch gap-1">
+            {days.map((iso) => {
+              const date = toDate(iso);
+              const active = iso === selectedDay;
+              const isToday = iso === todayIso;
+              const count = counts.get(iso) ?? 0;
+              const startsWeek = date.getDay() === 1;
+              // Solo l'etichetta "Dom" in rosso (tranne quando selezionata: lì vale il testo chiaro sul blu).
+              const sunday = date.getDay() === 0;
+              const label = `${capitalize(formatIt(date, "EEEE d MMMM"))}${isToday ? ", oggi" : ""}, ${
+                count === 0 ? "nessun evento" : `${count} ${count === 1 ? "evento" : "eventi"}`
+              }`;
+              return (
+                <li key={iso} className={cn("relative shrink-0 snap-center", startsWeek && "ml-2.5")}>
+                  {/* Lineetta verde accennata a metà dello stacco tra due settimane (ml-2.5 + gap-1 = 14px). */}
+                  {startsWeek && (
+                    <span aria-hidden="true" className="pointer-events-none absolute inset-y-4 -left-[7.5px] w-px rounded-full bg-success/45" />
                   )}
-                >
-                  {formatIt(date, "EEE")}
-                </span>
-                <span aria-hidden="true" className="font-serif text-xl leading-none tabular-nums">
-                  {formatIt(date, "d")}
-                </span>
-                <span aria-hidden="true" className="text-[10px] font-medium uppercase leading-none tracking-[0.08em] opacity-80">
-                  {formatIt(date, "MMM")}
-                </span>
-                {/* Riga fissa: "Oggi" e pallino dei giorni con eventi, così tutti i giorni hanno la stessa altezza. */}
-                <span aria-hidden="true" className="flex h-2.5 items-center gap-1 text-[9px] font-semibold uppercase leading-none tracking-[0.06em]">
-                  {isToday && <span className={active ? undefined : "text-bronze"}>Oggi</span>}
-                  {count > 0 && <span className={cn("size-1.5 rounded-full", active ? "bg-paper" : "bg-bronze")} />}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                  <button
+                    ref={active ? selectedRef : undefined}
+                    type="button"
+                    data-iso={iso}
+                    aria-pressed={active}
+                    aria-label={label}
+                    onClick={() => onSelectDay(iso)}
+                    className={cn(
+                      "flex w-14 flex-col items-center gap-1 rounded-xl pb-1.5 pt-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
+                      active ? "bg-petrol text-paper shadow-sm shadow-petrol/30" : "text-ink hover:bg-cream",
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn("text-[12px] leading-none", active ? "text-paper/85" : sunday ? "text-danger" : "text-slate-dark")}
+                    >
+                      {capitalize(formatIt(date, "EEE"))}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={cn("font-serif text-2xl leading-none tabular-nums", !active && isToday && "text-petrol")}
+                    >
+                      {formatIt(date, "dd")}
+                    </span>
+                    {/* Riga fissa: "Oggi" e pallino dei giorni con eventi, così tutti i giorni hanno la stessa altezza. */}
+                    <span aria-hidden="true" className="flex h-2.5 items-center gap-1 text-[9px] font-semibold uppercase leading-none tracking-[0.06em]">
+                      {isToday && <span className={active ? undefined : "text-bronze"}>Oggi</span>}
+                      {count > 0 && <span className={cn("size-1.5 rounded-full", active ? "bg-paper" : "bg-bronze")} />}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        <button type="button" onClick={() => scrollWeek(1)} aria-label="Giorni successivi" className={cn(SIDE_BUTTON, "inline-flex")}>
+          <ChevronRight aria-hidden="true" className="size-4" />
+        </button>
+      </div>
     </div>
   );
 }
