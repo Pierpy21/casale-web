@@ -109,7 +109,6 @@ export function AgendaBoard({
               view={view}
               selected={selected}
               today={today}
-              isAdmin={isAdmin}
               kind={kind}
               onNavigate={navigate}
               onKindChange={onKindChange}
@@ -138,7 +137,6 @@ export function AgendaBoard({
             view={view}
             selected={selected}
             today={today}
-            isAdmin={isAdmin}
             kind={kind}
             onNavigate={navigate}
             onKindChange={onKindChange}

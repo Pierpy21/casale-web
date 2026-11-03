@@ -1,11 +1,12 @@
-import { CalendarPlus } from "lucide-react";
-import { CREATE_EVENT_HREF } from "@/components/shell/nav";
-import { ButtonLink, TopBar } from "@/components/ui";
+import { TopBar } from "@/components/ui";
+import { MonthYearPicker } from "./MonthYearPicker";
 import {
   AGENDA_KIND_OPTIONS,
   agendaHref,
   periodTitle,
   shiftPeriod,
+  toDate,
+  toISO,
   type AgendaKindFilter,
   type AgendaView,
 } from "./agenda-utils";
@@ -27,7 +28,6 @@ export interface AgendaToolbarProps {
   view: AgendaView;
   selected: string;
   today: string;
-  isAdmin: boolean;
   /** Filtro corrente, mantenuto nei link di navigazione. */
   kind: AgendaKindFilter;
   /** Telefono e tablet: il periodo è sempre il mese (come la griglia sotto) e non ci sono tab di vista. */
@@ -38,13 +38,12 @@ export interface AgendaToolbarProps {
 
 /**
  * Barra in cima all'agenda, stessa struttura delle statistiche (TopBar): ‹ periodo › + Oggi, tab di vista (solo desktop),
- * filtro per tipo e "Crea evento" (admin). Il click cambia periodo nel client; il link resta valido senza JS.
+ * filtro per tipo. Toccando il periodo si scelgono mese e anno. Il click cambia periodo nel client; il link resta valido senza JS.
  */
 export function AgendaToolbar({
   view,
   selected,
   today,
-  isAdmin,
   kind,
   compact = false,
   onNavigate,
@@ -63,7 +62,14 @@ export function AgendaToolbar({
       titleAs="h1"
       prev={{ ...step(shiftPeriod(selected, period, -1)), label: "Periodo precedente" }}
       next={{ ...step(shiftPeriod(selected, period, 1)), label: "Periodo successivo" }}
-      title={periodTitle(period, selected)}
+      title={
+        // Toccando il periodo si scelgono mese e anno: si va al primo del mese scelto, nella stessa vista.
+        <MonthYearPicker
+          value={toDate(selected)}
+          label={periodTitle(period, selected)}
+          onPick={(year, month) => onNavigate(toISO(new Date(year, month, 1)), view)}
+        />
+      }
       today={{ href: agendaHref({ date: today, view, kind }), onSelect: () => onNavigate(today, view) }}
       tabs={
         compact
@@ -90,14 +96,6 @@ export function AgendaToolbar({
           onSelect: () => onKindChange(option.value),
         })),
       }}
-      action={
-        isAdmin ? (
-          <ButtonLink href={`${CREATE_EVENT_HREF}&date=${selected}`} variant="primary" size="md">
-            <CalendarPlus aria-hidden="true" className="size-4" />
-            Crea evento
-          </ButtonLink>
-        ) : undefined
-      }
     />
   );
 }

@@ -34,8 +34,8 @@ export interface TopBarProps {
   "aria-label": string;
   prev: TopBarNav;
   next: TopBarNav;
-  /** Nome del periodo, al centro tra le frecce. */
-  title: string;
+  /** Nome del periodo, al centro tra le frecce (testo o un selettore, es. MonthYearPicker). */
+  title: ReactNode;
   /** `h1` quando la barra è il titolo della pagina (agenda); `p` altrimenti. */
   titleAs?: "h1" | "p";
   /** Link "Oggi": assente quando non serve (periodo già in corso). */
@@ -52,8 +52,9 @@ export interface TopBarProps {
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
 
+/* Stesso aspetto della barra dei giorni della dashboard: fascia crema arrotondata, frecce in riquadri bianchi. */
 const ARROW =
-  "inline-flex size-11 shrink-0 items-center justify-center rounded-btn border border-field-edge bg-paper text-petrol transition-colors duration-200 hover:border-field-edge-hover hover:bg-cream";
+  "inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-paper text-ink shadow-sm shadow-ink/5 transition-colors duration-200 hover:text-petrol";
 
 /* Tab: testo con sottolineatura, chiaramente diverso dalle pillole. */
 const TAB = "flex min-h-11 items-end justify-center border-b-2 px-2 pb-2.5 text-[14px] font-medium transition-colors duration-200 sm:px-3";
@@ -108,12 +109,12 @@ export function TopBar({
         className,
       )}
     >
-      <div className="flex min-w-0 items-center gap-2 2xl:shrink-0">
+      <div className="flex min-w-0 items-center gap-2 rounded-xl bg-cream/70 p-1 2xl:min-w-[24rem] 2xl:shrink-0">
         <Link {...linkProps(prev)} aria-label={prev.label} className={cn(ARROW, FOCUS)}>
           <ChevronLeft aria-hidden="true" className="size-5" />
         </Link>
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-1 px-1 text-center 2xl:flex-none 2xl:px-3">
-          <Title aria-live="polite" className="min-w-0 break-words font-serif text-3xl leading-tight text-ink">
+          <Title aria-live="polite" className="min-w-0 break-words font-sans text-[16px] font-medium leading-tight text-ink">
             {title}
           </Title>
           {today && (

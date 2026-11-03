@@ -14,6 +14,8 @@ export interface MonthYearPickerProps {
   align?: "center" | "start";
   /** Classi del testo del pulsante (default 16px medio, come nella dashboard). */
   labelClassName?: string;
+  /** Testo del pulsante al posto di "mese anno" (es. il periodo della settimana in agenda). */
+  label?: string;
 }
 
 const MONTHS = Array.from({ length: 12 }, (_, month) => capitalize(formatIt(new Date(2000, month, 1), "LLL")));
@@ -22,7 +24,8 @@ const MONTHS = Array.from({ length: 12 }, (_, month) => capitalize(formatIt(new 
  * Mese e anno cliccabili: aprono un pannello con l'anno (frecce) e i 12 mesi.
  * Si chiude scegliendo un mese, con Esc o con un clic fuori.
  */
-export function MonthYearPicker({ value, onPick, align = "center", labelClassName }: MonthYearPickerProps) {
+export function MonthYearPicker({ value, onPick, align = "center", labelClassName, label }: MonthYearPickerProps) {
+  const text = label ?? capitalize(formatIt(value, "LLLL yyyy"));
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(value.getFullYear());
   const rootRef = useRef<HTMLDivElement>(null);
@@ -65,14 +68,14 @@ export function MonthYearPicker({ value, onPick, align = "center", labelClassNam
         onClick={toggle}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        aria-label={`${capitalize(formatIt(value, "LLLL yyyy"))}: scegli mese e anno`}
+        aria-label={`${text}: scegli mese e anno`}
         className={cn(
           "inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-lg text-ink transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol",
           align === "center" ? "px-3 hover:bg-paper" : "-ml-2 px-2 hover:bg-cream",
         )}
       >
         <span aria-live="polite" className={cn("truncate", labelClassName ?? "text-[16px] font-medium")}>
-          {capitalize(formatIt(value, "LLLL yyyy"))}
+          {text}
         </span>
         <ChevronDown aria-hidden="true" className={cn("size-4 shrink-0 text-petrol transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} />
       </button>

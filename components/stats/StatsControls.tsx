@@ -1,4 +1,5 @@
 import { TopBar } from "@/components/ui";
+import { StatsMonthPicker } from "./StatsMonthPicker";
 import type { StatsKind, StatsPeriod } from "@/lib/types";
 import { KIND_DOT, KINDS, PERIODS, statsHref } from "./shared";
 
@@ -24,7 +25,7 @@ export function StatsControls({ periodo, tipo, anchor, prevAnchor, nextAnchor, l
       aria-label="Periodo e filtri"
       prev={{ href: statsHref(periodo, tipo, prevAnchor), label: "Periodo precedente" }}
       next={{ href: statsHref(periodo, tipo, nextAnchor), label: "Periodo successivo" }}
-      title={label}
+      title={<StatsMonthPicker periodo={periodo} tipo={tipo} anchor={anchor} label={label} />}
       today={current ? undefined : { href: statsHref(periodo, tipo) }}
       tabs={{
         label: "Granularità del periodo",
