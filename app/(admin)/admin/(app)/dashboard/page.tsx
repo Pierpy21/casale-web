@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { formatIt, toDate, toISO, todayISO, capitalize } from "@/components/agenda/agenda-utils";
+import { toISO, todayISO } from "@/components/agenda/agenda-utils";
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { formatChangeTimestamp } from "@/components/bookings/change-labels";
 import { WeekOccupancy } from "@/components/dashboard/WeekOccupancy";
 import { resolveWeekStart, weekRange } from "@/components/dashboard/week";
-import { Card, EmptyState, Stat, type StatProps } from "@/components/ui";
+import { Card, EmptyState } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import {
   getBookingsInRange,
@@ -26,7 +25,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
 
   const params = await searchParams;
   const today = todayISO();
-  const todayDate = toDate(today);
   const currentWeekStart = resolveWeekStart(undefined, today);
   const weekStart = resolveWeekStart(params.week, today);
   const week = weekRange(weekStart);
@@ -46,38 +44,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
     getDeletionLog(5),
   ]);
 
-  // Ogni indicatore è un link alla vista che lo spiega.
-  const tiles: (StatProps & { href: string })[] = [
-    {
-      label: "Eventi oggi",
-      value: stats.eventsToday,
-      hint: capitalize(formatIt(todayDate, "EEEE d MMMM")),
-      href: `/admin/agenda?date=${today}&view=day`,
-    },
-    {
-      label: "Eventi nel mese",
-      value: stats.eventsThisMonth,
-      hint: capitalize(formatIt(todayDate, "LLLL yyyy")),
-      href: "/admin/statistiche?periodo=mese&tipo=evento",
-    },
-    {
-      label: "Coperti · 7 giorni",
-      value: stats.coversNext7Days,
-      hint: "Adulti e bambini nei prossimi sette giorni",
-      href: "/admin/statistiche?periodo=mese",
-    },
-    {
-      label: "Eventi senza acconto",
-      value: stats.pendingOptions,
-      hint: stats.pendingOptions > 0 ? "In attesa del primo acconto" : "Tutti gli eventi hanno un acconto",
-      highlight: stats.pendingOptions > 0,
-      href: "/admin/da-confermare",
-    },
-  ];
-
   const activeRooms = rooms.filter((room) => room.active);
 
-  // Ordine: intestazione con il giorno → occupazione sale → prenotazioni del giorno → indicatori → prossimi eventi → eliminazioni.
+  // Ordine: intestazione con il giorno → striscia giorni (telefono) → indicatori → prenotazioni del giorno → occupazione sale → prossimi eventi → eliminazioni.
+  // Eventi e coperti del giorno li calcola WeekOccupancy dal giorno selezionato; qui solo i valori del mese e i link.
   return (
     <div className="-mt-2 flex min-w-0 flex-col gap-6 lg:-mt-4">
       <WeekOccupancy
@@ -89,20 +59,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         initialDays={weekDays}
         initialBookings={weekBookings}
         initialSelectedDay={selectedDay}
+        indicators={{
+          eventsThisMonth: stats.eventsThisMonth,
+          pendingOptions: stats.pendingOptions,
+          eventsThisMonthHref: "/admin/statistiche?periodo=mese&tipo=evento",
+          pendingOptionsHref: "/admin/da-confermare",
+        }}
       >
-        <section aria-label="Indicatori principali" className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
-          {tiles.map(({ href, ...tile }) => (
-            <Link
-              key={tile.label}
-              href={href}
-              aria-label={`${tile.label}: ${tile.value}`}
-              className="block min-w-0 rounded-btn transition-shadow duration-200 hover:shadow-md hover:shadow-ink/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petrol focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
-            >
-              <Stat {...tile} className="h-full" />
-            </Link>
-          ))}
-        </section>
-
         <section aria-labelledby="prossimi-eventi" className="flex min-w-0 flex-col gap-5">
           <div className="flex items-end justify-between gap-4 border-b border-sand pb-3">
             <div className="flex flex-col gap-1">

@@ -24,6 +24,18 @@ export function weekRange(weekStart: Date): WeekRange {
   return { start: weekStart, end, startIso: toISO(weekStart), endIso: toISO(end), days };
 }
 
+/** Lunedì (YYYY-MM-DD) spostato di `weeks` settimane. */
+export function addWeeksIso(weekIso: string, weeks: number): string {
+  return toISO(addDays(toDate(weekIso), weeks * 7));
+}
+
+/** Lunedì di tutte le settimane da `fromIso` a `toIso` compresi (entrambi lunedì). */
+export function weeksBetween(fromIso: string, toIso: string): string[] {
+  const weeks: string[] = [];
+  for (let iso = fromIso; iso <= toIso; iso = addWeeksIso(iso, 1)) weeks.push(iso);
+  return weeks;
+}
+
 /** Etichetta leggibile: "Settimana corrente", "Settimana prossima" o "Settimana del 2 – 8 novembre". */
 export function weekLabel(weekStart: Date, currentWeekStart: Date): string {
   const diffWeeks = Math.round((weekStart.getTime() - currentWeekStart.getTime()) / (7 * 24 * 60 * 60 * 1000));

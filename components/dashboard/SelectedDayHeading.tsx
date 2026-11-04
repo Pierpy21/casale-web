@@ -29,7 +29,8 @@ export function SelectedDayHeading({ selectedDay, todayIso, rooms, bookings }: S
       <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
         {dayEyebrow(selectedDay, todayIso)}
       </p>
-      <h3 className="break-words text-xl">{capitalize(formatIt(toDate(selectedDay), "EEEE d MMMM"))}</h3>
+      {/* Telefono un po' più piccolo e su una riga (troncato se estremo); da sm come prima. */}
+      <h3 className="truncate text-lg sm:text-xl">{capitalize(formatIt(toDate(selectedDay), "EEEE d MMMM"))}</h3>
       <p className="text-[13px] text-slate-dark">
         {rooms.length === 0 ? "Nessuna sala attiva" : `${occupiedCount} su ${rooms.length} sale occupate`}
       </p>

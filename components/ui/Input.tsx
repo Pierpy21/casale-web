@@ -32,11 +32,18 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   large?: boolean;
 }
 
+/**
+ * Data e ora su Safari iOS/iPadOS: il controllo nativo ha una larghezza minima propria e sborda dalla colonna
+ * (due campi affiancati sembrano uniti). Senza aspetto nativo rispetta w-full/min-w-0; il valore resta a sinistra.
+ */
+const DATE_TIME_FIX = "appearance-none [&::-webkit-date-and-time-value]:min-h-[1.5em] [&::-webkit-date-and-time-value]:text-left";
+
 export function Input({ className, invalid, large, ...props }: InputProps) {
+  const dateTime = props.type === "date" || props.type === "time" || props.type === "datetime-local";
   return (
     <input
       aria-invalid={invalid || undefined}
-      className={cn(FIELD_BASE, large ? FIELD_TEXT_LARGE : FIELD_TEXT, borderClass(invalid), className)}
+      className={cn(FIELD_BASE, large ? FIELD_TEXT_LARGE : FIELD_TEXT, borderClass(invalid), dateTime && DATE_TIME_FIX, className)}
       {...props}
     />
   );

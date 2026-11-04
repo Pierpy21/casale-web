@@ -7,13 +7,16 @@ export function AgendaSkeleton() {
       <span className="sr-only">Caricamento agenda in corso</span>
 
       <div className="hidden flex-col gap-6 desk:flex">
-        <div className="flex items-center justify-between gap-4 border-b border-sand pb-5">
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-9 w-20" />
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-8 w-56" />
+        <div className="flex flex-col gap-3 border-b border-sand pb-3">
+          <div className="flex items-center gap-2">
+            <Skeleton className="size-11 rounded-btn" />
+            <Skeleton className="size-11 rounded-btn" />
+            <Skeleton className="h-9 w-64" />
           </div>
-          <Skeleton className="h-10 w-72" />
+          <div className="flex items-center justify-between gap-4">
+            <Skeleton className="h-8 w-80" />
+            <Skeleton className="h-10 w-72" />
+          </div>
         </div>
         <div className="grid grid-cols-7 gap-px">
           {Array.from({ length: 35 }, (_, i) => (
@@ -23,9 +26,13 @@ export function AgendaSkeleton() {
       </div>
 
       <div className="flex flex-col gap-6 desk:hidden">
-        <div className="flex items-center justify-between gap-2">
-          <Skeleton className="h-9 w-44" />
-          <Skeleton className="h-9 w-40" />
+        <div className="flex flex-col gap-3 border-b border-sand pb-2">
+          <div className="flex items-center justify-center gap-2">
+            <Skeleton className="size-11 rounded-btn" />
+            <Skeleton className="h-9 w-44" />
+            <Skeleton className="size-11 rounded-btn" />
+          </div>
+          <Skeleton className="h-11 w-full rounded-full" />
         </div>
         <div className="grid grid-cols-7 gap-y-1">
           {Array.from({ length: 35 }, (_, i) => (

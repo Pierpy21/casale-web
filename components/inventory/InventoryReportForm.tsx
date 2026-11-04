@@ -25,7 +25,6 @@ import {
 import { normalizeSearchText } from "./inventory-search";
 import { InventoryGroupChips } from "./InventoryGroupChips";
 import { InventoryGroupGrid } from "./InventoryGroupGrid";
-import { useIsTablet } from "./use-is-tablet";
 
 export interface InventoryReportFormProps {
   /** Prodotti attivi dal catalogo. */
@@ -94,7 +93,6 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
   const [addingFromSearch, setAddingFromSearch] = useState(false);
   // Tablet: griglia di gruppi con un gruppo aperto alla volta. Su telefono e desktop resta la fisarmonica.
   // Lo stato dei prodotti è in `counts` (non nel DOM): i gruppi non visibili non perdono quantità all'invio.
-  const isTablet = useIsTablet();
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const groupTitleRef = useRef<HTMLHeadingElement>(null);
@@ -145,8 +143,8 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
   const filledTotal = products.filter((p) => isFilled(counts[p.id])).length;
   const toOrderTotal = products.filter((p) => (counts[p.id]?.to_order ?? 0) > 0).length;
 
-  // Griglia/gruppo solo su tablet e senza ricerca; con una ricerca attiva si torna alla lista filtrata.
-  const tileMode = isTablet && !searching;
+  // Griglia/gruppo su ogni dispositivo; con una ricerca attiva si torna alla lista filtrata.
+  const tileMode = !searching;
   const activeGroup = groups.find((g) => g.key === activeKey);
   // Colore per categoria (cucina); per fornitore (admin) nessun colore: resta il look neutro.
   const colorOf = (g: Group) => (g.category ? INVENTORY_CATEGORY_COLORS[g.category] : undefined);

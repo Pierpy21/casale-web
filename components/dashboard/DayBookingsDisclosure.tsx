@@ -26,7 +26,10 @@ export function DayBookingsDisclosure({ dayLabel, bookings, className }: DayBook
       summaryClassName="min-h-11 rounded-btn px-4 py-3 text-ink hover:bg-cream focus-visible:ring-inset"
       summary={
         <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">{dayLabel}</span>
+          {/* Telefono più piccola e su una riga (troncata se estrema); da sm come prima. */}
+          <span className="truncate text-[10px] font-medium uppercase tracking-[0.12em] text-bronze sm:text-[11px] sm:tracking-[0.14em]">
+            {dayLabel}
+          </span>
           <span className="font-serif text-lg leading-tight">Prenotazioni del giorno</span>
         </span>
       }
