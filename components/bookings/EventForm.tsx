@@ -650,7 +650,7 @@ export function EventForm({
             </Field>
           </FormCard>
 
-          <FormCard label="Allergie e patologie">
+          <FormCard label="Allergie e intolleranze">
             <AllergyEditor
               rows={values.allergies}
               errors={errors}

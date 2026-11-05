@@ -23,7 +23,7 @@ const FIELD_LABELS: Record<string, string> = {
   setup_notes: "Descrizione allestimento",
   status: "Stato",
   notes: "Note",
-  allergie: "Allergie e patologie",
+  allergie: "Allergie e intolleranze",
   piatti: "Piatti",
   creazione: "Creazione",
   eliminazione: "Eliminazione",

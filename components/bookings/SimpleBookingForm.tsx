@@ -513,7 +513,7 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
         </>
       )}
 
-      <FormCard label="Allergie e patologie">
+      <FormCard label="Allergie e intolleranze">
         <AllergyEditor
           rows={values.allergies}
           errors={errors}

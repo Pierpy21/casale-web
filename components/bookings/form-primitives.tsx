@@ -316,7 +316,7 @@ export function AllergyEditor({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      {rows.length === 0 && <p className="text-[14px] text-slate">Nessuna allergia o patologia segnalata.</p>}
+      {rows.length === 0 && <p className="text-[14px] text-slate">Nessuna allergia o intolleranza segnalata.</p>}
       {rows.map((row, index) => {
         const base = `allergy-${index}`;
         const conditionError = first(errors[`allergies.${index}.condition`]);
@@ -331,7 +331,7 @@ export function AllergyEditor({
                 placeholder="es. Maria, figlio…"
               />
             </Field>
-            <Field label="Allergia o patologia" htmlFor={`${base}-condition`} required error={conditionError}>
+            <Field label="Allergia o intolleranza" htmlFor={`${base}-condition`} required error={conditionError}>
               <Input
                 id={`${base}-condition`}
                 disabled={disabled}
@@ -357,7 +357,7 @@ export function AllergyEditor({
       <div>
         <Button variant="outline" size="sm" onClick={onAdd} disabled={disabled}>
           <Plus aria-hidden="true" className="size-4" />
-          Aggiungi allergia o patologia
+          Aggiungi allergia o intolleranza
         </Button>
       </div>
     </div>
