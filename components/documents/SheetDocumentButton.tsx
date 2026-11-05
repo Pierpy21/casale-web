@@ -29,7 +29,7 @@ export function SheetDocumentButton<T>({ label, apiBase, fileBase, date, renderS
   const [open, setOpen] = useState(false);
   const online = useOnline();
   const documentDate = encodeURIComponent(date);
-  const { load, reload } = useSheetFetch<T>(`${apiBase}/sheet?date=${documentDate}`, open, online);
+  const { load, reload } = useSheetFetch<T>(`${apiBase}/sheet?date=${documentDate}`, open);
 
   // Ogni apertura richiede il foglio aggiornato: la finestra non mostra mai un foglio vecchio.
   const openSheet = () => {

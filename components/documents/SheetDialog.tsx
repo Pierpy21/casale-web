@@ -44,10 +44,20 @@ function neighbourLevel(current: number, direction: 1 | -1): number | null {
   return below.length > 0 ? below[below.length - 1] : null;
 }
 
+/** "il 5 nov alle 14:32" (ora italiana) dell'istante in cui il service worker ha salvato il foglio. */
+function formatSavedAt(iso: string): string | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const options = { timeZone: "Europe/Rome" } as const;
+  const day = new Intl.DateTimeFormat("it-IT", { ...options, day: "numeric", month: "short" }).format(date);
+  const time = new Intl.DateTimeFormat("it-IT", { ...options, hour: "2-digit", minute: "2-digit" }).format(date);
+  return `il ${day} alle ${time}`;
+}
+
 export interface SheetDialogProps<T> {
   open: boolean;
   onClose: () => void;
-  /** Rete disponibile: offline il foglio non si carica e la finestra lo dice. */
+  /** Rete disponibile: offline si vede la copia salvata sul dispositivo (se c'è), con l'avviso. */
   online: boolean;
   load: SheetLoad<T>;
   onRetry: () => void;
@@ -97,16 +107,10 @@ export function SheetDialog<T>({
   const currentPxPerMm = zoom === "fit" ? fitPxPerMm : zoom;
   const larger = neighbourLevel(currentPxPerMm, 1);
   const smaller = neighbourLevel(currentPxPerMm, -1);
-  const sheetReady = online && load.status === "ready";
+  const sheetReady = load.status === "ready";
 
   let content: ReactNode;
-  if (!online) {
-    content = (
-      <p role="status" className="mx-auto max-w-md py-12 text-center text-[15px] text-slate-dark">
-        Questo documento si genera sul server: l&apos;anteprima è disponibile solo online.
-      </p>
-    );
-  } else if (load.status === "loading") {
+  if (load.status === "loading") {
     content = <SheetSkeleton />;
   } else if (load.status === "error") {
     content = (
@@ -118,7 +122,17 @@ export function SheetDialog<T>({
       </div>
     );
   } else {
-    content = renderSheet(load.data, zoom === "fit" ? null : zoom);
+    const savedAt = load.cachedAt ? formatSavedAt(load.cachedAt) : null;
+    content = (
+      <>
+        {(savedAt || !online) && (
+          <p role="status" className="mx-auto mb-3 max-w-md rounded-lg bg-warning/15 px-3 py-2 text-center text-[13px] leading-snug text-ink">
+            {savedAt ? `Copia salvata sul dispositivo ${savedAt}` : "Sei offline"}: potrebbe non essere aggiornata.
+          </p>
+        )}
+        {renderSheet(load.data, zoom === "fit" ? null : zoom)}
+      </>
+    );
   }
 
   const headerActions = sheetReady ? (
