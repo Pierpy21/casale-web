@@ -12,8 +12,6 @@ export interface CoversEditorProps {
   adults: number;
   childCount: number;
   kidsMenus: number;
-  /** Evento: menù bambini prima e "Seggioloni" indipendenti; altrimenti "Bambini" con il limite sui menù bambini. */
-  isEvent?: boolean;
   /** `updated_at` della prenotazione letto con la pagina (controllo di conflitto offline). */
   expectedUpdated?: string;
 }
@@ -21,7 +19,7 @@ export interface CoversEditorProps {
 type Errors = Record<string, string[]>;
 
 /** Modifica dei soli coperti (sala e admin). Salva via updateBookingCovers e ricarica la pagina. */
-export function CoversEditor({ bookingId, adults, childCount, kidsMenus, isEvent = false, expectedUpdated }: CoversEditorProps) {
+export function CoversEditor({ bookingId, adults, childCount, kidsMenus, expectedUpdated }: CoversEditorProps) {
   const router = useRouter();
   const [values, setValues] = useState({ adults, children: childCount, kids_menus: kidsMenus });
   // Valori considerati salvati: di norma quelli ricevuti; dopo un salvataggio in coda, quelli inviati.
@@ -42,7 +40,7 @@ export function CoversEditor({ bookingId, adults, childCount, kidsMenus, isEvent
     setQueued(false);
     startTransition(async () => {
       const result = await submitMutation("bookings.updateBookingCovers", updateBookingCovers, [bookingId, values], {
-        label: `Coperti · ${values.adults} adulti, ${values.children} ${isEvent ? "seggioloni" : "bambini"}`,
+        label: `Coperti · ${values.adults} adulti, ${values.children} seggioloni`,
         entity: { type: "booking", id: bookingId },
         expectedUpdated,
       });
@@ -80,41 +78,20 @@ export function CoversEditor({ bookingId, adults, childCount, kidsMenus, isEvent
           onChange={(n) => setValues((v) => ({ ...v, adults: n }))}
           error={errors.adults?.[0]}
         />
-        {isEvent ? (
-          <>
-            <CountStepper
-              id="covers-kids-menus"
-              label="Menù bambini"
-              value={values.kids_menus}
-              onChange={(n) => setValues((v) => ({ ...v, kids_menus: n }))}
-              error={errors.kids_menus?.[0]}
-            />
-            <CountStepper
-              id="covers-children"
-              label="Seggioloni"
-              value={values.children}
-              onChange={(n) => setValues((v) => ({ ...v, children: n }))}
-            />
-          </>
-        ) : (
-          <>
-            <CountStepper
-              id="covers-children"
-              label="Bambini"
-              value={values.children}
-              onChange={(n) => setValues((v) => ({ ...v, children: n, kids_menus: Math.min(v.kids_menus, n) }))}
-            />
-            <CountStepper
-              id="covers-kids-menus"
-              label="Menù bambini"
-              value={values.kids_menus}
-              max={values.children}
-              onChange={(n) => setValues((v) => ({ ...v, kids_menus: n }))}
-              hint="Non può superare il numero di bambini"
-              error={errors.kids_menus?.[0]}
-            />
-          </>
-        )}
+        {/* Menù bambini subito dopo gli adulti; i seggioloni sono indipendenti (contano nei coperti). */}
+        <CountStepper
+          id="covers-kids-menus"
+          label="Menù bambini"
+          value={values.kids_menus}
+          onChange={(n) => setValues((v) => ({ ...v, kids_menus: n }))}
+          error={errors.kids_menus?.[0]}
+        />
+        <CountStepper
+          id="covers-children"
+          label="Seggioloni"
+          value={values.children}
+          onChange={(n) => setValues((v) => ({ ...v, children: n }))}
+        />
       </div>
 
       {error && <Alert tone="danger">{error}</Alert>}

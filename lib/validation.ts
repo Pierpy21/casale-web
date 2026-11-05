@@ -205,27 +205,8 @@ const coversShape = {
   kids_menus: intMin0Default,
 };
 
-/** Input del superRefine: i campi sono già numerici (intMin0) ma il tipo di input di preprocess li rende opzionali. */
-type Covers = { adults?: number; children?: number; kids_menus?: number };
-
-/**
- * Regole coperti: nessun minimo di ospiti (0 adulti e 0 bambini sono consentiti per ogni tipo di prenotazione).
- * Prenotazioni normali e appuntamenti: i menù bambini non possono superare i bambini.
- * Eventi: `children` sono i seggioloni, indipendenti dai menù bambini (nessun limite).
- */
-function checkCovers(v: Covers, ctx: z.RefinementCtx): void {
-  const children = v.children ?? 0;
-  const kidsMenus = v.kids_menus ?? 0;
-  if (kidsMenus > children) {
-    ctx.addIssue({
-      code: "custom",
-      message: "I menù bambini non possono superare i bambini",
-      path: ["kids_menus"],
-    });
-  }
-}
-
-// Solo coperti (updateBookingCovers): il tipo non è noto qui, quindi nessun legame; il limite dei non-eventi resta nel form.
+// Coperti: nessun minimo di ospiti e nessun legame tra i campi. `children` sono i seggioloni,
+// indipendenti dai menù bambini, in eventi e prenotazioni.
 export const CoversInput = z.object(coversShape);
 export type CoversInputType = z.infer<typeof CoversInput>;
 
@@ -372,21 +353,15 @@ const BookingObject = z
       if (!v.guest_name) issue("guest_name", "Inserisci il nome dell'ospite");
       if (v.menu_id || v.kids_menu_id) issue("menu_id", "Le prenotazioni normali non hanno menù");
       if (v.status === "opzione") issue("status", "Le prenotazioni normali non hanno lo stato Attesa");
-      checkCovers(v, ctx);
     } else {
       // Evento e appuntamento: un cliente di rubrica, esattamente uno tra esistente e nuovo.
       if (!v.client_id && !v.new_client) issue("client_id", "Indica il cliente");
       if (v.client_id && v.new_client) {
         issue("new_client", "Scegli un cliente esistente oppure inserisci un nuovo cliente, non entrambi");
       }
-      if (v.kind === "evento") {
-        // Il menù è facoltativo: senza menù l'evento non ha copia piatti e il preventivo automatico ha 0 righe.
-        // Coperti: seggioloni e menù bambini indipendenti, nessun controllo.
-      } else {
-        // appuntamento: incontro con il cliente, niente menù.
-        if (v.menu_id || v.kids_menu_id) issue("menu_id", "Gli appuntamenti non hanno menù");
-        checkCovers(v, ctx);
-      }
+      // Evento: il menù è facoltativo (senza menù niente copia piatti, preventivo automatico a 0 righe).
+      // Appuntamento: incontro con il cliente, niente menù.
+      if (v.kind === "appuntamento" && (v.menu_id || v.kids_menu_id)) issue("menu_id", "Gli appuntamenti non hanno menù");
     }
   })
   .transform((v) => {

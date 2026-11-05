@@ -175,7 +175,6 @@ export default async function BookingDetailPage({
           adults={booking.adults}
           childCount={booking.children}
           kidsMenus={booking.kids_menus}
-          isEvent={booking.kind === "evento"}
           expectedUpdated={booking.updated_at}
         />
       ),
