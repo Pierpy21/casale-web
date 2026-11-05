@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, MessageCircle } from "lucide-react";
+import { Check, Copy, MessageCircle, Phone } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { whatsappUrl } from "@/components/bookings/format";
 import { normalizePhoneInput, telHref } from "@/lib/phone";
@@ -59,7 +59,7 @@ const ICON_BUTTON =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-btn transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol";
 
 /**
- * Numero di telefono cliccabile (tel:) con pulsanti WhatsApp e "Copia" accanto. Il numero copiato è quello normalizzato.
+ * Numero di telefono cliccabile (tel:) con pulsanti WhatsApp, "Chiama" (stesso tel:, ma visibile come pulsante) e "Copia" accanto. Il numero copiato è quello normalizzato.
  * Il link e il pulsante hanno almeno 44 px di altezza per il tocco.
  */
 export function PhoneLink({ phone, className, whatsapp = true }: PhoneLinkProps) {
@@ -97,6 +97,14 @@ export function PhoneLink({ phone, className, whatsapp = true }: PhoneLinkProps)
           <MessageCircle aria-hidden="true" className="size-4" />
         </a>
       )}
+      <a
+        href={telHref(number)}
+        aria-label="Chiama"
+        title="Chiama"
+        className={cn(ICON_BUTTON, "text-petrol hover:bg-cream")}
+      >
+        <Phone aria-hidden="true" className="size-4" />
+      </a>
       <button
         type="button"
         onClick={handleCopy}
