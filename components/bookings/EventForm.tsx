@@ -265,17 +265,6 @@ export function EventForm({
   // Con un solo menù bambini attivo lo si sceglie in automatico appena servono menù bambini.
   const soleKidsMenuId = activeKidsMenus.length === 1 ? activeKidsMenus[0].id : null;
 
-  // Di norma ogni bambino prende il menù bambini: il contatore segue i bambini finché non lo si cambia a mano.
-  const changeChildren = (n: number) => {
-    const synced = values.kids_menus === values.children;
-    const kidsMenus = synced ? n : Math.min(values.kids_menus, n);
-    change({
-      children: n,
-      kids_menus: kidsMenus,
-      kids_menu_id: values.kids_menu_id ?? (kidsMenus > 0 ? soleKidsMenuId : null),
-    });
-  };
-
   // Cambiare menù riparte dai piatti del nuovo menù: le personalizzazioni erano sul menù precedente.
   const selectMenu = (menuId: string | null) => {
     if (menuId === values.menu_id) return;
@@ -326,7 +315,6 @@ export function EventForm({
     // Data: se il campo è stato svuotato si usa la data iniziale (l'evento ha sempre una data).
     const eventDate = values.event_date || dateFallback;
     if (!values.event_date) setValues((v) => ({ ...v, event_date: eventDate }));
-    if (values.kids_menus > values.children) add("kids_menus", "I menù bambini non possono superare i bambini");
     Object.assign(local, validateAllergies(values.allergies));
 
     let quotePayload: QuotePayload | null = null;
@@ -536,20 +524,19 @@ export function EventForm({
           <FormCard label="Coperti">
             <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-3">
               <CountStepper id="adults" label="Adulti" value={values.adults} onChange={(n) => change({ adults: n })} error={first(errors.adults)} />
-              <CountStepper
-                id="children"
-                label="Bambini"
-                value={values.children}
-                onChange={(n) => changeChildren(n)}
-              />
+              {/* Menù bambini subito dopo gli adulti; i seggioloni sono indipendenti (contano nei coperti). */}
               <CountStepper
                 id="kids_menus"
                 label="Menù bambini"
                 value={values.kids_menus}
-                max={values.children}
                 onChange={(n) => change({ kids_menus: n, kids_menu_id: values.kids_menu_id ?? (n > 0 ? soleKidsMenuId : null) })}
-                hint="Non può superare i bambini"
                 error={first(errors.kids_menus)}
+              />
+              <CountStepper
+                id="children"
+                label="Seggioloni"
+                value={values.children}
+                onChange={(n) => change({ children: n })}
               />
             </div>
             <p className="text-[14px] text-slate-dark">
@@ -616,7 +603,7 @@ export function EventForm({
                     price={`${formatEUR(menu.price_per_person)} a bambino`}
                     items={menu.items}
                     checked={values.kids_menu_id === menu.id}
-                    onSelect={() => change({ kids_menu_id: menu.id, kids_menus: values.kids_menus || values.children })}
+                    onSelect={() => change({ kids_menu_id: menu.id })}
                   />
                 ))}
               </div>

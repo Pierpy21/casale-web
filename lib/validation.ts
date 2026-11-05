@@ -210,7 +210,8 @@ type Covers = { adults?: number; children?: number; kids_menus?: number };
 
 /**
  * Regole coperti: nessun minimo di ospiti (0 adulti e 0 bambini sono consentiti per ogni tipo di prenotazione).
- * Resta solo la coerenza: i menù bambini non possono superare i bambini.
+ * Prenotazioni normali e appuntamenti: i menù bambini non possono superare i bambini.
+ * Eventi: `children` sono i seggioloni, indipendenti dai menù bambini (nessun limite).
  */
 function checkCovers(v: Covers, ctx: z.RefinementCtx): void {
   const children = v.children ?? 0;
@@ -224,7 +225,8 @@ function checkCovers(v: Covers, ctx: z.RefinementCtx): void {
   }
 }
 
-export const CoversInput = z.object(coversShape).superRefine((v, ctx) => checkCovers(v, ctx));
+// Solo coperti (updateBookingCovers): il tipo non è noto qui, quindi nessun legame; il limite dei non-eventi resta nel form.
+export const CoversInput = z.object(coversShape);
 export type CoversInputType = z.infer<typeof CoversInput>;
 
 // ---------------------------------------------------------------------
@@ -379,7 +381,7 @@ const BookingObject = z
       }
       if (v.kind === "evento") {
         // Il menù è facoltativo: senza menù l'evento non ha copia piatti e il preventivo automatico ha 0 righe.
-        checkCovers(v, ctx);
+        // Coperti: seggioloni e menù bambini indipendenti, nessun controllo.
       } else {
         // appuntamento: incontro con il cliente, niente menù.
         if (v.menu_id || v.kids_menu_id) issue("menu_id", "Gli appuntamenti non hanno menù");
