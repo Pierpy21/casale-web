@@ -5,7 +5,9 @@ import { StatsControls } from "@/components/stats/StatsControls";
 import { StatsSummary } from "@/components/stats/StatsSummary";
 import { WeeklyBreakdown } from "@/components/stats/WeeklyBreakdown";
 import { PageHeader, PinnedBar } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { requireProfile } from "@/lib/auth";
+import { canViewStats } from "@/lib/permissions";
 import { getCoversStats } from "@/lib/data/bookings";
 import { parseStatsKind, parseStatsPeriod, resolveStatsRange } from "@/lib/stats-period";
 
@@ -18,7 +20,8 @@ type SearchParams = Promise<{ periodo?: string; tipo?: string; da?: string }>;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default async function StatistichePage({ searchParams }: { searchParams: SearchParams }) {
-  await requireAdmin();
+  const profile = await requireProfile();
+  if (!canViewStats(profile)) redirect("/admin/agenda");
 
   const params = await searchParams;
   const periodo = parseStatsPeriod(params.periodo);
