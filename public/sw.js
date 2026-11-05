@@ -21,6 +21,8 @@
  *   si serve offline finché non arriva set-user (il layout lo invia a ogni montaggio).
  * - Richieste di prefetch del router: mai salvate (la risposta può essere parziale) e non cambiano stato.
  * - Asset statici /_next/static, icone e logo: cache-first.
+ * - Creazione (/admin/prenotazioni/nuova): se manca la copia HTML per quell'indirizzo, si usa quella con il solo
+ *   ?tipo= (preparata dal warm-up). La data dell'URL la recupera il form (components/bookings/NewBookingForm.tsx).
  * - Warm-up (warm-cache): pre-carica l'HTML delle pagine indicate, in background, 3 alla volta, al massimo ogni 30 minuti.
  */
 
@@ -86,6 +88,18 @@ function isAdminPath(pathname) {
 
 function isLoginPath(pathname) {
   return pathname === LOGIN_PATH || pathname.startsWith(`${LOGIN_PATH}/`);
+}
+
+const NEW_BOOKING_PATH = "/admin/prenotazioni/nuova";
+
+// Copia di ripiego per un indirizzo senza copia propria: per la creazione, la pagina con il solo tipo (senza data).
+function fallbackKeyFor(url, kind) {
+  if (kind !== "html" || url.pathname !== NEW_BOOKING_PATH) return null;
+  const base = new URL(url.pathname, url.origin);
+  const tipo = url.searchParams.get("tipo");
+  if (tipo) base.searchParams.set("tipo", tipo);
+  const key = cacheKeyFor(base, "html");
+  return key.url === cacheKeyFor(url, "html").url ? null : key;
 }
 
 function isCacheableStatic(pathname) {
@@ -411,7 +425,8 @@ async function handleAdminRequest(event, kind) {
 
   // Rete assente, lenta (oltre il timeout) o errore del server: se c'è una copia, la si mostra.
   const session = await sessionPromise;
-  const cached = await matchCached(session, key);
+  const fallbackKey = fallbackKeyFor(url, kind);
+  const cached = (await matchCached(session, key)) || (fallbackKey ? await matchCached(session, fallbackKey) : undefined);
   if (cached) {
     if (!prefetch) reportStatus(clientId, { fromCache: true, cachedAt: cached.headers.get(CACHED_AT_HEADER) });
     return cached;

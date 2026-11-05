@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { parseDateParam } from "@/components/agenda/agenda-utils";
-import { BookingForm } from "@/components/bookings/BookingForm";
+import { NewBookingForm } from "@/components/bookings/NewBookingForm";
 import { occupancyWindow } from "@/components/bookings/booking-window";
 import { requireProfile } from "@/lib/auth";
 import { getRoomBookingSlots } from "@/lib/data/bookings";
@@ -55,7 +55,7 @@ export default async function NewBookingPage({ searchParams }: { searchParams: S
   ]);
 
   return (
-    <BookingForm
+    <NewBookingForm
       mode="create"
       kind={kind}
       clients={[]}

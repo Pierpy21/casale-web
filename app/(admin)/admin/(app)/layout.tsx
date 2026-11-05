@@ -1,5 +1,5 @@
 import { requireProfile } from "@/lib/auth";
-import { canCreateAnyBooking, canUseInventory, isAdmin } from "@/lib/permissions";
+import { canCreateAnyBooking, canCreateBooking, canUseInventory, isAdmin } from "@/lib/permissions";
 import { BottomNav } from "@/components/shell/NavLinks";
 import { MobileHeader, Sidebar } from "@/components/shell/Sidebar";
 import { getNavLinks } from "@/components/shell/nav";
@@ -39,6 +39,10 @@ export default async function AppLayout({
   const extraPaths = [
     ...(isAdmin(profile) ? ["/admin/dashboard", "/admin/clienti", "/admin/catalogo"] : []),
     ...(canUseInventory(profile) ? ["/admin/giacenza"] : []),
+    // Pagine di creazione senza data: offline il service worker le usa per qualsiasi data (vedi NewBookingForm).
+    ...(["normale", "evento", "appuntamento"] as const)
+      .filter((kind) => canCreateBooking(profile, kind))
+      .map((kind) => `/admin/prenotazioni/nuova?tipo=${kind}`),
   ];
   const warmUrls = buildAgendaWarmUrls({ today, bookingIds, extraPaths });
 
