@@ -18,7 +18,7 @@ import {
 } from "@/lib/documents/reservations-view";
 
 // Foglio prenotazioni del giorno in PDF: stessa impostazione tipografica del preventivo e del report di giacenza.
-// Una tabella: Nome | Sala | Tavolo | Pasto | Cellulare. I valori mancanti diventano "—".
+// Una tabella: Nome | Sala | Tavolo | Coperti | Pasto | Cellulare. I valori mancanti diventano "—".
 
 const COLOR = {
   ink: "#1C2B2D",
@@ -62,8 +62,9 @@ const styles = StyleSheet.create({
   tableHeadText: { fontFamily: FONT.sansBold, fontSize: 8, color: COLOR.ink, textTransform: "uppercase", letterSpacing: 0.8 },
   tableRow: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: COLOR.line, paddingVertical: 6 },
   cellName: { flexGrow: 4, paddingRight: 8, fontSize: 9.5 },
-  cellRoom: { width: 110, paddingRight: 8, fontSize: 9.5 },
-  cellTable: { width: 60, textAlign: "center", fontSize: 9.5, fontFamily: FONT.sansBold },
+  cellRoom: { width: 95, paddingRight: 8, fontSize: 9.5 },
+  cellTable: { width: 50, textAlign: "center", fontSize: 9.5, fontFamily: FONT.sansBold },
+  cellCovers: { width: 55, textAlign: "center", fontSize: 9.5 },
   cellTime: { width: 55, textAlign: "center", fontSize: 9.5 },
   cellPhone: { width: 100, paddingLeft: 8, fontSize: 9.5 },
   empty: { fontSize: 9.5, color: COLOR.slate, fontFamily: FONT.serifItalic, marginTop: 8 },
@@ -96,7 +97,8 @@ function ReservationsTable({ rows }: { rows: ReservationPdfRow[] }) {
       <View style={styles.tableHead} fixed>
         <Text style={[styles.cellName, styles.tableHeadText]}>Nome</Text>
         <Text style={[styles.cellRoom, styles.tableHeadText]}>Sala</Text>
-        <Text style={[styles.tableHeadText, { width: 60, textAlign: "center" }]}>Tavolo</Text>
+        <Text style={[styles.tableHeadText, { width: 50, textAlign: "center" }]}>Tavolo</Text>
+        <Text style={[styles.tableHeadText, { width: 55, textAlign: "center" }]}>Coperti</Text>
         <Text style={[styles.tableHeadText, { width: 55, textAlign: "center" }]}>Pasto</Text>
         <Text style={[styles.cellPhone, styles.tableHeadText]}>Cellulare</Text>
       </View>
@@ -105,6 +107,7 @@ function ReservationsTable({ rows }: { rows: ReservationPdfRow[] }) {
           <Text style={styles.cellName}>{row.name}</Text>
           <Text style={styles.cellRoom}>{row.room}</Text>
           <Text style={styles.cellTable}>{row.table}</Text>
+          <Text style={styles.cellCovers}>{row.covers}</Text>
           <Text style={styles.cellTime}>{row.meal}</Text>
           <Text style={styles.cellPhone}>{row.phone}</Text>
         </View>

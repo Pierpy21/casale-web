@@ -1,5 +1,5 @@
 import { requireProfile } from "@/lib/auth";
-import { canCreateAnyBooking, canUseInventory, isAdmin } from "@/lib/permissions";
+import { canAssignRoom, canCreateAnyBooking, canCreateBooking, canUseInventory, canViewEventSheet, isAdmin } from "@/lib/permissions";
 import { BottomNav } from "@/components/shell/NavLinks";
 import { MobileHeader, Sidebar } from "@/components/shell/Sidebar";
 import { getNavLinks } from "@/components/shell/nav";
@@ -8,7 +8,7 @@ import { CreateBookingFab } from "@/components/bookings/CreateBookingFab";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { OfflineBanner } from "@/components/pwa/OfflineBanner";
 import { OfflineProvider as SwOfflineProvider } from "@/components/pwa/OfflineProvider";
-import { buildAgendaWarmUrls } from "@/components/pwa/offline-warm-urls";
+import { buildAgendaWarmUrls, buildSheetWarmUrls } from "@/components/pwa/offline-warm-urls";
 import { NotificationsProvider } from "@/components/notifications/NotificationsProvider";
 import { MenuColorsProvider } from "@/components/menu/MenuColorsProvider";
 import { OfflineProvider } from "@/components/offline/OfflineProvider";
@@ -39,8 +39,15 @@ export default async function AppLayout({
   const extraPaths = [
     ...(isAdmin(profile) ? ["/admin/dashboard", "/admin/clienti", "/admin/catalogo"] : []),
     ...(canUseInventory(profile) ? ["/admin/giacenza"] : []),
+    // Pagine di creazione senza data: offline il service worker le usa per qualsiasi data (vedi NewBookingForm).
+    ...(["normale", "evento", "appuntamento"] as const)
+      .filter((kind) => canCreateBooking(profile, kind))
+      .map((kind) => `/admin/prenotazioni/nuova?tipo=${kind}`),
+    // Anteprime dei fogli della settimana (foglio eventi per admin e cucina, foglio prenotazioni per admin e sala).
+    ...(canViewEventSheet(profile) ? buildSheetWarmUrls(today, "/api/events") : []),
+    ...(canAssignRoom(profile, "normale") ? buildSheetWarmUrls(today, "/api/reservations") : []),
   ];
-  const warmUrls = buildAgendaWarmUrls({ today, bookingIds, extraPaths });
+  const warmUrls = buildAgendaWarmUrls({ today, bookingIds, extraPaths, editPages: isAdmin(profile) });
 
   return (
     <NotificationsProvider

@@ -4,7 +4,7 @@ import { isValid, parseISO } from "date-fns";
 import { toISO } from "@/components/agenda/agenda-utils";
 import { resolveWeekStart, weekRange } from "@/components/dashboard/week";
 import { authorize, fail } from "@/lib/action-utils";
-import { getBookingsInRange } from "@/lib/data/bookings";
+import { getBookingsInRange, getMonthEventCount } from "@/lib/data/bookings";
 import { isAdmin } from "@/lib/permissions";
 import type { ActionResult, BookingListItem } from "@/lib/types";
 
@@ -31,5 +31,22 @@ export async function getWeekOccupancy(
   } catch (err) {
     console.error("[dashboard]", err);
     return fail("Impossibile caricare la settimana. Riprova.");
+  }
+}
+
+/** "Eventi nel mese" per il mese del giorno selezionato in dashboard (`monthIso` YYYY-MM-01). */
+export async function getMonthEvents(monthIso: string): Promise<ActionResult<{ month: string; count: number }>> {
+  const auth = await authorize(isAdmin);
+  if (!auth.ok) return auth;
+
+  if (typeof monthIso !== "string" || !/^\d{4}-\d{2}-01$/.test(monthIso) || !isValid(parseISO(monthIso))) {
+    return fail("Data non valida.");
+  }
+
+  try {
+    return { ok: true, data: { month: monthIso, count: await getMonthEventCount(monthIso) } };
+  } catch (err) {
+    console.error("[dashboard]", err);
+    return fail("Impossibile caricare gli eventi del mese. Riprova.");
   }
 }

@@ -21,6 +21,10 @@
  *   si serve offline finché non arriva set-user (il layout lo invia a ogni montaggio).
  * - Richieste di prefetch del router: mai salvate (la risposta può essere parziale) e non cambiano stato.
  * - Asset statici /_next/static, icone e logo: cache-first.
+ * - Creazione (/admin/prenotazioni/nuova): se manca la copia HTML per quell'indirizzo, si usa quella con il solo
+ *   ?tipo= (preparata dal warm-up). La data dell'URL la recupera il form (components/bookings/NewBookingForm.tsx).
+ * - Anteprime dei fogli (/api/events/sheet, /api/reservations/sheet, JSON): stessa strategia delle pagine
+ *   (rete con timeout, poi copia dell'utente). Sono le sole richieste /api gestite. Il warm-up le prepara per la settimana.
  * - Warm-up (warm-cache): pre-carica l'HTML delle pagine indicate, in background, 3 alla volta, al massimo ogni 30 minuti.
  */
 
@@ -88,6 +92,23 @@ function isLoginPath(pathname) {
   return pathname === LOGIN_PATH || pathname.startsWith(`${LOGIN_PATH}/`);
 }
 
+const NEW_BOOKING_PATH = "/admin/prenotazioni/nuova";
+const SHEET_PATHS = ["/api/events/sheet", "/api/reservations/sheet"];
+
+function isSheetPath(pathname) {
+  return SHEET_PATHS.includes(pathname);
+}
+
+// Copia di ripiego per un indirizzo senza copia propria: per la creazione, la pagina con il solo tipo (senza data).
+function fallbackKeyFor(url, kind) {
+  if (kind !== "html" || url.pathname !== NEW_BOOKING_PATH) return null;
+  const base = new URL(url.pathname, url.origin);
+  const tipo = url.searchParams.get("tipo");
+  if (tipo) base.searchParams.set("tipo", tipo);
+  const key = cacheKeyFor(base, "html");
+  return key.url === cacheKeyFor(url, "html").url ? null : key;
+}
+
 function isCacheableStatic(pathname) {
   return pathname.startsWith("/_next/static/") || pathname.startsWith("/icons/") || pathname === "/logo.svg";
 }
@@ -136,6 +157,7 @@ function rscVariant(request) {
 function isStorable(response, kind) {
   if (!response || response.type !== "basic" || response.status !== 200 || response.redirected) return false;
   const type = response.headers.get("content-type") || "";
+  if (kind === "json") return type.startsWith("application/json");
   return kind === "rsc" ? type.startsWith("text/x-component") : type.startsWith("text/html");
 }
 
@@ -338,6 +360,14 @@ function storeResponse(session, key, response) {
 // ---------------------------------------------------------------------
 
 function offlineFallback(kind) {
+  if (kind === "json") {
+    return Promise.resolve(
+      new Response(JSON.stringify({ error: "Sei offline e questo foglio non è ancora stato salvato sul dispositivo." }), {
+        status: 503,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+    );
+  }
   if (kind === "rsc") {
     return Promise.resolve(
       new Response("", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } }),
@@ -362,8 +392,10 @@ let bypassUntil = 0;
 async function handleAdminRequest(event, kind) {
   const request = event.request;
   const url = new URL(request.url);
-  const key = cacheKeyFor(url, kind === "rsc" ? rscVariant(request) : "html");
+  const key = cacheKeyFor(url, kind === "rsc" ? rscVariant(request) : kind);
   const prefetch = isPrefetchRequest(request);
+  // Lo stato "copia salvata" (barra gialla) riguarda la pagina, non le anteprime JSON.
+  const report = !prefetch && kind !== "json";
   const login = isLoginPath(url.pathname);
   const storable = !prefetch && !login;
   const clientId = event.resultingClientId || event.clientId || "";
@@ -405,22 +437,23 @@ async function handleAdminRequest(event, kind) {
   const serverError = Boolean(raw.response && raw.response.serverError);
   const outcome = serverError ? { response: raw.response.response, serverError: true } : raw;
   if (outcome.response && !outcome.serverError && outcome.response.status < 500) {
-    if (!prefetch) reportStatus(clientId, { fromCache: false });
+    if (report) reportStatus(clientId, { fromCache: false });
     return outcome.response;
   }
 
   // Rete assente, lenta (oltre il timeout) o errore del server: se c'è una copia, la si mostra.
   const session = await sessionPromise;
-  const cached = await matchCached(session, key);
+  const fallbackKey = fallbackKeyFor(url, kind);
+  const cached = (await matchCached(session, key)) || (fallbackKey ? await matchCached(session, fallbackKey) : undefined);
   if (cached) {
-    if (!prefetch) reportStatus(clientId, { fromCache: true, cachedAt: cached.headers.get(CACHED_AT_HEADER) });
+    if (report) reportStatus(clientId, { fromCache: true, cachedAt: cached.headers.get(CACHED_AT_HEADER) });
     return cached;
   }
   if (outcome.response) return outcome.response;
   if (outcome.timedOut) {
     // Nessuna copia: meglio aspettare la rete che mostrare una pagina vuota.
     const late = await network;
-    if (!prefetch) reportStatus(clientId, { fromCache: false });
+    if (report) reportStatus(clientId, { fromCache: false });
     return late && late.serverError ? late.response : late;
   }
   return offlineFallback(kind);
@@ -432,6 +465,10 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (isSheetPath(url.pathname)) {
+    event.respondWith(handleAdminRequest(event, "json").catch(() => offlineFallback("json")));
+    return;
+  }
   if (url.pathname.startsWith("/api/")) return;
 
   // Asset statici versionati, icone e logo: cache-first.
@@ -478,7 +515,8 @@ function normalizeWarmUrls(urls) {
     } catch {
       continue;
     }
-    if (url.origin !== self.location.origin || !isAdminPath(url.pathname) || isLoginPath(url.pathname)) continue;
+    const allowed = isSheetPath(url.pathname) || (isAdminPath(url.pathname) && !isLoginPath(url.pathname));
+    if (url.origin !== self.location.origin || !allowed) continue;
     url.hash = "";
     const id = cacheKeyFor(url, "html").url;
     if (seen.has(id)) continue;
@@ -500,8 +538,9 @@ async function runPool(items, size, worker) {
   await Promise.all(runners);
 }
 
-// Solo l'HTML: il router richiede le RSC con una chiave che dipende dal suo stato, che il warm-up non conosce.
+// HTML delle pagine e JSON dei fogli: le RSC no, il router le chiede con una chiave che dipende dal suo stato.
 async function warmOne(url, session) {
+  const kind = isSheetPath(url.pathname) ? "json" : "html";
   if (session.epoch !== epoch) return;
   try {
     const response = await fetch(url.href, {
@@ -513,10 +552,10 @@ async function warmOne(url, session) {
       await forgetCurrentUser();
       return;
     }
-    if (isStorable(response, "html")) {
+    if (isStorable(response, kind)) {
       const { serverError, forCache } = await inspectBody(response);
       // Pagina rotta da un errore del server (es. PocketBase irraggiungibile): si tiene la copia precedente.
-      if (!serverError) await storeResponse(session, cacheKeyFor(url, "html"), forCache);
+      if (!serverError) await storeResponse(session, cacheKeyFor(url, kind), forCache);
     } else if (response.body) {
       response.body.cancel().catch(() => {});
     }

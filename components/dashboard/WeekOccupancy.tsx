@@ -3,8 +3,9 @@
 import { endOfWeek } from "date-fns";
 import Link from "next/link";
 import { useEffect, useMemo, useReducer, useRef, useState, useTransition, type ReactNode } from "react";
-import { getWeekOccupancy } from "@/app/actions/dashboard";
+import { getMonthEvents, getWeekOccupancy } from "@/app/actions/dashboard";
 import { capitalize, formatIt, toDate, toISO } from "@/components/agenda/agenda-utils";
+import { statsHref } from "@/components/stats/shared";
 import { DayBookingsDisclosure } from "@/components/dashboard/DayBookingsDisclosure";
 import { DayStrip } from "@/components/dashboard/DayStrip";
 import { RoomDayView } from "@/components/dashboard/RoomDayView";
@@ -23,11 +24,10 @@ interface WeekData {
 
 /** Indicatori che non dipendono dal giorno selezionato: valori calcolati dal server, con il link alla pagina che li spiega. */
 export interface DashboardIndicatorValues {
-  /** Eventi non annullati del mese corrente. */
+  /** Eventi non annullati del mese corrente (gli altri mesi li carica il client quando si sceglie un giorno). */
   eventsThisMonth: number;
   /** Eventi senza acconto (stato "opzione") da oggi in poi. */
   pendingOptions: number;
-  eventsThisMonthHref: string;
   pendingOptionsHref: string;
 }
 
@@ -256,12 +256,28 @@ export function WeekOccupancy({
         .reduce((sum, b) => sum + b.adults + b.children, 0)
     : null;
   const dayTag = selectedDay === todayIso ? "Oggi" : capitalize(formatIt(toDate(selectedDay), "EEE d MMM"));
-  const monthName = capitalize(formatIt(toDate(todayIso), "LLLL"));
+  // "Eventi nel mese" segue il mese del giorno selezionato: il mese corrente arriva dal server, gli altri si caricano e restano in cache.
+  const selectedMonth = `${selectedDay.slice(0, 7)}-01`;
+  const [monthCounts, setMonthCounts] = useState<Record<string, number>>(() => ({
+    [`${todayIso.slice(0, 7)}-01`]: indicators.eventsThisMonth,
+  }));
+  const monthEvents = monthCounts[selectedMonth] ?? null;
+  useEffect(() => {
+    if (monthCounts[selectedMonth] !== undefined) return;
+    let cancelled = false;
+    getMonthEvents(selectedMonth).then((res) => {
+      if (!cancelled && res.ok) setMonthCounts((prev) => ({ ...prev, [res.data.month]: res.data.count }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMonth, monthCounts]);
+  const monthName = capitalize(formatIt(toDate(selectedMonth), "LLLL"));
 
   const dayHref = `/admin/agenda?date=${selectedDay}&view=day`;
   const tiles: IndicatorTile[] = [
     { label: "Eventi", value: dayEvents, sub: dayTag, href: dayHref },
-    { label: "Eventi nel mese", value: indicators.eventsThisMonth, sub: monthName, href: indicators.eventsThisMonthHref },
+    { label: "Eventi nel mese", value: monthEvents, sub: monthName, href: statsHref("mese", "evento", selectedMonth) },
     { label: "Coperti", value: dayCovers, sub: dayTag, href: dayHref },
     {
       label: "Senza acconto",

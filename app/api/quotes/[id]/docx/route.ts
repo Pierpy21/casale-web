@@ -33,7 +33,7 @@ async function handle(
     status: 200,
     headers: {
       "Content-Type": DOCX_MIME,
-      "Content-Disposition": `${disposition} filename="${quoteFileName(quote.number, "docx")}"`,
+      "Content-Disposition": `${disposition} filename="${quoteFileName(quote.number, "docx", quote.booking.status)}"`,
       "Cache-Control": "no-store",
     },
   });

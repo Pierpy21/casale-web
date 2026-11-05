@@ -38,8 +38,8 @@ const PAGE_HEIGHT = 16838;
 const MARGIN = 800;
 const CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN; // 10306
 
-/** Larghezze colonne (twip): Nome | Sala | Tavolo | Pasto | Cellulare. */
-const COL_WIDTHS = [3706, 2200, 1300, 1300, 1800];
+/** Larghezze colonne (twip): Nome | Sala | Tavolo | Coperti | Pasto | Cellulare. */
+const COL_WIDTHS = [3206, 1900, 1100, 1100, 1200, 1800];
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
 const NO_BORDERS: ITableBordersOptions = {
@@ -177,8 +177,9 @@ async function renderSheetView(view: ReservationSheetView, logo: Buffer): Promis
           headerCell("Nome", AlignmentType.LEFT, COL_WIDTHS[0]),
           headerCell("Sala", AlignmentType.LEFT, COL_WIDTHS[1]),
           headerCell("Tavolo", AlignmentType.CENTER, COL_WIDTHS[2]),
-          headerCell("Pasto", AlignmentType.CENTER, COL_WIDTHS[3]),
-          headerCell("Cellulare", AlignmentType.LEFT, COL_WIDTHS[4]),
+          headerCell("Coperti", AlignmentType.CENTER, COL_WIDTHS[3]),
+          headerCell("Pasto", AlignmentType.CENTER, COL_WIDTHS[4]),
+          headerCell("Cellulare", AlignmentType.LEFT, COL_WIDTHS[5]),
         ],
       }),
       ...view.rows.map(
@@ -189,8 +190,9 @@ async function renderSheetView(view: ReservationSheetView, logo: Buffer): Promis
               bodyCell(row.name, AlignmentType.LEFT, COL_WIDTHS[0]),
               bodyCell(row.room, AlignmentType.LEFT, COL_WIDTHS[1]),
               bodyCell(row.table, AlignmentType.CENTER, COL_WIDTHS[2]),
-              bodyCell(row.meal, AlignmentType.CENTER, COL_WIDTHS[3]),
-              bodyCell(row.phone, AlignmentType.LEFT, COL_WIDTHS[4]),
+              bodyCell(row.covers, AlignmentType.CENTER, COL_WIDTHS[3]),
+              bodyCell(row.meal, AlignmentType.CENTER, COL_WIDTHS[4]),
+              bodyCell(row.phone, AlignmentType.LEFT, COL_WIDTHS[5]),
             ],
           }),
       ),

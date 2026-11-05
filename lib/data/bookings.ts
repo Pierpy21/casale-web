@@ -190,6 +190,7 @@ export async function getReservationSheet(date: string): Promise<ReservationShee
       name: nameOf(r),
       room: room?.name ? String(room.name) : null,
       table: tableOf(r),
+      covers: num(r.adults) + num(r.children),
       meal: mealOf(r),
       phone: bookingPhone(personOf(r)),
     };
@@ -356,12 +357,29 @@ export async function getRoomOccupancy(date: string): Promise<{ room_id: string;
   return records.map((r) => ({ room_id: String(r.room), booking_id: r.id }));
 }
 
+/** Banchetti (kind evento) non annullati nel mese che contiene `date` (YYYY-MM-DD). */
+async function countMonthEvents(db: PocketBase, date: string): Promise<number> {
+  const { from, to } = monthBounds(date);
+  const filter = db.filter("event_date >= {:from} && event_date <= {:to} && status != {:s} && kind = {:k}", {
+    from: dayStartPb(from),
+    to: dayEndPb(to),
+    s: "annullato",
+    k: "evento",
+  });
+  return (await db.collection("bookings").getList(1, 1, { filter, skipTotal: false })).totalItems;
+}
+
+/** "Eventi nel mese" della dashboard per un mese qualsiasi (giorno selezionato nella striscia). 0 se non loggato. */
+export async function getMonthEventCount(date: string): Promise<number> {
+  if (!ISO_DATE.test(date) || !(await getCurrentProfile())) return 0;
+  return countMonthEvents(await getAdminPb(), date);
+}
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   const empty: DashboardStats = { eventsThisMonth: 0, coversNext7Days: 0, pendingOptions: 0, eventsToday: 0 };
   if (!(await getCurrentProfile())) return empty;
   const db = await getAdminPb();
   const today = romeToday();
-  const { from, to } = monthBounds(today);
   const weekEnd = addDaysISO(today, 6);
   const notCancelled = db.filter("status != {:s}", { s: "annullato" });
 
@@ -370,7 +388,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   const [eventsThisMonth, eventsToday, pendingOptions, week] = await Promise.all([
     // "Eventi oggi" / "Eventi nel mese": solo banchetti (kind evento), come nelle statistiche.
-    count(db.filter("event_date >= {:from} && event_date <= {:to} && status != {:s} && kind = {:k}", { from: dayStartPb(from), to: dayEndPb(to), s: "annullato", k: "evento" })),
+    countMonthEvents(db, today),
     count(db.filter("event_date >= {:from} && event_date <= {:to} && status != {:s} && kind = {:k}", { from: dayStartPb(today), to: dayEndPb(today), s: "annullato", k: "evento" })),
     // Eventi senza acconto (stato "opzione"): le prenotazioni normali non passano mai da qui.
     count(db.filter("kind = {:k} && status = {:s} && event_date >= {:from}", { k: "evento", s: "opzione", from: dayStartPb(today) })),

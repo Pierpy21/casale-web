@@ -51,7 +51,7 @@ export function WeekView({
                 <p className="px-1 text-[13px] text-slate">Nessun evento</p>
               ) : (
                 items.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" />
+                  <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" wholeCardLink />
                 ))
               )}
             </section>
@@ -99,7 +99,7 @@ export function DayView({
       {cards.length > 0 && (
         <section aria-label="Eventi della giornata" className="flex min-w-0 flex-col gap-4">
           {cards.map((booking) => (
-            <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" />
+            <BookingCard key={booking.id} booking={booking} variant="full" dishes="inline" wholeCardLink />
           ))}
         </section>
       )}

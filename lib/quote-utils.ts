@@ -1,4 +1,4 @@
-import type { BookingDetail, Menu, Quote, QuoteLine, QuoteTotals } from "./types";
+import type { BookingDetail, BookingStatus, Menu, Quote, QuoteLine, QuoteTotals } from "./types";
 
 /** Menu del catalogo usati per le righe automatiche (solo nome e prezzo a persona). */
 export interface QuoteMenuRef {
@@ -87,7 +87,16 @@ export function formatEUR(n: number): string {
 
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-/** Nome del file del preventivo (stesso nome usato dalle route PDF/DOCX). */
-export function quoteFileName(number: string, ext: "pdf" | "docx"): string {
-  return `Preventivo-${number.replace(/[^A-Za-z0-9._-]/g, "-")}.${ext}`;
+/**
+ * Nome del documento secondo lo stato dell'evento: "Preventivo" finché è in attesa (o annullato),
+ * "Ordine di servizio" quando è confermato o saldato.
+ */
+export function quoteDocumentTitle(status: BookingStatus): "Preventivo" | "Ordine di servizio" {
+  return status === "confermato" || status === "saldato" ? "Ordine di servizio" : "Preventivo";
+}
+
+/** Nome del file del documento (stesso nome usato dalle route PDF/DOCX), es. "Ordine-di-servizio-2026-001.pdf". */
+export function quoteFileName(number: string, ext: "pdf" | "docx", status: BookingStatus): string {
+  const base = quoteDocumentTitle(status).replace(/ /g, "-");
+  return `${base}-${number.replace(/[^A-Za-z0-9._-]/g, "-")}.${ext}`;
 }

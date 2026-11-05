@@ -280,7 +280,7 @@ export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBoo
               aria-label={when ? `Elimina prenotazione di ${title}, ${when}` : `Elimina prenotazione di ${title}`}
               disabled={deletingId !== null}
               onClick={() => setAskDelete(booking)}
-              className="inline-flex size-11 shrink-0 items-center justify-center self-end rounded-lg text-slate-dark transition-colors duration-150 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol disabled:cursor-not-allowed disabled:opacity-50"
+              className="relative z-10 inline-flex size-11 shrink-0 items-center justify-center self-end rounded-lg text-slate-dark transition-colors duration-150 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol disabled:cursor-not-allowed disabled:opacity-50"
             >
               <X aria-hidden="true" className="size-5" />
             </button>
@@ -289,14 +289,15 @@ export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBoo
           return (
             <li
               key={booking.id}
-              className="flex min-w-0 flex-col gap-2.5 px-4 py-3 desk:grid desk:grid-cols-[minmax(0,1fr)_auto] desk:items-center desk:gap-6"
+              className="relative flex min-w-0 cursor-pointer flex-col gap-2.5 px-4 py-3 transition-colors duration-200 hover:bg-cream/40 active:bg-cream/70 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:-outline-offset-2 has-[a:focus-visible]:outline-petrol desk:grid desk:grid-cols-[minmax(0,1fr)_auto] desk:items-center desk:gap-6"
             >
               <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
                   <span className="shrink-0 text-[15px] font-medium tabular-nums text-ink">{when ?? "—"}</span>
                   <Link
                     href={`/admin/prenotazioni/${booking.id}`}
-                    className="min-w-0 break-words font-serif text-[16px] leading-snug text-petrol hover:underline"
+                    // Link a tutta la riga (stretched): sala, tavolo, telefono ed elimina stanno sopra (z-10).
+                    className="min-w-0 break-words font-serif text-[16px] leading-snug text-petrol after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none"
                   >
                     {title}
                   </Link>
@@ -312,11 +313,11 @@ export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBoo
                   )}
                 </p>
                 {/* Fuori dal link del nome. La cucina non riceve il telefono (hideKitchenPhone): bookingPhone è null. */}
-                {phone && <PhoneLink phone={phone} className="text-[13px]" />}
+                {phone && <PhoneLink phone={phone} className="relative z-10 self-start text-[13px]" />}
               </div>
 
               {canAssign ? (
-                <div className="flex min-w-0 flex-col gap-1.5">
+                <div className="relative z-10 flex min-w-0 cursor-auto flex-col gap-1.5">
                   {inactiveCurrent && (
                     <p className="text-[13px] text-slate-dark">
                       Sala attuale: <span className="text-ink">{inactiveCurrent.name} (non attiva)</span>

@@ -315,7 +315,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
             </button>
             <DocumentDownload
               href={`/api/quotes/${quote.id}/pdf`}
-              fileName={quoteFileName(quote.number, "pdf")}
+              fileName={quoteFileName(quote.number, "pdf", quote.booking.status)}
               mimeType="application/pdf"
               className={buttonClasses("outline", "md")}
             >
@@ -324,7 +324,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
             </DocumentDownload>
             <DocumentDownload
               href={`/api/quotes/${quote.id}/docx`}
-              fileName={quoteFileName(quote.number, "docx")}
+              fileName={quoteFileName(quote.number, "docx", quote.booking.status)}
               mimeType={DOCX_MIME}
               className={buttonClasses("outline", "md")}
             >
@@ -334,6 +334,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
             <WhatsAppQuoteShare
               quoteId={quote.id}
               number={quote.number}
+              status={quote.booking.status}
               phone={bookingPhone(quote.booking)}
               clientName={bookingPersonName(quote.booking)}
               eventDate={formatIt(toDate(quote.booking.event_date), "EEEE d MMMM yyyy")}
