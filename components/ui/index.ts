@@ -16,6 +16,7 @@ export { Switch, type SwitchProps } from "./Switch";
 export { DocumentDownload } from "./DocumentDownload";
 export { PhoneLink, type PhoneLinkProps } from "./PhoneLink";
 export { PinnedBar, type PinnedBarProps } from "./PinnedBar";
+export { ScrollPinnedBar, type ScrollPinnedBarProps } from "./ScrollPinnedBar";
 export {
   TopBar,
   type TopBarProps,

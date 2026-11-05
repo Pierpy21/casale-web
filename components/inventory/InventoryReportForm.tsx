@@ -4,7 +4,7 @@ import { Eye, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent, type KeyboardEvent } from "react";
 import { createInventoryProduct, submitInventoryReport, updateInventoryReport } from "@/app/actions/inventory";
-import { Alert, Button, Field, Input, Modal, cn } from "@/components/ui";
+import { Alert, Button, Field, Input, Modal, ScrollPinnedBar, cn } from "@/components/ui";
 import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { compareInventoryProducts, defaultInventorySupplier, INVENTORY_CATEGORY_COLORS, sortSuppliers } from "@/lib/inventory-utils";
 import { isQueued, submitMutation } from "@/lib/offline/submit";
@@ -372,9 +372,11 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
         </Field>
       </div>
 
-      {/* top = altezza dell'header mobile (0.75rem + campanella 2.5rem + 0.75rem) meno 1px: la barra passa appena sotto
-          l'header (z-30), così con pixel frazionari non resta una giunzione che sfarfalla durante lo scroll. */}
-      <div className="sticky top-[calc(env(safe-area-inset-top)+4rem-1px)] z-10 -mx-4 flex flex-col gap-2 bg-paper px-4 py-2 sm:-mx-6 sm:px-6 desk:-mx-10 desk:top-0 desk:px-10 optouch:-mx-8 optouch:px-8">
+      {/* Ricerca (e pillole dei gruppi) in cima scorrendo: fixed su telefono e tablet, sticky su desktop (vedi ScrollPinnedBar). */}
+      <ScrollPinnedBar
+        className="-mx-4 sm:-mx-6 desk:-mx-10 optouch:-mx-8"
+        barClassName="flex flex-col gap-2 bg-paper px-4 py-2 sm:px-6 desk:px-10 optouch:px-8"
+      >
         <div className="relative">
           <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-dark" />
           <Input
@@ -403,7 +405,7 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
             disabled={pending}
           />
         )}
-      </div>
+      </ScrollPinnedBar>
 
       {searching && visibleGroups.length === 0 && (
         <div className="flex flex-col gap-3 border border-dashed border-slate/40 bg-paper px-4 py-6 sm:px-6">
