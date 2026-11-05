@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authorize, dbFail, fail, invalidInput, isRecordId } from "@/lib/action-utils";
-import { canManageInventory, canUseInventory, isAdmin } from "@/lib/permissions";
+import { canEditInventoryReport, canManageInventory, canUseInventory, isAdmin } from "@/lib/permissions";
 import { getInventoryProducts, getInventoryReport, getInventoryReports, getInventorySuppliers } from "@/lib/data/inventory";
 import { formatToOrderSummary, type InventoryToOrderCount } from "@/lib/inventory-utils";
 import { checkConflictById, withMutation } from "@/lib/mutations";
@@ -21,6 +21,7 @@ import {
   renameSupplier,
   reorderSuppliers,
   submitInventoryReport as writeInventoryReport,
+  updateInventoryReport as rewriteInventoryReport,
   updateProduct,
   updateSupplierActive,
   type InventoryProductRef,
@@ -305,6 +306,62 @@ export async function submitInventoryReport(input: unknown, opts?: MutationOptio
       ok: true,
       data: {
         id: result.id,
+        to_order: result.toOrder,
+        present: result.present,
+        to_order_by_supplier: result.toOrderBySupplier,
+      },
+    };
+  });
+}
+
+/**
+ * Modifica un report già inviato (stesso input di submitInventoryReport): data, note e righe sostituite.
+ * Solo l'admin o chi l'ha compilato. Il report torna "inviato" e l'admin riceve di nuovo la notifica.
+ */
+export async function updateInventoryReport(id: string, input: unknown, opts?: MutationOptions): Promise<ActionResult<SubmittedReport>> {
+  if (!isRecordId(id)) return fail("Report non valido.");
+  const auth = await authorize(canUseInventory, "Non sei autorizzato alla giacenza.");
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "inventory.updateInventoryReport", auth.profile.id, async (): Promise<ActionResult<SubmittedReport>> => {
+    const parsed = InventoryReportInput.safeParse(input);
+    if (!parsed.success) return invalidInput(parsed.error);
+
+    const report = await fetchOne(auth.db, "inventory_reports", id);
+    if (!report) return fail("Report non trovato.");
+    if (!canEditInventoryReport(auth.profile, { created_by: report.created_by ? String(report.created_by) : null })) {
+      return fail("Puoi modificare solo le giacenze che hai compilato tu.");
+    }
+
+    const actor = { id: auth.profile.id, full_name: auth.profile.full_name };
+    let result: Awaited<ReturnType<typeof rewriteInventoryReport>>;
+    try {
+      result = await rewriteInventoryReport(auth.db, id, parsed.data, actor);
+    } catch (err) {
+      return dbFail(err);
+    }
+
+    revalidateInventory();
+    revalidatePath(`/admin/giacenza/${id}`);
+    const date = parsed.data.report_date;
+    const summary = formatToOrderSummary(result.toOrderBySupplier);
+    const body = `${summary ? `Da ordinare: ${summary}` : "Nessun prodotto da ordinare"} · ${result.present} presenti — modificata da ${actor.full_name}`;
+    after(() =>
+      notify({
+        type: "inventory_report",
+        bookingId: null,
+        title: `Giacenza ${date} modificata`,
+        body,
+        actor,
+        recipients: "all-except-actor",
+        roles: ["admin"],
+        url: `/admin/giacenza/${id}`,
+      }),
+    );
+    return {
+      ok: true,
+      data: {
+        id,
         to_order: result.toOrder,
         present: result.present,
         to_order_by_supplier: result.toOrderBySupplier,

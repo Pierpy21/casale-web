@@ -49,10 +49,13 @@ export function InventoryReportSections({
   report,
   grouping,
   suppliers,
+  preview = false,
 }: {
   report: InventoryReport;
   grouping: InventoryReportGrouping;
   suppliers: InventorySupplier[];
+  /** Anteprima della bozza (report non ancora salvato): niente PDF per fornitore. */
+  preview?: boolean;
 }) {
   const sections = buildSections(report, grouping, suppliers);
 
@@ -77,7 +80,7 @@ export function InventoryReportSections({
                   {section.rows.length} {section.rows.length === 1 ? "prodotto" : "prodotti"}
                 </p>
               </div>
-              {section.supplierId && (
+              {section.supplierId && !preview && (
                 <DocumentDownload
                   href={inventoryPdfHref(report.id, section.supplierId)}
                   fileName={inventoryPdfFileName(report.report_date, section.supplierName)}

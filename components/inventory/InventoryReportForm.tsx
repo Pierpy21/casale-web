@@ -1,10 +1,11 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Eye, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition, type FormEvent, type KeyboardEvent } from "react";
-import { createInventoryProduct, submitInventoryReport } from "@/app/actions/inventory";
-import { Alert, Button, Field, Input, cn } from "@/components/ui";
+import { useEffect, useId, useRef, useState, useTransition, type FormEvent, type KeyboardEvent } from "react";
+import { createInventoryProduct, submitInventoryReport, updateInventoryReport } from "@/app/actions/inventory";
+import { Alert, Button, Field, Input, Modal, cn } from "@/components/ui";
+import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { compareInventoryProducts, defaultInventorySupplier, INVENTORY_CATEGORY_COLORS, sortSuppliers } from "@/lib/inventory-utils";
 import { isQueued, submitMutation } from "@/lib/offline/submit";
 import {
@@ -12,6 +13,8 @@ import {
   INVENTORY_CATEGORY_LABELS,
   type InventoryCategory,
   type InventoryProduct,
+  type InventoryReport,
+  type InventoryReportLine,
   type InventorySupplier,
 } from "@/lib/types";
 import { InventoryCategorySection, type InventoryCountField, type NewInventoryProductInput } from "./InventoryCategorySection";
@@ -25,6 +28,7 @@ import {
 import { normalizeSearchText } from "./inventory-search";
 import { InventoryGroupChips } from "./InventoryGroupChips";
 import { InventoryGroupGrid } from "./InventoryGroupGrid";
+import { InventoryReportSections } from "./InventoryReportSections";
 
 export interface InventoryReportFormProps {
   /** Prodotti attivi dal catalogo. */
@@ -35,6 +39,8 @@ export interface InventoryReportFormProps {
   today: string;
   /** Raggruppamento: per categoria (cucina) o per fornitore (admin). */
   groupBy?: "category" | "supplier";
+  /** Modifica di un report già inviato: valori di partenza (niente bozza locale) e salvataggio sul report. */
+  edit?: { reportId: string; reportDate: string; notes: string; counts: Record<string, InventoryDraftCount> };
 }
 
 type Group = {
@@ -76,13 +82,15 @@ const APPENDED_SORT = 1_000_000;
  * o per fornitore (admin), ricerca che filtra tutte le sezioni, barra di riepilogo e invio fisso in basso.
  * Le quantità restano in una bozza locale: un ricaricamento non fa perdere il lavoro.
  */
-export function InventoryReportForm({ products: initialProducts, suppliers, today, groupBy = "category" }: InventoryReportFormProps) {
+export function InventoryReportForm({ products: initialProducts, suppliers, today, groupBy = "category", edit }: InventoryReportFormProps) {
   const router = useRouter();
+  const formId = useId();
   const [pending, startTransition] = useTransition();
   const [products, setProducts] = useState<InventoryProduct[]>(initialProducts);
-  const [reportDate, setReportDate] = useState(today);
-  const [notes, setNotes] = useState("");
-  const [counts, setCounts] = useState<Counts>({});
+  const [reportDate, setReportDate] = useState(edit?.reportDate ?? today);
+  const [notes, setNotes] = useState(edit?.notes ?? "");
+  const [counts, setCounts] = useState<Counts>(edit?.counts ?? {});
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<string>>(
     () => new Set(buildGroups(initialProducts, groupBy, suppliers).filter((g) => g.all.length > 0).slice(0, 1).map((g) => g.key)),
   );
@@ -114,7 +122,9 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
   }, [activeKey]);
 
   // Bozza: si legge dopo il primo render (localStorage non esiste sul server) e poi si salva a ogni modifica.
+  // In modifica di un report inviato niente bozza: si parte dai dati salvati.
   useEffect(() => {
+    if (edit) return;
     const draft = readInventoryDraft();
     if (draft) {
       setReportDate(draft.reportDate);
@@ -123,12 +133,13 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
       setRestored(Object.keys(draft.counts).length > 0 || draft.notes.length > 0);
     }
     setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montaggio: `edit` non cambia durante la vita del form.
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || edit) return;
     writeInventoryDraft({ reportDate, notes, counts });
-  }, [hydrated, reportDate, notes, counts]);
+  }, [hydrated, edit, reportDate, notes, counts]);
 
   const normalizedQuery = normalizeSearchText(query);
   const searching = normalizedQuery.length > 0;
@@ -233,9 +244,42 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
     return c && isFilled(c) ? [{ product_id: p.id, stock: c.stock, to_order: c.to_order }] : [];
   });
 
+  // Anteprima: la bozza nella stessa forma di un report inviato, così si vede come apparirà.
+  const previewReport: InventoryReport = {
+    id: "anteprima",
+    created_by: null,
+    created_by_name: "",
+    report_date: reportDate,
+    notes: notes.trim() || null,
+    status: "inviato",
+    seen_by: null,
+    seen_at: null,
+    created_at: "",
+    lines: products.flatMap((p): InventoryReportLine[] => {
+      const c = counts[p.id];
+      if (!c || !isFilled(c)) return [];
+      const base = {
+        report_id: "anteprima",
+        product_id: p.id,
+        product_name: p.name,
+        unit: p.unit,
+        sort: 0,
+        supplier_id: p.supplier_id,
+        supplier_name: suppliers.find((s) => s.id === p.supplier_id)?.name ?? "",
+        category: p.category,
+      };
+      return [
+        ...(c.stock > 0 ? [{ ...base, id: `${p.id}-p`, state: "presente" as const, quantity: c.stock }] : []),
+        ...(c.to_order > 0 ? [{ ...base, id: `${p.id}-o`, state: "da_ordinare" as const, quantity: c.to_order }] : []),
+      ];
+    }),
+  };
+  const submitLabel = pending ? (edit ? "Salvataggio…" : "Invio in corso…") : edit ? "Salva modifiche" : "Invia giacenza";
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
+    setPreviewOpen(false);
     if (!reportDate) {
       setFormError("Indica la data della giacenza.");
       return;
@@ -244,11 +288,25 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
       setFormError("Compila almeno un prodotto: giacenza o quantità da ordinare.");
       return;
     }
+    const payload = { report_date: reportDate, notes: notes.trim() || null, lines: filledLines };
+    if (edit) {
+      startTransition(async () => {
+        const result = await submitMutation("inventory.updateInventoryReport", updateInventoryReport, [edit.reportId, payload], {
+          label: `Modifica giacenza del ${reportDate}`,
+        });
+        if (!result.ok) {
+          setFormError(result.error);
+          return;
+        }
+        router.push(`/admin/giacenza/${edit.reportId}`);
+      });
+      return;
+    }
     startTransition(async () => {
       const result = await submitMutation(
         "inventory.submitInventoryReport",
         submitInventoryReport,
-        [{ report_date: reportDate, notes: notes.trim() || null, lines: filledLines }],
+        [payload],
         { label: `Giacenza del ${reportDate}`, createsTempId: true },
       );
       if (!result.ok) {
@@ -271,7 +329,7 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
   };
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-label="Nuova giacenza" className="flex min-w-0 flex-col gap-5">
+    <form id={formId} onSubmit={onSubmit} noValidate aria-label={edit ? "Modifica giacenza" : "Nuova giacenza"} className="flex min-w-0 flex-col gap-5">
       {formError && <Alert tone="danger">{formError}</Alert>}
 
       {restored && (
@@ -334,6 +392,17 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
             className="h-12 pl-12"
           />
         </div>
+        {/* Dentro un gruppo le pillole dei gruppi restano fisse sotto la ricerca: "Tutte" torna alla griglia. */}
+        {tileMode && activeGroup && (
+          <InventoryGroupChips
+            groups={tiles}
+            activeKey={activeGroup.key}
+            allLabel={backLabel}
+            onShowAll={() => selectGroup(null)}
+            onSelect={(key) => selectGroup(key)}
+            disabled={pending}
+          />
+        )}
       </div>
 
       {searching && visibleGroups.length === 0 && (
@@ -361,23 +430,13 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
 
       <div
         ref={listRef}
-        className="flex min-w-0 scroll-mt-40 flex-col gap-3"
+        className={cn("flex min-w-0 flex-col gap-3", tileMode && activeGroup ? "scroll-mt-56" : "scroll-mt-40")}
         aria-label={groupBy === "supplier" ? "Prodotti per fornitore" : "Prodotti per categoria"}
       >
         {tileMode && !activeGroup && <InventoryGroupGrid groups={tiles} onSelect={(key) => selectGroup(key)} />}
 
         {tileMode && activeGroup && (
           <section aria-labelledby="inventory-group-title" className="flex min-w-0 flex-col gap-4">
-            {/* Pillole degli altri gruppi: "Tutte" torna alla griglia, la pillola attiva resta visibile e centrata. */}
-            <InventoryGroupChips
-              groups={tiles}
-              activeKey={activeGroup.key}
-              allLabel={backLabel}
-              onShowAll={() => selectGroup(null)}
-              onSelect={(key) => selectGroup(key)}
-              disabled={pending}
-            />
-
             <div className={cn("relative flex min-w-0 flex-col gap-1 border-b border-sand pb-3", activeColor && "pl-4")}>
               {/* Striscia del colore della categoria, accanto a titolo e conteggio. */}
               {activeColor && <span aria-hidden="true" className={cn("absolute inset-y-1 left-0 w-1.5 rounded-full", activeColor.accent)} />}
@@ -440,17 +499,60 @@ export function InventoryReportForm({ products: initialProducts, suppliers, toda
           {" · "}
           <span className="font-semibold text-ink">{toOrderTotal} da ordinare</span>
         </p>
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          disabled={pending || filledTotal === 0}
-          aria-busy={pending || undefined}
-          className="min-h-12 w-full sm:w-auto"
-        >
-          {pending ? "Invio in corso…" : "Invia giacenza"}
-        </Button>
+        <div className="flex min-w-0 items-center gap-2">
+          {/* Occhio: anteprima di come apparirà la giacenza, prima di inviarla. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            aria-label="Vedi anteprima della giacenza"
+            title="Vedi anteprima"
+            disabled={pending || filledTotal === 0}
+            onClick={() => setPreviewOpen(true)}
+            className="min-h-12 shrink-0 px-4"
+          >
+            <Eye aria-hidden="true" className="size-5" />
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            disabled={pending || filledTotal === 0}
+            aria-busy={pending || undefined}
+            className="min-h-12 min-w-0 flex-1 sm:flex-none"
+          >
+            {submitLabel}
+          </Button>
+        </div>
       </div>
+
+      <Modal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title="Anteprima giacenza"
+        size="xl"
+        footer={
+          <div className="flex w-full flex-wrap justify-end gap-3">
+            <Button variant="ghost" size="md" onClick={() => setPreviewOpen(false)}>
+              Torna a modificare
+            </Button>
+            <Button type="submit" form={formId} variant="primary" size="md" disabled={pending || filledTotal === 0}>
+              {submitLabel}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex min-w-0 flex-col gap-6">
+          <div className="flex min-w-0 flex-col gap-1 border-b border-sand pb-4">
+            <p className="text-[20px] font-serif text-ink">{reportDate ? capitalize(formatIt(toDate(reportDate), "EEEE d MMMM yyyy")) : "Data mancante"}</p>
+            <p className="text-[14px] tabular-nums text-slate-dark">
+              {filledTotal} {filledTotal === 1 ? "prodotto" : "prodotti"} · {toOrderTotal} da ordinare
+            </p>
+            {notes.trim() && <p className="whitespace-pre-line wrap-anywhere text-[15px] text-ink">{notes.trim()}</p>}
+          </div>
+          <InventoryReportSections report={previewReport} grouping={groupBy} suppliers={suppliers} preview />
+        </div>
+      </Modal>
     </form>
   );
 }

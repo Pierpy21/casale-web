@@ -250,18 +250,21 @@ export interface SubmittedInventoryReport {
   toOrderBySupplier: InventoryToOrderCount[];
 }
 
+/** settings.batch.maxRequests di PocketBase (migrazione 1793000000_casale_schema.js). */
+const BATCH_MAX_REQUESTS = 500;
+
+type ResolvedReportLine = InventoryLineSnapshot & { product_id: string };
+
 /**
- * Salva un report di giacenza: testata e righe in una batch. Ogni prodotto diventa fino a due righe
- * (presente = giacenza, da_ordinare = quantità da ordinare), con snapshot di fornitore (id e nome) e categoria.
- * I prodotti a testo libero vengono creati (o riattivati) prima.
+ * Righe del report dall'input: ogni prodotto diventa fino a due righe (presente = giacenza, da_ordinare = quantità
+ * da ordinare), con snapshot di fornitore (id e nome) e categoria. I prodotti a testo libero vengono creati (o riattivati).
  */
-export async function submitInventoryReport(
+async function resolveReportLines(
   db: PocketBase,
   input: InventoryReportInputType,
   actor: InventoryActor,
-): Promise<SubmittedInventoryReport> {
-  const reportId = generateRecordId();
-  const resolved: (InventoryLineSnapshot & { product_id: string })[] = [];
+): Promise<ResolvedReportLine[]> {
+  const resolved: ResolvedReportLine[] = [];
   // Nome del fornitore letto una volta per fornitore (lo snapshot è quello del momento dell'invio).
   const supplierNames = new Map<string, string>();
   const supplierNameOf = async (id: string): Promise<string> => {
@@ -299,19 +302,12 @@ export async function submitInventoryReport(
     if (line.stock > 0) resolved.push({ ...snapshot, state: "presente", quantity: line.stock });
     if (line.to_order > 0) resolved.push({ ...snapshot, state: "da_ordinare", quantity: line.to_order });
   }
+  return resolved;
+}
 
-  const rows = mergeReportLines(resolved);
-
-  const batch = db.createBatch();
-  batch.collection("inventory_reports").create({
-    id: reportId,
-    created_by: actor.id,
-    created_by_name: actor.full_name,
-    report_date: dayStartPb(input.report_date),
-    notes: input.notes ?? "",
-    status: "inviato",
-  });
-  resolved.forEach((line, index) => {
+/** Aggiunge alla batch le righe del report, nell'ordine dato. */
+function addReportLines(batch: ReturnType<PocketBase["createBatch"]>, reportId: string, lines: ResolvedReportLine[]): void {
+  lines.forEach((line, index) => {
     batch.collection("inventory_report_lines").create({
       id: generateRecordId(),
       report: reportId,
@@ -326,14 +322,72 @@ export async function submitInventoryReport(
       sort: index,
     });
   });
-  await batch.send();
+}
 
+async function summarize(db: PocketBase, reportId: string, lines: ResolvedReportLine[]): Promise<SubmittedInventoryReport> {
+  const rows = mergeReportLines(lines);
   return {
     id: reportId,
     toOrder: rows.filter((r) => (r.to_order ?? 0) > 0).length,
     present: rows.filter((r) => (r.stock ?? 0) > 0).length,
     toOrderBySupplier: countToOrderBySupplier(rows, await listSuppliers(db)),
   };
+}
+
+/** Salva un report di giacenza: testata e righe in una batch (righe da resolveReportLines). */
+export async function submitInventoryReport(
+  db: PocketBase,
+  input: InventoryReportInputType,
+  actor: InventoryActor,
+): Promise<SubmittedInventoryReport> {
+  const reportId = generateRecordId();
+  const resolved = await resolveReportLines(db, input, actor);
+
+  const batch = db.createBatch();
+  batch.collection("inventory_reports").create({
+    id: reportId,
+    created_by: actor.id,
+    created_by_name: actor.full_name,
+    report_date: dayStartPb(input.report_date),
+    notes: input.notes ?? "",
+    status: "inviato",
+  });
+  addReportLines(batch, reportId, resolved);
+  await batch.send();
+
+  return summarize(db, reportId, resolved);
+}
+
+/**
+ * Modifica un report già inviato: data, note e righe (le righe vecchie sono sostituite), in una batch.
+ * Il report torna "inviato" (se l'admin l'aveva già visto, deve rivederlo). Autore e data di creazione restano.
+ */
+export async function updateInventoryReport(
+  db: PocketBase,
+  reportId: string,
+  input: InventoryReportInputType,
+  actor: InventoryActor,
+): Promise<SubmittedInventoryReport> {
+  const resolved = await resolveReportLines(db, input, actor);
+  const oldLines = await listAll(db, "inventory_report_lines", db.filter("report = {:r}", { r: reportId }), { fields: "id" });
+  // Una sola batch (tutto o niente): testata + righe vecchie da eliminare + righe nuove entro maxRequests (500).
+  if (1 + oldLines.length + resolved.length > BATCH_MAX_REQUESTS) {
+    throw new UserFacingError("Il report ha troppe righe per essere modificato in una volta: invia una nuova giacenza.");
+  }
+
+  const batch = db.createBatch();
+  batch.collection("inventory_reports").update(reportId, {
+    report_date: dayStartPb(input.report_date),
+    notes: input.notes ?? "",
+    status: "inviato",
+    seen_by: "",
+    seen_at: "",
+  });
+  for (const line of oldLines) batch.collection("inventory_report_lines").delete(line.id);
+  addReportLines(batch, reportId, resolved);
+  await batch.send();
+
+  return summarize(db, reportId, resolved);
 }
 
 /** Segna il report come visto dall'admin (una sola volta: le visite successive non cambiano il dato). */

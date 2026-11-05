@@ -5,12 +5,12 @@ import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { inventoryPdfFileName, inventoryPdfHref } from "@/components/inventory/inventory-links";
 import { InventoryReportSections, type InventoryReportGrouping } from "@/components/inventory/InventoryReportSections";
 import { MarkSeenButton } from "@/components/inventory/ReportActions";
-import { Badge, DocumentDownload, buttonClasses } from "@/components/ui";
+import { Badge, ButtonLink, DocumentDownload, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
 import { requireProfile } from "@/lib/auth";
 import { mergeReportLines, reportSuppliers } from "@/lib/inventory-utils";
 import { getInventoryReport, getInventorySuppliers } from "@/lib/data/inventory";
-import { canManageInventory, canUseInventory } from "@/lib/permissions";
+import { canEditInventoryReport, canManageInventory, canUseInventory } from "@/lib/permissions";
 
 export const metadata: Metadata = {
   title: "Giacenza · Casale del Notaio",
@@ -83,6 +83,11 @@ export default async function InventoryReportPage({ params }: { params: Promise<
               </DocumentDownload>
             ))}
           </div>
+          {canEditInventoryReport(profile, report) && (
+            <ButtonLink href={`/admin/giacenza/${report.id}/modifica`} variant="outline" size="md" className="min-h-11">
+              Modifica
+            </ButtonLink>
+          )}
           {admin && <MarkSeenButton reportId={report.id} seen={seen} />}
         </div>
       </header>
