@@ -62,7 +62,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         indicators={{
           eventsThisMonth: stats.eventsThisMonth,
           pendingOptions: stats.pendingOptions,
-          eventsThisMonthHref: "/admin/statistiche?periodo=mese&tipo=evento",
           pendingOptionsHref: "/admin/da-confermare",
         }}
       >
