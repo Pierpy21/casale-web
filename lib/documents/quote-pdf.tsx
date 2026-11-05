@@ -170,7 +170,7 @@ function MenuBlock({ title, menu }: { title: string; menu: QuoteDocumentMenu }) 
 function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffer }) {
   const { issuer, meta, client, event, setup, totals } = model;
   return (
-    <Document title={`Preventivo ${meta.number}`} author={issuer.name} creator={issuer.name}>
+    <Document title={`${model.title} ${meta.number}`} author={issuer.name} creator={issuer.name}>
       <Page size="A4" style={styles.page}>
         {/* Intestazione: dati Casale a sinistra, logo in alto a destra */}
         <View style={styles.headerRow}>

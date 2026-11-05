@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { DocumentDownload, buttonClasses } from "@/components/ui";
-import type { Quote } from "@/lib/types";
+import type { BookingStatus, Quote } from "@/lib/types";
 import { DOCX_MIME, computeQuoteTotals, formatEUR, quoteFileName } from "@/lib/quote-utils";
 
 /** Elenco dei preventivi della prenotazione (solo admin), dal più recente. Dentro Pagamenti e acconti. */
-export function QuotesList({ quotes }: { quotes: Quote[] }) {
+export function QuotesList({ quotes, status }: { quotes: Quote[]; status: BookingStatus }) {
   if (quotes.length === 0) {
     return (
       <p className="text-[13px] text-slate">
@@ -31,7 +31,7 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
               </Link>
               <DocumentDownload
                 href={`/api/quotes/${quote.id}/pdf`}
-                fileName={quoteFileName(quote.number, "pdf")}
+                fileName={quoteFileName(quote.number, "pdf", status)}
                 mimeType="application/pdf"
                 className={buttonClasses("outline", "sm", "min-h-11")}
               >
@@ -39,7 +39,7 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
               </DocumentDownload>
               <DocumentDownload
                 href={`/api/quotes/${quote.id}/docx`}
-                fileName={quoteFileName(quote.number, "docx")}
+                fileName={quoteFileName(quote.number, "docx", status)}
                 mimeType={DOCX_MIME}
                 className={buttonClasses("outline", "sm", "min-h-11")}
               >

@@ -8,6 +8,7 @@ import { ButtonLink, PageHeader } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
 import { requireAdmin } from "@/lib/auth";
 import { getQuote } from "@/lib/data/quotes";
+import { quoteDocumentTitle } from "@/lib/quote-utils";
 
 export const metadata: Metadata = {
   title: "Preventivo · Casale del Notaio",
@@ -21,6 +22,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const quote = await getQuote(id);
   if (!quote) notFound();
 
+  const docTitle = quoteDocumentTitle(quote.booking.status);
   // Chiave sulla versione salvata: dopo un salvataggio l'editor riparte dai dati del server.
   const version = JSON.stringify([quote.issued_at, quote.valid_until, quote.discount, quote.final_total, quote.vat_rate, quote.notes, quote.lines]);
 
@@ -29,8 +31,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       {/* Stampa: solo il foglio A4 del preventivo (vedi QuotePrintStyles). */}
       <QuotePrintStyles />
       <PageHeader
-        eyebrow="Preventivo"
-        title={`Preventivo n. ${quote.number}`}
+        eyebrow={docTitle}
+        title={`${docTitle} n. ${quote.number}`}
         description={`${bookingPersonName(quote.booking)} ·${formatIt(toDate(quote.booking.event_date), "EEEE d MMMM yyyy")}`}
         actions={
           <ButtonLink href={`/admin/prenotazioni/${quote.booking_id}`} variant="ghost" size="md" className="no-print">

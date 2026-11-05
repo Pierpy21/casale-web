@@ -8,10 +8,13 @@ import { createQuoteFromBooking } from "@/app/actions/quotes";
 import { WhatsAppQuoteShare } from "@/components/quotes/WhatsAppQuoteShare";
 import { Alert, DocumentDownload, buttonClasses, cn } from "@/components/ui";
 import { isQueued, submitMutation } from "@/lib/offline/submit";
-import { DOCX_MIME, quoteFileName } from "@/lib/quote-utils";
+import { DOCX_MIME, quoteDocumentTitle, quoteFileName } from "@/lib/quote-utils";
+import type { BookingStatus } from "@/lib/types";
 
 export interface PreventivoMenuProps {
   bookingId: string;
+  /** Stato dell'evento: "Preventivo" in attesa, "Ordine di servizio" da confermato. */
+  status: BookingStatus;
   /** Preventivo più recente, null se non ce n'è nessuno. */
   latest: { id: string; number: string } | null;
   /** Numero totale di preventivi della prenotazione (per la nota nel menu). */
@@ -36,7 +39,8 @@ const ICON = "size-4 shrink-0 text-bronze";
  * Senza preventivo: Crea preventivo. Si chiude con Esc, con un clic fuori o dopo una scelta.
  * Il menu è ancorato al bordo destro del pulsante, quindi resta sempre nello schermo.
  */
-export function PreventivoMenu({ bookingId, latest, quotesCount, phone, clientName, eventDate, total }: PreventivoMenuProps) {
+export function PreventivoMenu({ bookingId, status, latest, quotesCount, phone, clientName, eventDate, total }: PreventivoMenuProps) {
+  const docTitle = quoteDocumentTitle(status);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,8 +108,8 @@ export function PreventivoMenu({ bookingId, latest, quotesCount, phone, clientNa
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Preventivo"
-        title="Preventivo"
+        aria-label={docTitle}
+        title={docTitle}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-busy={pending || undefined}
@@ -113,7 +117,7 @@ export function PreventivoMenu({ bookingId, latest, quotesCount, phone, clientNa
         className={buttonClasses("outline", "sm", "min-h-11 shrink-0")}
       >
         <FileText aria-hidden="true" className="size-4" />
-        <span className="hidden sm:inline">{pending ? "Creazione…" : "Preventivo"}</span>
+        <span className="hidden sm:inline">{pending ? "Creazione…" : docTitle}</span>
         <ChevronDown aria-hidden="true" className={cn("size-4 transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} />
       </button>
 
@@ -126,7 +130,7 @@ export function PreventivoMenu({ bookingId, latest, quotesCount, phone, clientNa
           {latest ? (
             <>
               <div className="flex flex-col gap-0.5 px-2.5 pb-1.5 pt-1">
-                <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-bronze">Preventivo più recente</span>
+                <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-bronze">{docTitle} più recente</span>
                 <span className="text-[14px] text-ink wrap-anywhere">n. {latest.number}</span>
                 {quotesCount > 1 && (
                   <span className="text-[12px] text-slate-dark">
@@ -137,7 +141,7 @@ export function PreventivoMenu({ bookingId, latest, quotesCount, phone, clientNa
               <div className="flex flex-col gap-0.5 border-t border-sand pt-1">
                 <DocumentDownload
                   href={`/api/quotes/${latest.id}/pdf`}
-                  fileName={quoteFileName(latest.number, "pdf")}
+                  fileName={quoteFileName(latest.number, "pdf", status)}
                   mimeType="application/pdf"
                   className={ITEM}
                   onActivate={() => setOpen(false)}
@@ -147,7 +151,7 @@ export function PreventivoMenu({ bookingId, latest, quotesCount, phone, clientNa
                 </DocumentDownload>
                 <DocumentDownload
                   href={`/api/quotes/${latest.id}/docx`}
-                  fileName={quoteFileName(latest.number, "docx")}
+                  fileName={quoteFileName(latest.number, "docx", status)}
                   mimeType={DOCX_MIME}
                   className={ITEM}
                   onActivate={() => setOpen(false)}
@@ -158,6 +162,7 @@ export function PreventivoMenu({ bookingId, latest, quotesCount, phone, clientNa
                 <WhatsAppQuoteShare
                   quoteId={latest.id}
                   number={latest.number}
+                  status={status}
                   phone={phone}
                   clientName={clientName}
                   eventDate={eventDate}
@@ -170,7 +175,7 @@ export function PreventivoMenu({ bookingId, latest, quotesCount, phone, clientNa
                 </WhatsAppQuoteShare>
                 <Link href={`/admin/preventivi/${latest.id}`} className={ITEM} onClick={() => setOpen(false)}>
                   <ExternalLink aria-hidden="true" className={ICON} />
-                  Apri preventivo
+                  Apri {docTitle.toLowerCase()}
                 </Link>
               </div>
             </>

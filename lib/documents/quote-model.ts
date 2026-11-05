@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
-import { computeQuoteTotals, formatEUR, round2 } from "@/lib/quote-utils";
+import { computeQuoteTotals, formatEUR, quoteDocumentTitle, round2 } from "@/lib/quote-utils";
 import { bookingPersonName, bookingPhone } from "@/components/bookings/format";
 import {
   BOOKING_MEAL_LABELS,
@@ -102,9 +102,11 @@ const CASALE_ISSUER = {
   email: "info@casaledelnotaio.it",
 } as const;
 
+const VALIDITY_CONDITION = "Il preventivo ha validità fino alla data indicata.";
+
 const CONDITIONS = [
   "Prezzi espressi in euro, IVA inclusa.",
-  "Il preventivo ha validità fino alla data indicata.",
+  VALIDITY_CONDITION,
   "Ogni sala è riservata a un singolo evento: esclusività della sala, tavolo torta e decorazioni sono incluse nella banchettistica.",
 ] as const;
 
@@ -143,6 +145,9 @@ function groupByCourse(
 export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel {
   const b = q.booking;
   const totals = computeQuoteTotals(q);
+  // Evento confermato o saldato: "Ordine di servizio", senza scadenza né la condizione sulla validità.
+  const title = quoteDocumentTitle(b.status);
+  const isOrder = title !== "Preventivo";
 
   const dishesMenu: QuoteDocumentMenu | null =
     b.menu || b.dishes.length > 0
@@ -161,11 +166,11 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
       phone: CASALE_ISSUER.phone,
       email: CASALE_ISSUER.email,
     },
-    title: "Preventivo",
+    title,
     meta: {
       number: q.number,
       issuedAt: formatDateShort(q.issued_at),
-      validUntil: q.valid_until ? formatDateShort(q.valid_until) : null,
+      validUntil: !isOrder && q.valid_until ? formatDateShort(q.valid_until) : null,
     },
     // Il preventivo nasce da un evento, quindi ha sempre il cliente di rubrica; i campi restano null-safe.
     client: {
@@ -208,7 +213,7 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
       overridden: totals.overridden,
     },
     notes: orNull(q.notes),
-    conditions: [...CONDITIONS],
+    conditions: isOrder ? CONDITIONS.filter((line) => line !== VALIDITY_CONDITION) : [...CONDITIONS],
     signature: {
       issuerLabel: "Per il Casale del Notaio",
       clientLabel: "Per accettazione (firma del cliente)",

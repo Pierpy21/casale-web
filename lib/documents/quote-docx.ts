@@ -389,7 +389,7 @@ export async function renderQuoteDocx(model: QuoteDocumentModel): Promise<Buffer
 
   const doc = new Document({
     creator: issuer.name,
-    title: `Preventivo ${meta.number}`,
+    title: `${model.title} ${meta.number}`,
     styles: {
       default: {
         document: { run: { font: FONT.sans, size: 19, color: COLOR.ink } },
