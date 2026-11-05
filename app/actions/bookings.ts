@@ -491,7 +491,7 @@ export async function resetDishesFromMenu(id: string, opts?: MutationOptions): P
 }
 
 /**
- * Allergie e patologie: sostituzione dell'elenco. Admin sempre; sala attiva su eventi e prenotazioni normali
+ * Allergie e intolleranze: sostituzione dell'elenco. Admin sempre; sala attiva su eventi e prenotazioni normali
  * (canEditAllergies). Audit e notifica (booking_updated) solo se qualcosa cambia.
  */
 export async function saveBookingAllergies(bookingId: string, allergies: BookingAllergyDraft[], opts?: MutationOptions): Promise<ActionResult> {

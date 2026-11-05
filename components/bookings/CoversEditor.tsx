@@ -40,7 +40,7 @@ export function CoversEditor({ bookingId, adults, childCount, kidsMenus, expecte
     setQueued(false);
     startTransition(async () => {
       const result = await submitMutation("bookings.updateBookingCovers", updateBookingCovers, [bookingId, values], {
-        label: `Coperti · ${values.adults} adulti, ${values.children} bambini`,
+        label: `Coperti · ${values.adults} adulti, ${values.children} seggioloni`,
         entity: { type: "booking", id: bookingId },
         expectedUpdated,
       });
@@ -78,22 +78,19 @@ export function CoversEditor({ bookingId, adults, childCount, kidsMenus, expecte
           onChange={(n) => setValues((v) => ({ ...v, adults: n }))}
           error={errors.adults?.[0]}
         />
-        <CountStepper
-          id="covers-children"
-          label="Bambini"
-          value={values.children}
-          onChange={(n) =>
-            setValues((v) => ({ ...v, children: n, kids_menus: Math.min(v.kids_menus, n) }))
-          }
-        />
+        {/* Menù bambini subito dopo gli adulti; i seggioloni sono indipendenti (contano nei coperti). */}
         <CountStepper
           id="covers-kids-menus"
           label="Menù bambini"
           value={values.kids_menus}
-          max={values.children}
           onChange={(n) => setValues((v) => ({ ...v, kids_menus: n }))}
-          hint="Non può superare il numero di bambini"
           error={errors.kids_menus?.[0]}
+        />
+        <CountStepper
+          id="covers-children"
+          label="Seggioloni"
+          value={values.children}
+          onChange={(n) => setValues((v) => ({ ...v, children: n }))}
         />
       </div>
 

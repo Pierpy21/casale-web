@@ -237,9 +237,6 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
     if (!isAppointment && values.table_number.trim() !== "" && parseTable(values.table_number) === null) {
       add("table_number", "Numero del tavolo non valido: usa un numero da 1 a 9999.");
     }
-    if (!isAppointment && values.kids_menus > values.children) {
-      add("kids_menus", "I menù bambini non possono superare i bambini");
-    }
     Object.assign(local, validateAllergies(values.allergies));
 
     setErrors(local);
@@ -445,19 +442,21 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       {!isAppointment && (
         <>
           <FormCard label="Coperti">
-            <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-2">
+            {/* Come negli eventi: menù bambini subito dopo gli adulti, seggioloni indipendenti (contano nei coperti). */}
+            <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-3">
               <CountStepper id="adults" label="Adulti" value={values.adults} onChange={(n) => change({ adults: n })} error={first(errors.adults)} />
               <CountStepper
-                id="children"
-                label="Bambini"
-                value={values.children}
-                onChange={(n) => change({ children: n, kids_menus: Math.min(values.kids_menus, n) })}
+                id="kids_menus"
+                label="Menù bambini"
+                value={values.kids_menus}
+                onChange={(n) => change({ kids_menus: n })}
+                error={first(errors.kids_menus)}
               />
+              <CountStepper id="children" label="Seggioloni" value={values.children} onChange={(n) => change({ children: n })} />
             </div>
             <p className="text-[14px] text-slate-dark">
               Totale coperti: <span className="font-serif text-2xl tabular-nums text-ink">{covers}</span>
             </p>
-            {first(errors.kids_menus) && <p className="text-[13px] text-danger">{first(errors.kids_menus)}</p>}
           </FormCard>
 
           <FormCard label="Sala e tavolo">
@@ -514,7 +513,7 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
         </>
       )}
 
-      <FormCard label="Allergie e patologie">
+      <FormCard label="Allergie e intolleranze">
         <AllergyEditor
           rows={values.allergies}
           errors={errors}

@@ -265,7 +265,7 @@ export function BookingCard({
       {allergyCount > 0 && !isKitchen && (
         <div className="border-l-[3px] border-danger bg-danger/5 px-4 py-3">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-danger">
-            Allergie e patologie
+            Allergie e intolleranze
           </p>
           <ul className="mt-2 flex flex-col gap-1 text-[14px] text-ink">
             {b.allergies.map((allergy) => (

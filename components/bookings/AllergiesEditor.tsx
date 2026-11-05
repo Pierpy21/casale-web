@@ -58,7 +58,7 @@ const SECTION_CLASS =
   "flex min-w-0 flex-col gap-5 rounded-[2px] border-l-[3px] border-danger bg-danger/5 p-5 sm:p-6";
 
 /**
- * Allergie e patologie della prenotazione. Di default mostra l'elenco in lettura.
+ * Allergie e intolleranze della prenotazione. Di default mostra l'elenco in lettura.
  * Con `editable` un pulsante apre il modulo di modifica (aggiunta, modifica, rimozione) che si salva
  * in blocco (saveBookingAllergies): "Salva" torna alla lettura, "Annulla" scarta la bozza.
  * Il salvataggio è ottimistico: con errore l'elenco torna a quello salvato e il modulo si riapre con la bozza.
@@ -92,7 +92,7 @@ export function AllergiesEditor({ bookingId, allergies, editable, expectedUpdate
         {editable ? "Attenzione" : "Attenzione · sola lettura"}
       </p>
       <h2 id="allergie-title" className="text-2xl">
-        Allergie e patologie
+        Allergie e intolleranze
       </h2>
     </div>
   );
@@ -158,7 +158,7 @@ export function AllergiesEditor({ bookingId, allergies, editable, expectedUpdate
     startTransition(async () => {
       setSaved(optimistic);
       const result = await submitMutation("bookings.saveBookingAllergies", saveBookingAllergies, [bookingId, payload], {
-        label: "Allergie e patologie",
+        label: "Allergie e intolleranze",
         entity: { type: "booking", id: bookingId },
         expectedUpdated,
       });
@@ -186,7 +186,7 @@ export function AllergiesEditor({ bookingId, allergies, editable, expectedUpdate
         {header}
         {alerts}
         {saved.length === 0 ? (
-          <p className="text-[15px] text-ink">Nessuna allergia o patologia segnalata.</p>
+          <p className="text-[15px] text-ink">Nessuna allergia o intolleranza segnalata.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {saved.map((allergy) => (
