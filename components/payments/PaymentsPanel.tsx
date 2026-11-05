@@ -106,7 +106,8 @@ export function PaymentsPanel({ booking, payments, paymentsError }: PaymentsPane
       const result = await submitMutation("payments.deletePayment", deletePayment, [target.id], {
         label: `Elimina acconto · ${formatEUR(target.amount)}`,
         entity: { type: "booking", id: booking.id },
-        expectedUpdated: updatedAtOf(booking),
+        // Il server confronta con l'`updated` dell'acconto (non della prenotazione: darebbe sempre conflitto).
+        expectedUpdated: updatedAtOf(target),
       });
       if (!result.ok) {
         // Rollback: l'acconto torna nell'elenco.
