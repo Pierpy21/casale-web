@@ -316,11 +316,11 @@ export async function submitInventoryReport(input: unknown, opts?: MutationOptio
 
 /**
  * Modifica un report già inviato (stesso input di submitInventoryReport): data, note e righe sostituite.
- * Solo l'admin o chi l'ha compilato. Il report torna "inviato" e l'admin riceve di nuovo la notifica.
+ * Chiunque usi la giacenza (admin e cucina). Il report torna "inviato" e l'admin riceve di nuovo la notifica.
  */
 export async function updateInventoryReport(id: string, input: unknown, opts?: MutationOptions): Promise<ActionResult<SubmittedReport>> {
   if (!isRecordId(id)) return fail("Report non valido.");
-  const auth = await authorize(canUseInventory, "Non sei autorizzato alla giacenza.");
+  const auth = await authorize(canEditInventoryReport, "Non sei autorizzato alla giacenza.");
   if (!auth.ok) return auth;
 
   return withMutation(auth.db, opts, "inventory.updateInventoryReport", auth.profile.id, async (): Promise<ActionResult<SubmittedReport>> => {
@@ -329,9 +329,6 @@ export async function updateInventoryReport(id: string, input: unknown, opts?: M
 
     const report = await fetchOne(auth.db, "inventory_reports", id);
     if (!report) return fail("Report non trovato.");
-    if (!canEditInventoryReport(auth.profile, { created_by: report.created_by ? String(report.created_by) : null })) {
-      return fail("Puoi modificare solo le giacenze che hai compilato tu.");
-    }
 
     const actor = { id: auth.profile.id, full_name: auth.profile.full_name };
     let result: Awaited<ReturnType<typeof rewriteInventoryReport>>;

@@ -87,10 +87,9 @@ export function canViewStats(p: Profile): boolean {
   return p.active && (p.role === "admin" || p.role === "cucina");
 }
 
-/** Modifica di un report di giacenza già inviato: l'admin, oppure chi l'ha compilato (se può usare la giacenza). */
-export function canEditInventoryReport(p: Profile, report: { created_by: string | null }): boolean {
-  if (isAdmin(p)) return true;
-  return canUseInventory(p) && report.created_by === p.id;
+/** Modifica di un report di giacenza già inviato: chiunque usi la giacenza (admin e tutta la cucina). */
+export function canEditInventoryReport(p: Profile): boolean {
+  return canUseInventory(p);
 }
 
 /** Gestione del catalogo giacenza (disattivare prodotti) e segnatura dei report come visti: solo admin. */

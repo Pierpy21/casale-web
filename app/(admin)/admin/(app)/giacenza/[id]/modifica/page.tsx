@@ -29,7 +29,7 @@ export default async function EditInventoryReportPage({ params }: { params: Prom
     getInventorySuppliers({ includeInactive: true }),
   ]);
   if (!report) notFound();
-  if (!canEditInventoryReport(profile, report)) redirect(`/admin/giacenza/${id}`);
+  if (!canEditInventoryReport(profile)) redirect(`/admin/giacenza/${id}`);
 
   // Quantità salvate per prodotto. I prodotti disattivati nel frattempo restano nell'elenco (dallo snapshot della riga).
   const counts: Record<string, InventoryDraftCount> = {};

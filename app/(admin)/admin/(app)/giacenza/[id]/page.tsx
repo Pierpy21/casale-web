@@ -83,7 +83,7 @@ export default async function InventoryReportPage({ params }: { params: Promise<
               </DocumentDownload>
             ))}
           </div>
-          {canEditInventoryReport(profile, report) && (
+          {canEditInventoryReport(profile) && (
             <ButtonLink href={`/admin/giacenza/${report.id}/modifica`} variant="outline" size="md" className="min-h-11">
               Modifica
             </ButtonLink>
