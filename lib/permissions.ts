@@ -82,6 +82,11 @@ export function canUseInventory(p: Profile): boolean {
   return p.active && (p.role === "admin" || p.role === "cucina");
 }
 
+/** Statistiche (coperti e menù, nessun importo): admin e cucina. */
+export function canViewStats(p: Profile): boolean {
+  return p.active && (p.role === "admin" || p.role === "cucina");
+}
+
 /** Gestione del catalogo giacenza (disattivare prodotti) e segnatura dei report come visti: solo admin. */
 export function canManageInventory(p: Profile): boolean {
   return isAdmin(p);

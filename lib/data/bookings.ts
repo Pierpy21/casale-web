@@ -7,7 +7,7 @@ import { isRecordId, dayEndPb, dayStartPb, nn, num, toDateOnly, type PbRecord } 
 import { mapChange, mealOf } from "@/lib/pocketbase/mappers";
 import { listAll, listByParents, fetchOne } from "@/lib/pocketbase/queries";
 import { addDaysISO, monthBounds, romeToday } from "@/lib/dates";
-import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, isAdmin } from "@/lib/permissions";
+import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, canViewStats, isAdmin } from "@/lib/permissions";
 import { mondayOf } from "@/lib/stats-period";
 import {
   BOOKING_KINDS,
@@ -556,7 +556,7 @@ export async function getCoversStats(opts: { from: string; to: string; kind?: St
   };
   if (!ISO_DATE.test(opts.from) || !ISO_DATE.test(opts.to) || opts.from > opts.to) return empty;
   const me = await getCurrentProfile();
-  if (!me || !isAdmin(me)) return empty;
+  if (!me || !canViewStats(me)) return empty;
   const db = await getAdminPb();
 
   const records = await listAll(
