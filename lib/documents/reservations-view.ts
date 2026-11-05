@@ -11,6 +11,8 @@ export interface ReservationPdfRow {
   name: string;
   room: string;
   table: string;
+  /** Coperti (adulti + bambini), "—" se zero. */
+  covers: string;
   /** Pasto: "Pranzo", "Cena" o "—". */
   meal: string;
   phone: string;
@@ -39,14 +41,16 @@ export function buildReservationSheetView(sheet: ReservationSheet): ReservationS
   const [y, m, d] = sheet.date.split("-").map(Number);
   const day = new Date(y, m - 1, d);
   const count = sheet.rows.length;
+  const covers = sheet.rows.reduce((acc, row) => acc + row.covers, 0);
   return {
     title: "Foglio prenotazioni",
     dateLong: capitalize(format(day, "EEEE d MMMM yyyy", { locale: it })),
-    countLabel: `${count} ${count === 1 ? "prenotazione" : "prenotazioni"}`,
+    countLabel: `${count} ${count === 1 ? "prenotazione" : "prenotazioni"} · ${covers} ${covers === 1 ? "coperto" : "coperti"}`,
     rows: sheet.rows.map((row) => ({
       name: row.name || DASH,
       room: row.room || DASH,
       table: row.table === null ? DASH : String(row.table),
+      covers: row.covers > 0 ? String(row.covers) : DASH,
       meal: row.meal ? BOOKING_MEAL_LABELS[row.meal] : DASH,
       phone: row.phone || DASH,
     })),

@@ -8,8 +8,9 @@ import type { ReservationSheetView } from "@/lib/documents/reservations-view";
 /** Colonne del foglio come nel PDF (larghezze in pt; il nome prende lo spazio residuo). */
 const COLUMNS: SheetPreviewColumn[] = [
   { label: "Nome" },
-  { label: "Sala", widthPt: 110 },
-  { label: "Tavolo", widthPt: 60, align: "center", strong: true },
+  { label: "Sala", widthPt: 95 },
+  { label: "Tavolo", widthPt: 50, align: "center", strong: true },
+  { label: "Coperti", widthPt: 55, align: "center" },
   { label: "Pasto", widthPt: 55, align: "center" },
   { label: "Cellulare", widthPt: 100 },
 ];
@@ -32,7 +33,7 @@ export function ReservationSheetButton({ date }: { date: string }) {
           footer={SHEET_PREVIEW_FOOTER}
           pxPerMm={pxPerMm ?? undefined}
           columns={COLUMNS}
-          rows={view.rows.map((row) => [row.name, row.room, row.table, row.meal, row.phone])}
+          rows={view.rows.map((row) => [row.name, row.room, row.table, row.covers, row.meal, row.phone])}
           emptyText="Nessuna prenotazione"
         />
       )}
