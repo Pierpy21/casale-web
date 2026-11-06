@@ -61,7 +61,7 @@ export default async function AppLayout({
           {/* data-shell: sala e cucina su tablet restano sul layout da telefono (varianti desk:/optouch: in globals.css). */}
           <div
             data-shell={isAdmin(profile) ? undefined : OPERATOR_SHELL}
-            className="min-h-dvh bg-paper desk:grid desk:grid-cols-[17rem_minmax(0,1fr)]"
+            className="min-h-dvh bg-paper desk:grid desk:grid-cols-[17rem_minmax(0,1fr)] desk:transition-[grid-template-columns] desk:duration-300 desk:ease-out motion-reduce:transition-none sidebar-compact:desk:grid-cols-[4rem_minmax(0,1fr)]"
           >
             <a
               href="#contenuto"
@@ -75,7 +75,7 @@ export default async function AppLayout({
 
             <main
               id="contenuto"
-              className="min-w-0 clip-x px-4 pb-32 pt-6 sm:px-6 desk:px-10 desk:pb-14 desk:pt-10 optouch:mx-auto optouch:w-full optouch:max-w-[56rem] optouch:px-8 optouch:pt-8"
+              className="min-w-0 clip-x px-4 pb-32 pt-6 sm:px-6 desk:px-10 desk:pb-14 desk:pt-10 sidebar-compact:desk:px-6 sidebar-compact:desk:pt-6 optouch:mx-auto optouch:w-full optouch:max-w-[56rem] optouch:px-8 optouch:pt-8"
             >
               <OfflineBanner />
               {children}

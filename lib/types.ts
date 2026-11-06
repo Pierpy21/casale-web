@@ -201,3 +201,38 @@ export interface WeekStats { week_start: string; week_end: string; event_covers:
 /** Porzioni consumate per menù (adulti: adults; bambini: kids_menus), solo eventi non annullati. */
 export interface MenuConsumption { menu_id: string; name: string; is_kids: boolean; servings: number; }
 export interface CoversStats { from: string; to: string; weeks: WeekStats[]; totals: { event_covers: number; normal_covers: number; events: number; normal_bookings: number }; /** Coperti totali del periodo (eventi + prenotazioni): base per le percentuali. */ period_total_covers: number; menus: MenuConsumption[]; }
+
+// ---------------------------------------------------------------------
+// Mappa sala (admin + sala): tavoli delle sale e occupazione per giorno/pasto
+// ---------------------------------------------------------------------
+/** Forme dei tavoli. "L" e "U": tavolate da banchetto composte (posti fuori e dentro sui lati lunghi, capotavola sui lati corti). */
+export const TABLE_SHAPES = ["tondo", "quadrato", "rettangolare", "L", "U"] as const;
+export type TableShape = (typeof TABLE_SHAPES)[number];
+export const TABLE_SHAPE_LABELS: Record<TableShape, string> = { tondo: "Tondo", quadrato: "Quadrato", rettangolare: "Rettangolare", L: "A L", U: "A U" };
+/**
+ * Tavolo di una sala (collezione room_tables). `x`/`y`: centro del tavolo in % della stanza (0–100). `rotation`: gradi in senso orario, 0–359 (0 = orizzontale).
+ * `layout_date`/`layout_meal`: null = disposizione standard della sala; valorizzati = tavolo della disposizione speciale di quel giorno e pasto.
+ */
+export interface RoomTable { id: string; room_id: string; number: number; seats: number; shape: TableShape; x: number; y: number; rotation: number; active: boolean; layout_date: string | null; layout_meal: BookingMeal | null; }
+/** Bozza per il salvataggio della disposizione di una sala. `id` presente = tavolo esistente. */
+export interface RoomTableDraft { id?: string; number: number; seats: number; shape: TableShape; x: number; y: number; rotation: number; }
+/** Prenotazione normale nella mappa (dati minimi). */
+export interface FloorBooking { id: string; name: string; phone: string | null; covers: number; adults: number; children: number; status: BookingStatus; room_id: string | null; table_number: number | null; notes: string | null; }
+/** Evento che riserva una sala nel giorno/pasto. */
+/**
+ * Evento nella mappa. Un evento può occupare più tavoli della stessa sala: `table_numbers` = tutti i suoi tavoli
+ * (il primo coincide con `table_number`, il tavolo principale; vuoto = nessun tavolo).
+ */
+export interface FloorEvent { id: string; room_id: string | null; table_number: number | null; table_numbers: number[]; title: string; covers: number; status: BookingStatus; }
+/**
+ * Disposizione da salvare: `null` = standard della sala (vale tutti i giorni); valorizzato = disposizione speciale
+ * solo per quel giorno e pasto (sostituisce la standard in quel giorno/pasto).
+ */
+export type LayoutScope = { date: string; meal: BookingMeal } | null;
+/** Dati della mappa sala per un giorno (`date` YYYY-MM-DD) e un pasto. */
+/**
+ * Dati della mappa per giorno+pasto. `tables`: per ogni sala, i tavoli della disposizione speciale del giorno/pasto se esiste,
+ * altrimenti quelli standard. `dayLayoutRoomIds`: sale che in questo giorno/pasto usano una disposizione speciale.
+ * `events`: eventi non annullati del giorno/pasto, anche senza sala (room_id null = da assegnare).
+ */
+export interface FloorPlanData { date: string; meal: BookingMeal; rooms: Room[]; tables: RoomTable[]; dayLayoutRoomIds: string[]; bookings: FloorBooking[]; events: FloorEvent[]; }

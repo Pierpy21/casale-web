@@ -28,6 +28,9 @@ import {
   type Room,
   type Booking,
   type BookingMeal,
+  type RoomTable,
+  type TableShape,
+  TABLE_SHAPES,
 } from "@/lib/types";
 import { normalizeInventoryCategory } from "@/lib/inventory-utils";
 import { fileUrl, nn, num, toDateOnly, toIsoDateTime, type PbRecord } from "./helpers";
@@ -82,6 +85,29 @@ export function mapRoom(r: PbRecord): Room {
   };
 }
 
+/**
+ * Tavolo di una sala (collezione room_tables). Forma sconosciuta → "quadrato". Rotazione 0–359 (vuoto = 0).
+ * `layout_date` vuoto → null (disposizione standard); `layout_meal` solo pranzo/cena, altrimenti null.
+ */
+export function mapRoomTable(r: PbRecord): RoomTable {
+  const shape = TABLE_SHAPES.includes(r.shape) ? (r.shape as TableShape) : "quadrato";
+  const rotation = ((Math.round(num(r.rotation)) % 360) + 360) % 360;
+  const layoutMeal = nn(r.layout_meal);
+  return {
+    id: r.id,
+    room_id: String(r.room ?? ""),
+    number: num(r.number),
+    seats: num(r.seats),
+    shape,
+    x: num(r.x),
+    y: num(r.y),
+    rotation,
+    active: Boolean(r.active),
+    layout_date: nn(r.layout_date),
+    layout_meal: layoutMeal === "pranzo" || layoutMeal === "cena" ? layoutMeal : null,
+  };
+}
+
 export function mapMenuItem(r: PbRecord): MenuItem {
   return {
     id: r.id,
@@ -127,6 +153,28 @@ export function mapMenu(r: PbRecord, items: MenuItem[], baseUrl: string): Menu {
     photos,
     updated_at: toIsoDateTime(r.updated),
   };
+}
+
+/**
+ * Tavoli extra di un evento (bookings.extra_tables, JSON): solo interi > 0, senza duplicati e diversi dal tavolo principale
+ * (table_number). Campo assente o non array → [].
+ */
+export function extraTableNumbersOf(r: PbRecord): number[] {
+  const raw = r.extra_tables;
+  if (!Array.isArray(raw)) return [];
+  const principal = num(r.table_number);
+  const out: number[] = [];
+  for (const v of raw) {
+    const n = typeof v === "number" ? v : Number(v);
+    if (Number.isInteger(n) && n > 0 && n !== principal && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+/** Tutti i tavoli occupati da una prenotazione/evento: il principale (se > 0) seguito dagli extra. */
+export function occupiedTableNumbersOf(r: PbRecord): number[] {
+  const principal = num(r.table_number);
+  return [...(principal > 0 ? [principal] : []), ...extraTableNumbersOf(r)];
 }
 
 /** Pasto del record: solo i valori noti ("pranzo", "cena"); vuoto o sconosciuto → null. */

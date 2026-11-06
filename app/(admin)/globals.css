@@ -20,6 +20,11 @@
   @media (min-width: 96rem) and (pointer: fine), (min-width: 96rem) and (pointer: none) { @slot; }
   @media (min-width: 96rem) and (pointer: coarse) { &:where(:not(html:has([data-shell="operator"]) *)) { @slot; } }
 }
+/*
+ * Sidebar desk ridotta a sola icona (attributo data-sidebar="compact" su <html>, impostato dalla pagina:
+ * compactSidebar() in components/shell/shell-mode.ts). Senza attributo non cambia nulla.
+ */
+@custom-variant sidebar-compact (&:where(html[data-sidebar="compact"] *));
 /* Sala e cucina su tablet: layout da telefono in una colonna centrata e più ampia. */
 @custom-variant optouch {
   @media (min-width: 48rem) and (pointer: coarse) { &:where(html:has([data-shell="operator"]) *) { @slot; } }

@@ -1,7 +1,7 @@
-import { canUseInventory, canViewActivityLog, canViewStats, isAdmin } from "@/lib/permissions";
+import { canUseInventory, canViewActivityLog, canViewFloorPlan, canViewStats, isAdmin } from "@/lib/permissions";
 import type { Profile } from "@/lib/types";
 
-export type NavIcon = "event" | "agenda" | "dashboard" | "clients" | "operators" | "catalog" | "inventory" | "activity" | "stats" | "sync";
+export type NavIcon = "event" | "agenda" | "floor" | "dashboard" | "clients" | "operators" | "catalog" | "inventory" | "activity" | "stats" | "sync";
 
 export interface NavLink {
   href: string;
@@ -28,6 +28,7 @@ export const SYNC_HREF = "/admin/sincronizzazione";
 const LINKS: NavDefinition[] = [
   { href: CREATE_EVENT_HREF, label: "Crea evento", icon: "event", prominent: true, mobileBar: false, visible: isAdmin },
   { href: "/admin/agenda", label: "Agenda", icon: "agenda", visible: (p) => p.active },
+  { href: "/admin/sala", label: "Mappa sala", icon: "floor", visible: canViewFloorPlan },
   { href: "/admin/dashboard", label: "Dashboard", icon: "dashboard", visible: isAdmin },
   { href: "/admin/statistiche", label: "Statistiche", icon: "stats", visible: canViewStats },
   { href: "/admin/clienti", label: "Clienti", icon: "clients", visible: isAdmin },

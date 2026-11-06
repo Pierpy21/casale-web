@@ -8,6 +8,7 @@ import {
   INVENTORY_STATES,
   PAYMENT_METHODS,
   SETUP_COLORS,
+  TABLE_SHAPES,
 } from "./types";
 
 // ---------------------------------------------------------------------
@@ -604,6 +605,156 @@ export const RoomInput = z.object({
   active: z.boolean().default(true),
 });
 export type RoomInputType = z.infer<typeof RoomInput>;
+
+// ---------------------------------------------------------------------
+// Mappa sala: disposizione dei tavoli (admin) e sistemazione di una prenotazione (admin e sala)
+// ---------------------------------------------------------------------
+/** Tavoli per sala: limite prudente (ogni tavolo può costare fino a due scritture nella batch). */
+export const MAX_ROOM_TABLES = 100;
+
+/** Posizione del centro del tavolo in % della stanza: fuori dal 0–100 si porta al bordo, due decimali. */
+const roomPercent = z.preprocess(
+  toNumber,
+  z
+    .number(numberError("Posizione non valida"))
+    .refine(Number.isFinite, "Posizione non valida")
+    .transform((n) => Math.round(Math.min(100, Math.max(0, n)) * 100) / 100),
+);
+
+export const RoomTableDraftInput = z.object({
+  /** Presente = tavolo esistente della sala; assente o vuoto = tavolo nuovo. */
+  id: z.preprocess(emptyToNull, z.string().regex(/^[a-z0-9]{15}$/, "Tavolo non valido").nullish()),
+  number: z.preprocess(
+    toNumber,
+    z.number(numberError("Numero del tavolo non valido"))
+      .int("Numero del tavolo non valido: usa un numero intero")
+      .min(1, "Numero del tavolo non valido: usa un numero da 1 a 9999.")
+      .max(9999, "Numero del tavolo non valido: usa un numero da 1 a 9999."),
+  ),
+  /** Posti: fino a 300 (le tavolate a U per i banchetti grandi). */
+  seats: z.preprocess(
+    toNumber,
+    z.number(numberError("Numero di posti non valido"))
+      .int("Il numero di posti deve essere intero")
+      .min(1, "Un tavolo ha almeno 1 posto")
+      .max(300, "Un tavolo non può avere più di 300 posti"),
+  ),
+  shape: z.enum(TABLE_SHAPES, { message: "Forma del tavolo non valida" }),
+  x: roomPercent,
+  y: roomPercent,
+  /** Rotazione in gradi orari: intero, normalizzato modulo 360 (-15 → 345, 360 → 0). Assente o vuoto = 0. */
+  rotation: z.preprocess(
+    (v) => (v === undefined || v === null || (typeof v === "string" && v.trim() === "") ? 0 : toNumber(v)),
+    z
+      .number(numberError("Rotazione non valida"))
+      .int("Rotazione non valida: usa un numero intero di gradi")
+      .transform((n) => ((n % 360) + 360) % 360),
+  ),
+});
+export type RoomTableDraftInputType = z.infer<typeof RoomTableDraftInput>;
+
+/** Disposizione completa di una sala: numeri e id ripetuti sono errori (il numero è unico nella sala). */
+export const RoomLayoutInput = z
+  .array(RoomTableDraftInput)
+  .max(MAX_ROOM_TABLES, `Troppi tavoli (massimo ${MAX_ROOM_TABLES} per sala)`)
+  .superRefine((tables, ctx) => {
+    const numbers = new Set<number>();
+    const ids = new Set<string>();
+    tables.forEach((t, index) => {
+      if (numbers.has(t.number)) {
+        ctx.addIssue({ code: "custom", message: `Il numero ${t.number} è usato da più tavoli: ogni tavolo ha un numero diverso`, path: [index, "number"] });
+      }
+      numbers.add(t.number);
+      if (t.id) {
+        if (ids.has(t.id)) ctx.addIssue({ code: "custom", message: "Tavolo ripetuto", path: [index, "id"] });
+        ids.add(t.id);
+      }
+    });
+  });
+export type RoomLayoutInputType = z.infer<typeof RoomLayoutInput>;
+
+/**
+ * Ambito della disposizione salvata: null = standard della sala (vale tutti i giorni); { date, meal } = disposizione
+ * speciale solo per quel giorno e pasto.
+ */
+/** Giorno e pasto di una disposizione speciale (data YYYY-MM-DD reale, pranzo o cena). */
+export const DayLayoutInput = z.object({
+  date: dateSchema,
+  meal: z.enum(BOOKING_MEALS, { message: "Pasto non valido (pranzo o cena)" }),
+});
+export type DayLayoutInputType = z.infer<typeof DayLayoutInput>;
+
+export const LayoutScopeInput = DayLayoutInput.nullable();
+export type LayoutScopeInputType = z.infer<typeof LayoutScopeInput>;
+
+/** Sistemazione di prenotazioni normali da applicare insieme alla disposizione (numero del tavolo 1–9999). */
+export const LayoutAssignmentsInput = z
+  .array(
+    z.object({
+      bookingId: z.string().trim().min(1, "Prenotazione non valida"),
+      tableNumber: z.preprocess(
+        toNumber,
+        z.number(numberError("Numero del tavolo non valido"))
+          .int("Numero del tavolo non valido: usa un numero intero")
+          .min(1, "Numero del tavolo non valido: usa un numero da 1 a 9999.")
+          .max(9999, "Numero del tavolo non valido: usa un numero da 1 a 9999."),
+      ),
+    }),
+  )
+  .max(50, "Troppe sistemazioni in una volta (massimo 50)");
+export type LayoutAssignmentsInputType = z.infer<typeof LayoutAssignmentsInput>;
+
+/**
+ * Controllo incrociato: ogni tavolo assegnato deve esistere tra i numeri della disposizione inviata.
+ * Ritorna il messaggio d'errore del primo problema, altrimenti null.
+ */
+export function assignmentsTableIssue(
+  tables: readonly { number: number }[],
+  assignments: readonly { tableNumber: number }[],
+): string | null {
+  const numbers = new Set(tables.map((t) => t.number));
+  const missing = assignments.find((a) => !numbers.has(a.tableNumber));
+  return missing ? `Il tavolo ${missing.tableNumber} non è nella disposizione inviata.` : null;
+}
+
+/**
+ * Sistemazione di una prenotazione: numero del tavolo, o null per liberarlo (la sala resta).
+ * `meal` facoltativo: pasto della disposizione in cui cercare il tavolo (null/assente = quello della prenotazione).
+ */
+export const FloorSeatInput = z.object({
+  table_number: z
+    .number({ message: "Numero del tavolo non valido" })
+    .int("Numero del tavolo non valido: usa un numero intero")
+    .min(1, "Numero del tavolo non valido: usa un numero da 1 a 9999.")
+    .max(9999, "Numero del tavolo non valido: usa un numero da 1 a 9999.")
+    .nullable(),
+  meal: z.enum(BOOKING_MEALS, { message: "Pasto non valido (pranzo o cena)" }).nullish(),
+});
+export type FloorSeatInputType = z.infer<typeof FloorSeatInput>;
+
+/** Tavoli massimi di un evento (setEventTables). */
+export const MAX_EVENT_TABLES = 30;
+
+/**
+ * Tavoli di un evento in una sala per un giorno e pasto (setEventTables). Lista vuota = nessun tavolo.
+ * Il primo numero è il tavolo principale; numeri interi 1–9999, senza ripetizioni.
+ */
+export const EventTablesInput = z.object({
+  eventId: z.string().trim().min(1, "Evento non valido"),
+  roomId: z.string().trim().min(1, "Sala non valida"),
+  tableNumbers: z
+    .array(
+      z
+        .number({ message: "Numero del tavolo non valido" })
+        .int("Numero del tavolo non valido: usa un numero intero")
+        .min(1, "Numero del tavolo non valido: usa un numero da 1 a 9999.")
+        .max(9999, "Numero del tavolo non valido: usa un numero da 1 a 9999."),
+    )
+    .max(MAX_EVENT_TABLES, `Un evento può occupare al massimo ${MAX_EVENT_TABLES} tavoli`)
+    .refine((numbers) => new Set(numbers).size === numbers.length, "Lo stesso tavolo non può comparire due volte"),
+  meal: z.enum(BOOKING_MEALS, { message: "Pasto non valido (pranzo o cena)" }),
+});
+export type EventTablesInputType = z.infer<typeof EventTablesInput>;
 
 // ---------------------------------------------------------------------
 // Preventivi

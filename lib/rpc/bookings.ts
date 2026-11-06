@@ -38,7 +38,7 @@ export interface DishLike {
 type Batch = ReturnType<PocketBase["createBatch"]>;
 
 /** Riga di booking_changes nella batch. Senza bookingId (eliminazione) la riga resta come storico. */
-function queueAudit(
+export function queueAudit(
   batch: Batch,
   actor: Actor,
   e: { bookingId?: string | null; label?: string | null; table?: string; field: string; old: string | null; new: string | null },
@@ -194,10 +194,15 @@ function bookingRecordFields(
     meal: appointment ? "" : (input.meal ?? ""),
     event_time: appointment ? (input.event_time ?? "") : "",
     room: input.room_id ?? "",
-    // Tavolo: solo per le prenotazioni normali (0 = nessuno). Assente nel payload: non si tocca.
-    ...(input.table_number !== undefined || input.kind !== "normale"
-      ? { table_number: input.kind === "normale" ? (input.table_number ?? 0) : 0 }
-      : {}),
+    // Tavolo: normali dal payload (assente = non si tocca); appuntamenti mai; eventi: li gestisce la Mappa sala
+    // (tavolo principale + extra_tables), quindi il modulo non li tocca (vedi il cambio sala in saveBooking).
+    ...(input.kind === "normale"
+      ? input.table_number !== undefined
+        ? { table_number: input.table_number ?? 0 }
+        : {}
+      : input.kind === "appuntamento"
+        ? { table_number: 0, extra_tables: [] }
+        : {}),
     adults: input.adults,
     children: input.children,
     kids_menus: input.kids_menus,
@@ -252,6 +257,10 @@ export async function upsertBooking(
   // Prenotazione normale: nessun cliente di rubrica (l'ospite sta sulla prenotazione).
   const clientId = input.kind === "normale" ? null : await planClient(db, input, batch);
   const fields = bookingRecordFields(input, actor, clientId, menuId, kidsMenuId, status);
+  // Evento spostato in un'altra sala (o diventato evento): i numeri dei tavoli non valgono più, si tolgono.
+  if (input.kind === "evento" && (!before || String(before.room ?? "") !== String(fields.room ?? "") || String(before.kind) !== "evento")) {
+    Object.assign(fields, { table_number: 0, extra_tables: [] });
+  }
 
   if (!id) {
     batch.collection("bookings").create({ id: bookingId, ...fields, created_by: actor.id });

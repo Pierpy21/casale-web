@@ -3,7 +3,8 @@ import type { BookingKind, Profile } from "./types";
 // Puro (senza server-only): usabile anche nei Client Component.
 // Riepilogo ruoli:
 // - admin: tutto (prenotazioni di ogni tipo, preventivi, pagamenti, rubrica, catalogo, operatori, giacenza).
-// - sala: vede tutte le prenotazioni; modifica solo i coperti; crea solo prenotazioni normali (cliente via nuovo cliente).
+// - sala: vede tutte le prenotazioni; modifica solo i coperti; crea solo prenotazioni normali (cliente via nuovo cliente);
+//   nella Mappa sala ha gli stessi poteri dell'admin (disposizione, tavoli generati, eventi sui tavoli).
 // - cucina: sola lettura delle prenotazioni; usa la giacenza. Il flag is_chef non dà più permessi.
 
 /**
@@ -105,4 +106,25 @@ export function canAddBookingNote(p: Profile): boolean {
 /** Registro delle modifiche alle prenotazioni: solo admin (la sala non lo vede). */
 export function canViewActivityLog(p: Profile): boolean {
   return isAdmin(p);
+}
+
+/**
+ * Mappa sala (piantina, occupazione per giorno e pasto) e sistemazione delle prenotazioni normali sui tavoli:
+ * admin e sala attivi. La cucina non vede la mappa.
+ */
+export function canViewFloorPlan(p: Profile): boolean {
+  return p.active && (p.role === "admin" || p.role === "sala");
+}
+
+/**
+ * Mappa sala completa: disposizione dei tavoli (standard e del giorno), tavoli generati, eventi sui tavoli (anche più tavoli):
+ * admin e sala attivi (la sala ha nella mappa gli stessi poteri dell'admin).
+ */
+export function canEditFloorLayout(p: Profile): boolean {
+  return canViewFloorPlan(p);
+}
+
+/** Sistemazione sui tavoli della mappa: admin e sala attivi, prenotazioni normali ed eventi (mai appuntamenti). */
+export function canSeatBooking(p: Profile, kind: BookingKind): boolean {
+  return canViewFloorPlan(p) && kind !== "appuntamento";
 }
