@@ -7,6 +7,7 @@ import {
   Ellipsis,
   History,
   LayoutDashboard,
+  LayoutGrid,
   PartyPopper,
   RefreshCw,
   UserCog,
@@ -17,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { signOut } from "@/app/actions/auth";
 import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 import { SignOutForm } from "@/components/pwa/SignOutForm";
@@ -26,10 +27,12 @@ import { useOnline } from "@/components/offline/useOnline";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { cn } from "@/components/ui/cn";
 import type { NavIcon, NavLink } from "./nav";
+import { isSidebarCompact, subscribeSidebarCompact } from "./shell-mode";
 
 const ICONS: Record<NavIcon, LucideIcon> = {
   event: PartyPopper,
   agenda: CalendarDays,
+  floor: LayoutGrid,
   dashboard: LayoutDashboard,
   clients: Users,
   operators: UserCog,
@@ -49,30 +52,46 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
+/** Sidebar ridotta a sola icona (attributo su <html>, vedi compactSidebar()). Falso al server e al primo render. */
+function useSidebarCompact(): boolean {
+  return useSyncExternalStore(subscribeSidebarCompact, isSidebarCompact, () => false);
+}
+
+/*
+ * Variante sidebar-compact: etichetta nascosta (resta il nome accessibile), icona centrata, title per il passaggio
+ * del mouse; il badge della coda diventa un pallino sull'icona.
+ */
+const COMPACT_LINK = "sidebar-compact:relative sidebar-compact:justify-center sidebar-compact:gap-0 sidebar-compact:px-0";
+const COMPACT_LABEL = "sidebar-compact:sr-only";
+
 /** Navigazione laterale desktop (≥ lg). La voce in evidenza (Crea evento) sta in cima, in colore sabbia. */
 export function SidebarNav({ items }: { items: NavLink[] }) {
   const pathname = usePathname();
+  const compact = useSidebarCompact();
   return (
     <nav aria-label="Navigazione principale">
       <ul className="flex flex-col gap-1">
         {items.map((item) => {
           const Icon = ICONS[item.icon];
           const active = isActive(pathname, item.href);
+          const title = compact ? item.label : undefined;
           if (item.prominent) {
             return (
               <li key={item.href} className="mb-3">
                 <Link
                   href={item.href}
+                  title={title}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-3 rounded-[2px] border px-3.5 py-3 text-[13px] font-semibold uppercase tracking-[0.12em] transition-colors duration-300",
+                    COMPACT_LINK,
                     active
                       ? "border-logo-cream bg-logo-cream text-ink"
                       : "border-sand/60 bg-sand/15 text-logo-cream hover:bg-sand/25",
                   )}
                 >
                   <Icon aria-hidden="true" className="size-[18px] shrink-0" />
-                  {item.label}
+                  <span className={COMPACT_LABEL}>{item.label}</span>
                 </Link>
               </li>
             );
@@ -81,17 +100,21 @@ export function SidebarNav({ items }: { items: NavLink[] }) {
             <li key={item.href}>
               <Link
                 href={item.href}
+                title={title}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex items-center gap-3 rounded-[2px] px-3 py-2.5 text-[13px] font-medium uppercase tracking-[0.12em] transition-colors duration-300",
+                  COMPACT_LINK,
                   active
                     ? "bg-petrol text-paper"
                     : "text-sand hover:bg-white/5 hover:text-logo-cream",
                 )}
               >
                 <Icon aria-hidden="true" className="size-[18px] shrink-0" />
-                {item.label}
-                {item.badge === "queue" && <QueueBadge className="ml-auto" />}
+                <span className={COMPACT_LABEL}>{item.label}</span>
+                {item.badge === "queue" && (
+                  <QueueBadge className="ml-auto sidebar-compact:absolute sidebar-compact:right-0.5 sidebar-compact:top-0.5 sidebar-compact:h-4 sidebar-compact:min-w-4 sidebar-compact:px-1 sidebar-compact:text-[10px]" />
+                )}
               </Link>
             </li>
           );
