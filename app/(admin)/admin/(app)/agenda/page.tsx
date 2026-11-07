@@ -75,6 +75,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       isAdmin={admin}
       rooms={rooms}
       canAssignRooms={canAssignRoom(profile, "normale")}
+      roomsView={profile.role === "sala"}
       nextEventAfterRange={nextEventAfterRange}
     />
   );

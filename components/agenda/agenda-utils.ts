@@ -89,20 +89,27 @@ export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** Link alla vista agenda con searchParams. */
+/** Link alla vista agenda con searchParams. `sala`: sala aperta nella vista sale (id, o "senza" per Senza sala). */
 export function agendaHref({
   date,
   view = "month",
   kind = "tutti",
+  sala = null,
 }: {
   date: string;
   view?: AgendaView;
   kind?: AgendaKindFilter;
+  sala?: string | null;
 }): string {
   const params = new URLSearchParams({ date, view });
   if (kind !== "tutti") params.set("tipo", kind);
+  if (sala) params.set("sala", sala);
   return `/admin/agenda?${params.toString()}`;
 }
+
+/** Parametro `sala` della query: id della sala aperta, "senza" per Senza sala, null se la vista è la griglia. */
+export const SALA_PARAM = "sala";
+export const SALA_WITHOUT = "senza";
 
 /** Sposta il periodo selezionato di una unità della vista corrente. */
 export function shiftPeriod(iso: string, view: AgendaView, direction: 1 | -1): string {
