@@ -39,7 +39,7 @@ const MARGIN = 800;
 const CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN; // 10306
 
 /** Larghezze colonne (twip): Nome | Sala | Tavolo | Coperti | Pasto | Cellulare. */
-const COL_WIDTHS = [2606, 1900, 1100, 1700, 1200, 1800];
+const COL_WIDTHS = [2206, 1900, 1100, 2100, 1200, 1800];
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
 const NO_BORDERS: ITableBordersOptions = {

@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   cellName: { flexGrow: 4, paddingRight: 8, fontSize: 9.5 },
   cellRoom: { width: 95, paddingRight: 8, fontSize: 9.5 },
   cellTable: { width: 50, textAlign: "center", fontSize: 9.5, fontFamily: FONT.sansBold },
-  cellCovers: { width: 90, textAlign: "center", fontSize: 9.5 },
+  cellCovers: { width: 115, textAlign: "center", fontSize: 9.5 },
   cellTime: { width: 55, textAlign: "center", fontSize: 9.5 },
   cellPhone: { width: 100, paddingLeft: 8, fontSize: 9.5 },
   empty: { fontSize: 9.5, color: COLOR.slate, fontFamily: FONT.serifItalic, marginTop: 8 },
@@ -98,7 +98,7 @@ function ReservationsTable({ rows }: { rows: ReservationPdfRow[] }) {
         <Text style={[styles.cellName, styles.tableHeadText]}>Nome</Text>
         <Text style={[styles.cellRoom, styles.tableHeadText]}>Sala</Text>
         <Text style={[styles.tableHeadText, { width: 50, textAlign: "center" }]}>Tavolo</Text>
-        <Text style={[styles.tableHeadText, { width: 90, textAlign: "center" }]}>Coperti</Text>
+        <Text style={[styles.tableHeadText, { width: 115, textAlign: "center" }]}>Coperti</Text>
         <Text style={[styles.tableHeadText, { width: 55, textAlign: "center" }]}>Pasto</Text>
         <Text style={[styles.cellPhone, styles.tableHeadText]}>Cellulare</Text>
       </View>
