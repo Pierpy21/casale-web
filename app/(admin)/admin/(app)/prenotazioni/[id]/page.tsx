@@ -15,7 +15,7 @@ import { KindBadge } from "@/components/bookings/KindBadge";
 import { decodeWarnings } from "@/components/bookings/booking-form-model";
 import { PreventivoMenu } from "@/components/bookings/QuoteActions";
 import { CourseList } from "@/components/bookings/MenuPreview";
-import { bookingPersonName, bookingPhone, bookingWhen, formatCovers, totalCovers, whatsappUrl } from "@/components/bookings/format";
+import { bookingPersonName, bookingPhone, bookingWhen, formatCoversDetail, totalCovers, whatsappUrl } from "@/components/bookings/format";
 import type { NameLookup } from "@/components/bookings/change-labels";
 import {
   BookingNumbers,
@@ -116,7 +116,7 @@ export default async function BookingDetailPage({
       key: "covers",
       label: "Coperti totali",
       value: totals,
-      hint: `Adulti ${booking.adults} · Bambini ${booking.children}`,
+      hint: `Adulti ${booking.adults} · Seggioloni ${booking.children}`,
       panel: coversPanel,
       cta: "Modifica coperti",
     });
@@ -152,7 +152,7 @@ export default async function BookingDetailPage({
       key: "covers",
       label: "Coperti",
       value: totals,
-      hint: formatCovers(booking),
+      hint: formatCoversDetail(booking),
       panel: coversPanel,
       cta: "Modifica coperti",
     });

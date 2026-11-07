@@ -217,7 +217,7 @@ export interface RoomTable { id: string; room_id: string; number: number; seats:
 /** Bozza per il salvataggio della disposizione di una sala. `id` presente = tavolo esistente. */
 export interface RoomTableDraft { id?: string; number: number; seats: number; shape: TableShape; x: number; y: number; rotation: number; }
 /** Prenotazione normale nella mappa (dati minimi). */
-export interface FloorBooking { id: string; name: string; phone: string | null; covers: number; adults: number; children: number; status: BookingStatus; room_id: string | null; table_number: number | null; notes: string | null; }
+export interface FloorBooking { id: string; name: string; phone: string | null; covers: number; adults: number; children: number; kids_menus: number; status: BookingStatus; room_id: string | null; table_number: number | null; notes: string | null; }
 /** Evento che riserva una sala nel giorno/pasto. */
 /**
  * Evento nella mappa. Un evento può occupare più tavoli della stessa sala: `table_numbers` = tutti i suoi tavoli
