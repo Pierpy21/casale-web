@@ -183,8 +183,8 @@ export async function createBooking(
         console.error("[bookings] preventivo non creato:", err);
         warnings.push(
           err instanceof UserFacingError
-            ? `Preventivo non creato: ${err.message}`
-            : "Preventivo non creato: puoi crearlo dalla pagina della prenotazione.",
+            ? `Ordine di servizio non creato: ${err.message}`
+            : "Ordine di servizio non creato: puoi crearlo dalla pagina della prenotazione.",
         );
       }
     }

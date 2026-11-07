@@ -47,20 +47,20 @@ export function QuotePanel({ enabled, onEnabledChange, draft, lines, onChange, e
     >
       <header className="flex flex-col gap-3">
         <h2 id="quote-title" className="font-serif text-3xl leading-none">
-          Preventivo
+          Ordine di servizio
         </h2>
         <Checkbox
           id="create-quote"
           checked={enabled}
           disabled={disabled}
           onChange={(e) => onEnabledChange(e.target.checked)}
-          label="Crea preventivo"
+          label="Crea ordine di servizio"
         />
       </header>
 
       {!enabled ? (
         <p className="text-[14px] leading-relaxed text-slate-dark">
-          Nessun preventivo verrà creato. Potrai crearlo in seguito dalla pagina della prenotazione.
+          Nessun ordine di servizio verrà creato. Potrai crearlo in seguito dalla pagina della prenotazione.
         </p>
       ) : (
         <div className="flex flex-col gap-5">
@@ -79,7 +79,7 @@ export function QuotePanel({ enabled, onEnabledChange, draft, lines, onChange, e
           {errors["quote.lines"] && <p className="text-[13px] text-danger">{first(errors["quote.lines"])}</p>}
 
           {lines.length > 0 && (
-            <ol className="flex flex-col gap-3" aria-label="Voci del preventivo">
+            <ol className="flex flex-col gap-3" aria-label="Voci dell’ordine di servizio">
               {lines.map((line, index) => {
                 const base = `quote-line-${index}`;
                 const descErr = errors[`quote.lines.${index}.description`];
@@ -216,7 +216,7 @@ export function QuotePanel({ enabled, onEnabledChange, draft, lines, onChange, e
             />
           </Field>
 
-          <Field label="Note sul preventivo" htmlFor="quote-notes">
+          <Field label="Note sull’ordine di servizio" htmlFor="quote-notes">
             <Textarea
               id="quote-notes"
               rows={2}

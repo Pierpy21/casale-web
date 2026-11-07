@@ -1,0 +1,39 @@
+/* Foglio prenotazioni per sala: misure in mm del foglio (--mm, definita da .sheet in SheetPreview.module.css). */
+
+/* Un foglio A4 sotto l'altro, come le pagine del PDF. */
+.pages {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.roomHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(4 * var(--mm));
+  margin-bottom: calc(1.41 * var(--mm)); /* 4 pt */
+}
+
+.roomName {
+  margin: 0;
+  font-family: "Times New Roman", Times, serif;
+  font-weight: 400;
+  font-size: calc(5.64 * var(--mm)); /* 16 pt */
+  line-height: 1.2;
+  color: #1c2b2d;
+}
+
+.roomCount {
+  margin: 0;
+  flex: 0 0 auto;
+  font-size: calc(3.18 * var(--mm)); /* 9 pt */
+  color: #5a6668;
+}
+
+/* Linea tra le sale della stessa pagina (0,9 pt, margini 14 pt). */
+.divider {
+  height: calc(0.32 * var(--mm));
+  margin: calc(4.94 * var(--mm)) 0;
+  background: #1c2b2d;
+}

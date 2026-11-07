@@ -67,6 +67,8 @@ export interface QuoteDocumentModel {
   };
   menu: QuoteDocumentMenu | null;
   kidsMenu: QuoteDocumentMenu | null;
+  /** Allergie e intolleranze, una riga ciascuna: "Celiachia (Mario) — note". Vuoto se nessuna. */
+  allergies: string[];
   setup: {
     colors: string[];
     notes: string | null;
@@ -87,7 +89,6 @@ export interface QuoteDocumentModel {
     overridden: boolean;
   };
   notes: string | null;
-  conditions: string[];
   signature: {
     issuerLabel: string;
     clientLabel: string;
@@ -101,14 +102,6 @@ const CASALE_ISSUER = {
   phone: "+39 340 109 0100",
   email: "info@casaledelnotaio.it",
 } as const;
-
-const VALIDITY_CONDITION = "Il preventivo ha validità fino alla data indicata.";
-
-const CONDITIONS = [
-  "Prezzi espressi in euro, IVA inclusa.",
-  VALIDITY_CONDITION,
-  "Ogni sala è riservata a un singolo evento: esclusività della sala, tavolo torta e decorazioni sono incluse nella banchettistica.",
-] as const;
 
 const numberFormatter = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 2 });
 
@@ -142,12 +135,60 @@ function groupByCourse(
   });
 }
 
+/**
+ * Divide le portate in due colonne (in ordine: la prima colonna si legge prima della seconda),
+ * bilanciando il numero di righe, così il menù sta in un unico foglio A4.
+ */
+export function splitCoursesInColumns(
+  courses: QuoteDocumentCourse[],
+): [QuoteDocumentCourse[], QuoteDocumentCourse[]] {
+  // Peso di una portata: i piatti più lo spazio dell'etichetta.
+  const weight = (c: QuoteDocumentCourse) => c.dishes.length + 0.4;
+  const total = courses.reduce((sum, c) => sum + weight(c), 0);
+  let best = courses.length;
+  let bestHeight = total;
+  let left = 0;
+  for (let i = 0; i <= courses.length; i++) {
+    const height = Math.max(left, total - left);
+    if (height < bestHeight) {
+      bestHeight = height;
+      best = i;
+    }
+    if (i < courses.length) left += weight(courses[i]);
+  }
+  return [courses.slice(0, best), courses.slice(best)];
+}
+
+/** Ospiti su una riga: "80 adulti · 10 bambini (8 menù bambini)". */
+export function guestsLabel(event: QuoteDocumentModel["event"]): string {
+  const parts = [`${event.adults} adulti`, `${event.children} bambini`];
+  const kids = event.kidsMenus > 0 ? ` (${event.kidsMenus} menù bambini)` : "";
+  return parts.join(" · ") + kids;
+}
+
+/** Campi del cliente valorizzati, in ordine, come coppie [etichetta, valore]. */
+export function clientFields(client: QuoteDocumentModel["client"]): Array<[string, string]> {
+  const fields: Array<[string, string | null]> = [
+    ["Nome", client.fullName],
+    ["Telefono", client.phone],
+    ["Email", client.email],
+    ["Codice fiscale", client.taxCode],
+    ["Partita IVA", client.vatNumber],
+  ];
+  return fields.filter((f): f is [string, string] => !!f[1]);
+}
+
+function allergyLine(a: { subject_name: string | null; condition: string; notes: string | null }): string {
+  const who = orNull(a.subject_name);
+  const note = orNull(a.notes);
+  return `${a.condition.trim()}${who ? ` (${who})` : ""}${note ? ` — ${note}` : ""}`;
+}
+
 export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel {
   const b = q.booking;
   const totals = computeQuoteTotals(q);
-  // Evento confermato o saldato: "Ordine di servizio", senza scadenza né la condizione sulla validità.
+  // Il documento si chiama sempre "Ordine di servizio".
   const title = quoteDocumentTitle(b.status);
-  const isOrder = title !== "Preventivo";
 
   const dishesMenu: QuoteDocumentMenu | null =
     b.menu || b.dishes.length > 0
@@ -170,7 +211,8 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
     meta: {
       number: q.number,
       issuedAt: formatDateShort(q.issued_at),
-      validUntil: !isOrder && q.valid_until ? formatDateShort(q.valid_until) : null,
+      // Ordine di servizio: nessuna scadenza stampata.
+      validUntil: null,
     },
     // Il preventivo nasce da un evento, quindi ha sempre il cliente di rubrica; i campi restano null-safe.
     client: {
@@ -190,6 +232,7 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
     },
     menu: dishesMenu,
     kidsMenu,
+    allergies: b.allergies.map(allergyLine),
     setup: {
       colors: [...b.setup_colors],
       notes: orNull(b.setup_notes),
@@ -213,7 +256,6 @@ export function buildQuoteDocumentModel(q: QuoteWithBooking): QuoteDocumentModel
       overridden: totals.overridden,
     },
     notes: orNull(q.notes),
-    conditions: isOrder ? CONDITIONS.filter((line) => line !== VALIDITY_CONDITION) : [...CONDITIONS],
     signature: {
       issuerLabel: "Per il Casale del Notaio",
       clientLabel: "Per accettazione (firma del cliente)",

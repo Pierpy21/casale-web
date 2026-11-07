@@ -124,7 +124,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
 
   const snapshot = snapshotOf(issuedAt, validUntil, rows, discount, finalTotal, vatRate, notes);
   const dirty = snapshot !== savedSnapshot;
-  const saveLabel = pending ? "Salvataggio…" : dirty ? "Salva preventivo" : saved ? "Preventivo salvato" : "Nessuna modifica da salvare";
+  const saveLabel = pending ? "Salvataggio…" : dirty ? "Salva ordine di servizio" : saved ? "Ordine di servizio salvato" : "Nessuna modifica da salvare";
 
   const updateRow = (index: number, changes: Partial<Omit<LineRow, "key">>) => {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...changes } : r)));
@@ -149,7 +149,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
     setErrors({});
     setSaved(false);
     if (rows.length === 0) {
-      setErrors({ lines: ["Il preventivo deve avere almeno una riga."] });
+      setErrors({ lines: ["L’ordine di servizio deve avere almeno una riga."] });
       setFormError("Controlla i campi evidenziati.");
       return;
     }
@@ -176,7 +176,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
           },
         ],
         {
-          label: `Modifica preventivo n. ${quote.number}`,
+          label: `Modifica ordine di servizio n. ${quote.number}`,
           entity: { type: "quote", id: quote.id },
           expectedUpdated: updatedAtOf(quote),
         },
@@ -193,7 +193,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
 
   return (
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] xl:items-start">
-      <form onSubmit={onSubmit} noValidate className="no-print flex min-w-0 flex-col gap-6" aria-label="Modifica preventivo">
+      <form onSubmit={onSubmit} noValidate className="no-print flex min-w-0 flex-col gap-6" aria-label="Modifica ordine di servizio">
         {formError && <Alert tone="danger">{formError}</Alert>}
 
         <section className="grid gap-5 rounded-[2px] border border-sand bg-paper p-5 sm:grid-cols-2 sm:p-6" aria-label="Date">
@@ -346,7 +346,7 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
             </WhatsAppQuoteShare>
           </div>
           {saved && !dirty && (
-            <span role="status" className="text-[13px] text-success">Preventivo salvato.</span>
+            <span role="status" className="text-[13px] text-success">Ordine di servizio salvato.</span>
           )}
           {dirty && (
             <p className="text-[13px] text-slate-dark">
@@ -356,15 +356,15 @@ export function QuoteEditor({ quote }: QuoteEditorProps) {
 
           <div className="border-t border-sand pt-5">
             <ConfirmAction
-              label="Elimina preventivo"
+              label="Elimina ordine di servizio"
               variant="danger"
-              title="Eliminare il preventivo?"
-              description={`Il preventivo n. ${quote.number} verrà eliminato definitivamente.`}
+              title="Eliminare l’ordine di servizio?"
+              description={`L’ordine di servizio n. ${quote.number} verrà eliminato definitivamente.`}
               confirmLabel="Elimina"
               pendingLabel="Eliminazione…"
               run={() =>
                 submitMutation("quotes.deleteQuote", deleteQuote, [quote.id], {
-                  label: `Elimina preventivo n. ${quote.number}`,
+                  label: `Elimina ordine di servizio n. ${quote.number}`,
                   entity: { type: "quote", id: quote.id },
                   expectedUpdated: updatedAtOf(quote),
                 })

@@ -41,7 +41,8 @@ export function RoomDayView({ rooms, selectedDay, bookings }: RoomDayViewProps) 
                       <h4 className="font-serif text-lg leading-tight break-words">{room.name}</h4>
                       <p className="text-[12px] text-slate-dark">Capienza {room.capacity}</p>
                     </div>
-                    <Badge tone={booking ? "petrol" : "neutral"} className="shrink-0">
+                    {/* Occupata: rosso pieno, si nota a colpo d'occhio. */}
+                    <Badge tone={booking ? "dangerSolid" : "neutral"} className="shrink-0">
                       {booking ? "Occupata" : "Libera"}
                     </Badge>
                   </header>

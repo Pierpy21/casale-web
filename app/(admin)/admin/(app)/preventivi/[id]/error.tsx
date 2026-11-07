@@ -14,7 +14,7 @@ export default function QuoteError({
 
   return (
     <ErrorState
-      title="Impossibile caricare il preventivo"
+      title="Impossibile caricare l’ordine di servizio"
       message="Controlla la connessione e riprova. Se il problema persiste, contatta l’amministratore."
       reset={reset}
       updating={updating}

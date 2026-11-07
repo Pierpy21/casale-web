@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui";
 
 export default function QuoteLoading() {
   return (
-    <div className="flex flex-col gap-8" aria-busy="true" aria-label="Caricamento preventivo">
+    <div className="flex flex-col gap-8" aria-busy="true" aria-label="Caricamento ordine di servizio">
       <div className="flex flex-col gap-3">
         <Skeleton className="h-3 w-32" />
         <Skeleton className="h-10 w-80 max-w-full" />

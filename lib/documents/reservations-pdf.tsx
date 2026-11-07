@@ -14,11 +14,13 @@ import {
   SHEET_ISSUER,
   buildReservationSheetView,
   type ReservationPdfRow,
+  type ReservationRoomSection,
   type ReservationSheetView,
 } from "@/lib/documents/reservations-view";
 
 // Foglio prenotazioni del giorno in PDF: stessa impostazione tipografica del preventivo e del report di giacenza.
-// Una tabella: Nome | Sala | Tavolo | Coperti | Pasto | Cellulare. I valori mancanti diventano "—".
+// Una pagina per gruppo di sale (vedi ROOM_PAGES): Sala 1-2-3 separate da una linea, Sala Grande, Palmento,
+// Terrazza e Pozzo. Per ogni sala una tabella: Nome | Tavolo | Coperti | Pasto | Cellulare. I valori mancanti diventano "—".
 
 const COLOR = {
   ink: "#1C2B2D",
@@ -62,12 +64,20 @@ const styles = StyleSheet.create({
   tableHeadText: { fontFamily: FONT.sansBold, fontSize: 8, color: COLOR.ink, textTransform: "uppercase", letterSpacing: 0.8 },
   tableRow: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: COLOR.line, paddingVertical: 6 },
   cellName: { flexGrow: 4, paddingRight: 8, fontSize: 9.5 },
-  cellRoom: { width: 95, paddingRight: 8, fontSize: 9.5 },
   cellTable: { width: 50, textAlign: "center", fontSize: 9.5, fontFamily: FONT.sansBold },
   cellCovers: { width: 115, textAlign: "center", fontSize: 9.5 },
   cellTime: { width: 55, textAlign: "center", fontSize: 9.5 },
   cellPhone: { width: 100, paddingLeft: 8, fontSize: 9.5 },
-  empty: { fontSize: 9.5, color: COLOR.slate, fontFamily: FONT.serifItalic, marginTop: 8 },
+  empty: { fontSize: 9.5, color: COLOR.slate, fontFamily: FONT.serifItalic, marginTop: 4 },
+  // Intestazione compatta delle pagine dopo la prima.
+  pageHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 14 },
+  pageHeadTitle: { fontFamily: FONT.serif, fontSize: 14, color: COLOR.ink },
+  pageHeadDate: { fontFamily: FONT.serifItalic, fontSize: 11, color: COLOR.petrol },
+  roomHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 },
+  roomName: { fontFamily: FONT.serif, fontSize: 16, color: COLOR.ink },
+  roomCount: { fontSize: 9, color: COLOR.slate },
+  // Linea tra le sale della stessa pagina.
+  roomDivider: { height: 0.9, backgroundColor: COLOR.ink, marginTop: 14, marginBottom: 14 },
   footer: {
     position: "absolute",
     bottom: 22,
@@ -94,9 +104,8 @@ function loadLogo(): Promise<Buffer> {
 function ReservationsTable({ rows }: { rows: ReservationPdfRow[] }) {
   return (
     <View>
-      <View style={styles.tableHead} fixed>
+      <View style={styles.tableHead}>
         <Text style={[styles.cellName, styles.tableHeadText]}>Nome</Text>
-        <Text style={[styles.cellRoom, styles.tableHeadText]}>Sala</Text>
         <Text style={[styles.tableHeadText, { width: 50, textAlign: "center" }]}>Tavolo</Text>
         <Text style={[styles.tableHeadText, { width: 115, textAlign: "center" }]}>Coperti</Text>
         <Text style={[styles.tableHeadText, { width: 55, textAlign: "center" }]}>Pasto</Text>
@@ -105,7 +114,6 @@ function ReservationsTable({ rows }: { rows: ReservationPdfRow[] }) {
       {rows.map((row, i) => (
         <View key={i} style={styles.tableRow} wrap={false}>
           <Text style={styles.cellName}>{row.name}</Text>
-          <Text style={styles.cellRoom}>{row.room}</Text>
           <Text style={styles.cellTable}>{row.table}</Text>
           <Text style={styles.cellCovers}>{row.covers}</Text>
           <Text style={styles.cellTime}>{row.meal}</Text>
@@ -116,49 +124,84 @@ function ReservationsTable({ rows }: { rows: ReservationPdfRow[] }) {
   );
 }
 
+function RoomSection({ section }: { section: ReservationRoomSection }) {
+  return (
+    <View>
+      <View style={styles.roomHead} wrap={false}>
+        <Text style={styles.roomName}>{section.room}</Text>
+        <Text style={styles.roomCount}>{section.countLabel}</Text>
+      </View>
+      {section.rows.length === 0 ? (
+        <Text style={styles.empty}>Nessuna prenotazione</Text>
+      ) : (
+        <ReservationsTable rows={section.rows} />
+      )}
+    </View>
+  );
+}
+
+function Footer() {
+  return (
+    <View style={styles.footer} fixed>
+      <Text style={styles.footerText}>{SHEET_ISSUER.footer}</Text>
+      <Text
+        style={styles.footerText}
+        render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}
+      />
+    </View>
+  );
+}
+
 function ReservationsDocument({ view, logo }: { view: ReservationSheetView; logo: Buffer }) {
   return (
     <Document title={`${view.title} ${view.dateLong}`} author="Casale del Notaio" creator="Casale del Notaio">
-      <Page size="A4" style={styles.page}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.issuerName}>{SHEET_ISSUER.name}</Text>
-            <Text style={styles.issuerTagline}>{SHEET_ISSUER.tagline}</Text>
-            {SHEET_ISSUER.lines.map((line) => (
-              <Text key={line} style={styles.issuerText}>
-                {line}
-              </Text>
-            ))}
-          </View>
-          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image non supporta la prop alt */}
-          <Image src={logo} style={styles.logo} />
-        </View>
-        <View style={styles.rule} />
+      {view.pages.map((page, pageIndex) => (
+        <Page key={pageIndex} size="A4" style={styles.page}>
+          {pageIndex === 0 ? (
+            <>
+              <View style={styles.headerRow}>
+                <View style={styles.headerLeft}>
+                  <Text style={styles.issuerName}>{SHEET_ISSUER.name}</Text>
+                  <Text style={styles.issuerTagline}>{SHEET_ISSUER.tagline}</Text>
+                  {SHEET_ISSUER.lines.map((line) => (
+                    <Text key={line} style={styles.issuerText}>
+                      {line}
+                    </Text>
+                  ))}
+                </View>
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image non supporta la prop alt */}
+                <Image src={logo} style={styles.logo} />
+              </View>
+              <View style={styles.rule} />
 
-        <View style={styles.titleRow}>
-          <View>
-            <Text style={styles.docTitle}>{view.title}</Text>
-            <Text style={styles.docSubtitle}>{view.dateLong}</Text>
-          </View>
-          <View>
-            <Text style={styles.metaText}>{view.countLabel}</Text>
-          </View>
-        </View>
+              <View style={styles.titleRow}>
+                <View>
+                  <Text style={styles.docTitle}>{view.title}</Text>
+                  <Text style={styles.docSubtitle}>{view.dateLong}</Text>
+                </View>
+                <View>
+                  <Text style={styles.metaText}>{view.countLabel}</Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            // Pagine successive: intestazione compatta con titolo e data.
+            <View style={styles.pageHead}>
+              <Text style={styles.pageHeadTitle}>{view.title}</Text>
+              <Text style={styles.pageHeadDate}>{view.dateLong}</Text>
+            </View>
+          )}
 
-        {view.rows.length === 0 ? (
-          <Text style={styles.empty}>Nessuna prenotazione</Text>
-        ) : (
-          <ReservationsTable rows={view.rows} />
-        )}
+          {page.sections.map((section, i) => (
+            <View key={section.room}>
+              {i > 0 ? <View style={styles.roomDivider} /> : null}
+              <RoomSection section={section} />
+            </View>
+          ))}
 
-        <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>{SHEET_ISSUER.footer}</Text>
-          <Text
-            style={styles.footerText}
-            render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}
-          />
-        </View>
-      </Page>
+          <Footer />
+        </Page>
+      ))}
     </Document>
   );
 }
