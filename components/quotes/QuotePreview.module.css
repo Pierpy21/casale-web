@@ -19,8 +19,8 @@
   width: calc(210 * var(--mm));
   min-height: calc(297 * var(--mm));
   margin: 0;
-  /* Margini come nel PDF: 40 pt laterali e in alto, 60 pt in basso (spazio per il piè di pagina). */
-  padding: calc(14.1 * var(--mm)) calc(14.1 * var(--mm)) calc(21.2 * var(--mm));
+  /* Margini come nel PDF: 40 pt laterali, 32 pt in alto, 50 pt in basso (spazio per il piè di pagina). */
+  padding: calc(11.3 * var(--mm)) calc(14.1 * var(--mm)) calc(17.6 * var(--mm));
   background: #ffffff;
   color: #1c2b2d;
   font-family: Helvetica, Arial, sans-serif;
@@ -36,7 +36,7 @@
   }
 }
 
-/* Intestazione: dati del Casale a sinistra, logo a destra. */
+/* Intestazione: logo e dati del Casale a sinistra, dettagli evento a destra. */
 .header {
   display: flex;
   align-items: flex-start;
@@ -50,17 +50,8 @@
   padding-right: calc(5.6 * var(--mm));
 }
 
-.issuerName {
-  margin: 0 0 calc(2.1 * var(--mm));
-  font-family: "Times New Roman", Times, serif;
-  font-weight: 400;
-  font-size: calc(7.06 * var(--mm)); /* 20 pt */
-  line-height: 1.2;
-  color: #1c2b2d;
-}
-
 .issuerTagline {
-  margin: 0 0 calc(2.8 * var(--mm));
+  margin: 0 0 calc(1.41 * var(--mm));
   font-family: "Times New Roman", Times, serif;
   font-style: italic;
   font-size: calc(3.35 * var(--mm)); /* 9,5 pt */
@@ -74,19 +65,14 @@
   color: #5a6668;
 }
 
-.logoBlock {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: flex-end;
+.eventBlock {
+  flex: 0 0 calc(88.2 * var(--mm)); /* 250 pt */
+  min-width: 0;
 }
 
-.logoNumber {
-  margin: calc(2.1 * var(--mm)) 0 0;
-  font-size: calc(3.17 * var(--mm)); /* 9 pt */
-  line-height: 1.3;
-  color: #5a6668;
-  text-align: right;
+/* Etichette più strette nel blocco evento (44 pt), come nel PDF. */
+.eventBlock .kvLabel {
+  flex-basis: calc(15.5 * var(--mm));
 }
 
 .logo {
@@ -94,16 +80,17 @@
   flex: 0 0 auto;
   width: calc(52.9 * var(--mm)); /* 150 pt */
   height: auto;
+  margin-bottom: calc(2.1 * var(--mm));
 }
 
 .rule {
   height: calc(0.26 * var(--mm));
-  margin: calc(4.9 * var(--mm)) 0;
+  margin: calc(3.53 * var(--mm)) 0;
   background: #d5d5b7;
 }
 
 .eyebrow {
-  margin: 0 0 calc(1.76 * var(--mm));
+  margin: 0 0 calc(1.41 * var(--mm));
   font-family: Helvetica, Arial, sans-serif;
   font-weight: 700;
   font-size: calc(2.82 * var(--mm)); /* 8 pt */
@@ -118,14 +105,14 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: calc(4 * var(--mm));
-  margin-bottom: calc(9.2 * var(--mm));
+  margin-bottom: calc(3.53 * var(--mm));
 }
 
 .docTitle {
   margin: 0;
   font-family: "Times New Roman", Times, serif;
   font-weight: 400;
-  font-size: calc(7.76 * var(--mm)); /* 22 pt */
+  font-size: calc(7.06 * var(--mm)); /* 20 pt */
   line-height: 1.2;
   color: #1c2b2d;
 }
@@ -147,7 +134,6 @@
 .twoCols {
   display: flex;
   gap: calc(8.47 * var(--mm));
-  margin-bottom: calc(4.94 * var(--mm));
 }
 
 .col {
@@ -155,9 +141,48 @@
   min-width: 0;
 }
 
+/* Griglia a due colonne (cliente): i campi si dispongono a coppie per riga. */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 0;
+}
+
+.gridCell {
+  min-width: 0;
+  padding-right: calc(4.2 * var(--mm));
+}
+
+.menuHeading {
+  display: flex;
+  align-items: baseline;
+  gap: calc(3.53 * var(--mm));
+  margin-bottom: calc(1.76 * var(--mm));
+}
+
+.menuEyebrow {
+  margin-bottom: 0;
+}
+
+.allergyList {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.allergyItem {
+  min-width: 0;
+  padding-right: calc(4.2 * var(--mm));
+  margin-bottom: calc(0.35 * var(--mm));
+  font-size: calc(3.35 * var(--mm)); /* 9,5 pt */
+  color: #1c2b2d;
+}
+
 .kvRow {
   display: flex;
-  margin: 0 0 calc(1.06 * var(--mm));
+  margin: 0 0 calc(0.7 * var(--mm));
 }
 
 .kvLabel {
@@ -176,11 +201,11 @@
 }
 
 .section {
-  margin: 0 0 calc(4.94 * var(--mm));
+  margin: 0 0 calc(3.53 * var(--mm));
 }
 
 .sectionTitle {
-  margin: 0 0 calc(2.12 * var(--mm));
+  margin: 0;
   font-family: "Times New Roman", Times, serif;
   font-weight: 400;
   font-size: calc(4.59 * var(--mm)); /* 13 pt */
@@ -190,12 +215,12 @@
 
 .courseRow {
   display: flex;
-  margin-bottom: calc(1.41 * var(--mm));
+  margin-bottom: calc(1.06 * var(--mm));
   break-inside: avoid;
 }
 
 .courseLabel {
-  flex: 0 0 calc(27.5 * var(--mm));
+  flex: 0 0 calc(23.3 * var(--mm)); /* 66 pt */
   margin: 0;
   padding-top: calc(0.35 * var(--mm));
   font-weight: 700;
@@ -236,7 +261,7 @@
 }
 
 .td {
-  padding: calc(2.1 * var(--mm)) 0;
+  padding: calc(1.41 * var(--mm)) 0;
   border-bottom: calc(0.18 * var(--mm)) solid #d5d5b7;
   text-align: left;
   vertical-align: top;
@@ -260,11 +285,22 @@
 
 .totalsWrap {
   display: flex;
-  justify-content: flex-end;
-  margin-top: calc(3.53 * var(--mm));
+  justify-content: space-between;
+  margin-top: calc(2.82 * var(--mm));
+}
+
+.besideTotals {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-right: calc(8.47 * var(--mm)); /* 24 pt */
+}
+
+.besideBlock {
+  margin-bottom: calc(2.12 * var(--mm));
 }
 
 .totalsBox {
+  flex: 0 0 auto;
   width: calc(81.2 * var(--mm)); /* 230 pt */
   margin: 0;
 }
@@ -324,16 +360,10 @@
   white-space: pre-line;
 }
 
-.conditionText {
-  margin: 0 0 calc(0.7 * var(--mm));
-  font-size: calc(2.82 * var(--mm)); /* 8 pt */
-  color: #5a6668;
-}
-
 .signatureRow {
   display: flex;
   gap: calc(14.1 * var(--mm));
-  margin-top: calc(9.9 * var(--mm)); /* 28 pt */
+  margin-top: calc(2.82 * var(--mm)); /* 8 pt */
 }
 
 .signatureBox {
@@ -342,7 +372,7 @@
 }
 
 .signatureLine {
-  height: calc(12.7 * var(--mm)); /* 36 pt */
+  height: calc(11.3 * var(--mm)); /* 32 pt */
   margin-bottom: calc(1.41 * var(--mm));
   border-bottom: calc(0.21 * var(--mm)) solid #1c2b2d;
 }

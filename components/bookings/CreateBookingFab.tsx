@@ -1,12 +1,16 @@
 "use client";
 
-import { Armchair, CalendarClock, PartyPopper, Plus, type LucideIcon } from "lucide-react";
+import { Armchair, CalendarClock, PartyPopper, type LucideIcon } from "lucide-react";
+import { Montserrat } from "next/font/google";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { capitalize, formatIt, toDate, todayISO } from "@/components/agenda/agenda-utils";
 import { buttonClasses } from "@/components/ui";
 import { BookingDatePicker } from "./BookingDatePicker";
+
+// Il "+" del tasto di creazione è un carattere in Montserrat regular (non un'icona).
+const montserrat = Montserrat({ subsets: ["latin"], weight: ["400"], display: "swap" });
 
 const NEW_BOOKING_BASE = "/admin/prenotazioni/nuova";
 
@@ -28,7 +32,7 @@ const ADMIN_OPTIONS: CreateOption[] = [
   {
     href: `${NEW_BOOKING_BASE}?tipo=evento`,
     label: "Evento",
-    description: "Banchetto con menù, sala e preventivo.",
+    description: "Banchetto con menù, sala e ordine di servizio.",
     Icon: PartyPopper,
   },
   {
@@ -42,8 +46,9 @@ const ADMIN_OPTIONS: CreateOption[] = [
 /** Passi del foglio: admin sceglie prima la data, poi il tipo. Sala resta sul passo data (Continua va alla prenotazione). */
 type SheetStep = "date" | "type";
 
+// Tasto di creazione: rotondo, rosa #DA528A (icona bianca, 3.6:1: sufficiente per un'icona grande, WCAG 1.4.11).
 const FAB_CLASS =
-  "no-print fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-5 z-40 grid size-14 place-items-center rounded-[2px] bg-petrol text-paper shadow-lg shadow-ink/30 transition-colors duration-200 hover:bg-petrol-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-petrol desk:bottom-8 desk:right-8 desk:size-16";
+  "no-print fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-5 z-40 grid size-14 place-items-center rounded-full bg-[#da528a] text-white shadow-lg shadow-ink/30 transition-colors duration-200 hover:bg-[#c2457a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#da528a] desk:bottom-8 desk:right-8 desk:size-16";
 
 const SHEET_CLASS =
   "no-print fixed inset-x-0 bottom-0 top-auto m-0 max-h-[85dvh] w-full max-w-none overflow-y-auto rounded-none border-t border-sand bg-paper p-0 pb-[env(safe-area-inset-bottom)] text-ink shadow-2xl shadow-ink/30 backdrop:bg-ink/50 desk:inset-auto desk:bottom-28 desk:right-8 desk:max-h-[calc(100dvh-9rem)] desk:w-[24rem] desk:rounded-[2px] desk:border desk:pb-0";
@@ -116,7 +121,9 @@ export function CreateBookingFab({ canCreateEvent }: CreateBookingFabProps) {
         onClick={openSheet}
         className={FAB_CLASS}
       >
-        <Plus aria-hidden="true" className="size-7" />
+        <span aria-hidden="true" className={`${montserrat.className} text-[2.25rem] leading-none desk:text-[2.5rem]`}>
+          +
+        </span>
       </button>
 
       <dialog

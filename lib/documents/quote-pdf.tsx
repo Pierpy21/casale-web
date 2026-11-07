@@ -9,7 +9,14 @@ import {
   View,
   renderToBuffer,
 } from "@react-pdf/renderer";
-import type { QuoteDocumentMenu, QuoteDocumentModel } from "@/lib/documents/quote-model";
+import {
+  clientFields,
+  guestsLabel,
+  splitCoursesInColumns,
+  type QuoteDocumentCourse,
+  type QuoteDocumentMenu,
+  type QuoteDocumentModel,
+} from "@/lib/documents/quote-model";
 
 const COLOR = {
   ink: "#1C2B2D",
@@ -34,22 +41,21 @@ const styles = StyleSheet.create({
     fontFamily: FONT.sans,
     fontSize: 10,
     color: COLOR.ink,
-    paddingTop: 40,
-    paddingBottom: 60,
+    paddingTop: 32,
+    paddingBottom: 46,
     paddingHorizontal: 40,
     backgroundColor: COLOR.paper,
     lineHeight: 1.35,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   headerLeft: { flexGrow: 1, paddingRight: 16 },
-  // lineHeight esplicito: evita che il motto in corsivo si sovrapponga al nome del Casale.
-  issuerName: { fontFamily: FONT.serif, fontSize: 20, lineHeight: 1.2, color: COLOR.ink, marginBottom: 6 },
-  issuerTagline: { fontFamily: FONT.serifItalic, fontSize: 9.5, lineHeight: 1.3, color: COLOR.petrol, marginBottom: 8 },
+  // Logo in alto a sinistra, al posto del nome del Casale.
+  logo: { width: 135, height: 45, marginBottom: 4 },
+  issuerTagline: { fontFamily: FONT.serifItalic, fontSize: 9.5, lineHeight: 1.3, color: COLOR.petrol, marginBottom: 4 },
   issuerText: { fontSize: 8.5, color: COLOR.slate, marginBottom: 1 },
-  logo: { width: 150, height: 50 },
-  logoBlock: { alignItems: "flex-end" },
-  logoNumber: { fontSize: 9, color: COLOR.slate, marginTop: 6, textAlign: "right" },
-  rule: { height: 0.75, backgroundColor: COLOR.line, marginTop: 14, marginBottom: 14 },
+  // Dettagli evento in alto a destra, dove prima c'era il logo.
+  eventBlock: { width: 250 },
+  rule: { height: 0.75, backgroundColor: COLOR.line, marginTop: 10, marginBottom: 10 },
   rulePlain: { height: 0.5, backgroundColor: COLOR.line, marginTop: 6, marginBottom: 6 },
   eyebrow: {
     fontFamily: FONT.sansBold,
@@ -57,41 +63,48 @@ const styles = StyleSheet.create({
     color: COLOR.bronze,
     textTransform: "uppercase",
     letterSpacing: 1.4,
-    marginBottom: 5,
+    marginBottom: 4,
   },
-  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 26 },
-  docTitle: { fontFamily: FONT.serif, fontSize: 22, color: COLOR.ink },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 14 },
+  docTitle: { fontFamily: FONT.serif, fontSize: 20, color: COLOR.ink },
   metaBlock: { alignItems: "flex-end" },
   metaText: { fontSize: 9, color: COLOR.slate, marginBottom: 1 },
-  twoCols: { flexDirection: "row", gap: 24, marginBottom: 14 },
+  twoCols: { flexDirection: "row", gap: 24 },
   col: { flexGrow: 1, flexBasis: 0 },
-  kvRow: { flexDirection: "row", marginBottom: 3 },
+  grid: { flexDirection: "row", flexWrap: "wrap" },
+  gridCell: { width: "50%", paddingRight: 12 },
+  kvRow: { flexDirection: "row", marginBottom: 2 },
   kvLabel: { width: 78, fontSize: 8.5, color: COLOR.slate },
-  kvValue: { flexGrow: 1, fontSize: 10, color: COLOR.ink },
-  section: { marginBottom: 14 },
-  sectionTitle: { fontFamily: FONT.serif, fontSize: 13, color: COLOR.ink, marginBottom: 6 },
-  courseRow: { flexDirection: "row", marginBottom: 4 },
-  courseLabel: { width: 78, fontFamily: FONT.sansBold, fontSize: 8, color: COLOR.bronze, textTransform: "uppercase", letterSpacing: 0.8, paddingTop: 1 },
-  courseDishes: { flexGrow: 1 },
-  dish: { fontSize: 9.5, color: COLOR.ink, marginBottom: 1 },
+  kvLabelCompact: { width: 44 },
+  kvValue: { flexGrow: 1, flexShrink: 1, fontSize: 10, color: COLOR.ink },
+  section: { marginBottom: 8 },
+  sectionTitle: { fontFamily: FONT.serif, fontSize: 13, color: COLOR.ink },
+  menuHeading: { flexDirection: "row", alignItems: "baseline", gap: 10, marginBottom: 5 },
+  menuEyebrow: { marginBottom: 0 },
+  courseRow: { flexDirection: "row", marginBottom: 3 },
+  courseLabel: { width: 66, fontFamily: FONT.sansBold, fontSize: 8, color: COLOR.bronze, textTransform: "uppercase", letterSpacing: 0.8, paddingTop: 1 },
+  courseDishes: { flexGrow: 1, flexShrink: 1 },
+  dish: { fontSize: 9.5, lineHeight: 1.25, color: COLOR.ink, marginBottom: 1 },
   tableHead: {
     flexDirection: "row",
     borderBottomWidth: 0.9,
     borderBottomColor: COLOR.ink,
-    paddingVertical: 5,
+    paddingVertical: 3,
   },
   tableHeadText: { fontFamily: FONT.sansBold, fontSize: 8, color: COLOR.ink, textTransform: "uppercase", letterSpacing: 0.8 },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 0.5,
     borderBottomColor: COLOR.line,
-    paddingVertical: 6,
+    paddingVertical: 3,
   },
   cellDescription: { flexGrow: 4, paddingRight: 8, fontSize: 9.5 },
   cellQty: { width: 50, textAlign: "right", fontSize: 9.5 },
   cellUnit: { width: 90, textAlign: "right", fontSize: 9.5 },
   cellAmount: { width: 90, textAlign: "right", fontSize: 9.5 },
-  totalsWrap: { flexDirection: "row", justifyContent: "flex-end", marginTop: 10 },
+  totalsWrap: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
+  besideTotals: { flexGrow: 1, flexShrink: 1, flexBasis: 0, paddingRight: 24 },
+  besideBlock: { marginBottom: 6 },
   totalsBox: { width: 230 },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 },
   totalsLabel: { fontSize: 9, color: COLOR.slate },
@@ -107,10 +120,12 @@ const styles = StyleSheet.create({
   totalsGrandLabel: { fontFamily: FONT.sansBold, fontSize: 10, color: COLOR.ink },
   totalsGrandValue: { fontFamily: FONT.serifBold, fontSize: 14, color: COLOR.ink },
   bodyText: { fontSize: 9.5, color: COLOR.ink },
-  conditionText: { fontSize: 8, color: COLOR.slate, marginBottom: 2 },
-  signatureRow: { flexDirection: "row", gap: 40, marginTop: 28 },
+  // Due colonne: ogni voce occupa metà riga.
+  allergyList: { flexDirection: "row", flexWrap: "wrap" },
+  allergyItem: { width: "50%", paddingRight: 12, fontSize: 9.5, color: COLOR.ink, marginBottom: 1 },
+  signatureRow: { flexDirection: "row", gap: 40, marginTop: 8 },
   signatureBox: { flexGrow: 1, flexBasis: 0 },
-  signatureLine: { borderBottomWidth: 0.6, borderBottomColor: COLOR.ink, height: 36, marginBottom: 4 },
+  signatureLine: { borderBottomWidth: 0.6, borderBottomColor: COLOR.ink, height: 24, marginBottom: 4 },
   signatureLabel: { fontSize: 8.5, color: COLOR.slate },
   footer: {
     position: "absolute",
@@ -135,23 +150,19 @@ function loadLogo(): Promise<Buffer> {
   return logoCache;
 }
 
-function KeyValue({ label, value }: { label: string; value: string }) {
+function KeyValue({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
     <View style={styles.kvRow}>
-      <Text style={styles.kvLabel}>{label}</Text>
+      <Text style={compact ? [styles.kvLabel, styles.kvLabelCompact] : styles.kvLabel}>{label}</Text>
       <Text style={styles.kvValue}>{value}</Text>
     </View>
   );
 }
 
-function MenuBlock({ title, menu }: { title: string; menu: QuoteDocumentMenu }) {
+function CourseColumn({ courses }: { courses: QuoteDocumentCourse[] }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.eyebrow}>{title}</Text>
-      {menu.name && menu.name.trim().toLowerCase() !== title.trim().toLowerCase() ? (
-        <Text style={styles.sectionTitle}>{menu.name}</Text>
-      ) : null}
-      {menu.courses.map((course) => (
+    <View style={styles.col}>
+      {courses.map((course) => (
         <View key={course.course} style={styles.courseRow} wrap={false}>
           <Text style={styles.courseLabel}>{course.label}</Text>
           <View style={styles.courseDishes}>
@@ -167,27 +178,57 @@ function MenuBlock({ title, menu }: { title: string; menu: QuoteDocumentMenu }) 
   );
 }
 
+/** Menù su due colonne bilanciate, per stare in un unico foglio A4. */
+function MenuBlock({ title, menu }: { title: string; menu: QuoteDocumentMenu }) {
+  const [left, right] = splitCoursesInColumns(menu.courses);
+  return (
+    <View style={styles.section}>
+      <View style={styles.menuHeading}>
+        <Text style={[styles.eyebrow, styles.menuEyebrow]}>{title}</Text>
+        {menu.name && menu.name.trim().toLowerCase() !== title.trim().toLowerCase() ? (
+          <Text style={styles.sectionTitle}>{menu.name}</Text>
+        ) : null}
+      </View>
+      <View style={styles.twoCols}>
+        <CourseColumn courses={left} />
+        <CourseColumn courses={right} />
+      </View>
+    </View>
+  );
+}
+
 function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffer }) {
   const { issuer, meta, client, event, setup, totals } = model;
   return (
     <Document title={`${model.title} ${meta.number}`} author={issuer.name} creator={issuer.name}>
       <Page size="A4" style={styles.page}>
-        {/* Intestazione: dati Casale a sinistra, logo in alto a destra */}
+        {/* Footer con numerazione pagine */}
+        <View style={styles.footer} fixed>
+          <Text style={styles.footerText}>
+            {issuer.name} · {issuer.addressLines.join(", ")} · {issuer.phone}
+          </Text>
+          <Text
+            style={styles.footerText}
+            render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}
+          />
+        </View>
+        {/* Intestazione: logo e dati Casale a sinistra, dettagli evento in alto a destra */}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <Text style={styles.issuerName}>{issuer.name}</Text>
-            <Text style={styles.issuerTagline}>{issuer.tagline}</Text>
-            {issuer.addressLines.map((line) => (
-              <Text key={line} style={styles.issuerText}>{line}</Text>
-            ))}
-            <Text style={styles.issuerText}>{issuer.phone}</Text>
-            <Text style={styles.issuerText}>{issuer.email}</Text>
-          </View>
-          {/* Logo e, sotto in piccolo, il numero del preventivo */}
-          <View style={styles.logoBlock}>
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image non supporta la prop alt */}
             <Image src={logo} style={styles.logo} />
-            <Text style={styles.logoNumber}>N. {meta.number}</Text>
+            <Text style={styles.issuerTagline}>{issuer.tagline}</Text>
+            <Text style={styles.issuerText}>{issuer.addressLines.join(", ")}</Text>
+            <Text style={styles.issuerText}>
+              {issuer.phone} · {issuer.email}
+            </Text>
+          </View>
+          <View style={styles.eventBlock}>
+            <Text style={styles.eyebrow}>Evento</Text>
+            <KeyValue compact label="Data" value={event.dateLong} />
+            {event.meal ? <KeyValue compact label="Pasto" value={event.meal} /> : null}
+            <KeyValue compact label="Sala" value={event.room} />
+            <KeyValue compact label="Ospiti" value={guestsLabel(event)} />
           </View>
         </View>
         <View style={styles.rule} />
@@ -198,33 +239,25 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
             <Text style={styles.docTitle}>{model.title}</Text>
           </View>
           <View style={styles.metaBlock}>
-            <Text style={styles.metaText}>Data di emissione: {meta.issuedAt}</Text>
+            <Text style={styles.metaText}>
+              N. {meta.number} · Data di emissione: {meta.issuedAt}
+            </Text>
             {meta.validUntil ? (
               <Text style={styles.metaText}>Valido fino al: {meta.validUntil}</Text>
             ) : null}
           </View>
         </View>
 
-        {/* Cliente ed evento */}
-        <View style={styles.twoCols}>
-          <View style={styles.col}>
-            <Text style={styles.eyebrow}>Cliente</Text>
-            <KeyValue label="Nome" value={client.fullName} />
-            {client.phone ? <KeyValue label="Telefono" value={client.phone} /> : null}
-            {client.email ? <KeyValue label="Email" value={client.email} /> : null}
-            {client.taxCode ? <KeyValue label="Codice fiscale" value={client.taxCode} /> : null}
-            {client.vatNumber ? <KeyValue label="Partita IVA" value={client.vatNumber} /> : null}
-          </View>
-          <View style={styles.col}>
-            <Text style={styles.eyebrow}>Evento</Text>
-            <KeyValue label="Data" value={event.dateLong} />
-            {event.meal ? <KeyValue label="Pasto" value={event.meal} /> : null}
-            <KeyValue label="Sala" value={event.room} />
-            <KeyValue label="Adulti" value={String(event.adults)} />
-            <KeyValue label="Bambini" value={String(event.children)} />
-            {event.kidsMenus > 0 ? (
-              <KeyValue label="Menù bambini" value={String(event.kidsMenus)} />
-            ) : null}
+        {/* Cliente */}
+        <View style={styles.section}>
+          <Text style={styles.eyebrow}>Cliente</Text>
+          {/* Griglia a due colonne: i campi si dispongono a coppie per riga */}
+          <View style={styles.grid}>
+            {clientFields(client).map(([label, value]) => (
+              <View key={label} style={styles.gridCell}>
+                <KeyValue label={label} value={value} />
+              </View>
+            ))}
           </View>
         </View>
 
@@ -232,16 +265,21 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
         {model.menu ? <MenuBlock title="Menù" menu={model.menu} /> : null}
         {model.kidsMenu ? <MenuBlock title="Menù bambini" menu={model.kidsMenu} /> : null}
 
-        {/* Allestimento */}
-        {setup.colors.length > 0 || setup.notes ? (
-          <View style={styles.section}>
-            <Text style={styles.eyebrow}>Allestimento</Text>
-            {setup.colors.length > 0 ? (
-              <KeyValue label="Colori" value={setup.colors.join(", ")} />
-            ) : null}
-            {setup.notes ? <Text style={styles.bodyText}>{setup.notes}</Text> : null}
-          </View>
-        ) : null}
+        {/* Allergie e intolleranze */}
+        <View style={styles.section} wrap={false}>
+          <Text style={styles.eyebrow}>Allergie e intolleranze</Text>
+          {model.allergies.length > 0 ? (
+            <View style={styles.allergyList}>
+              {model.allergies.map((line, i) => (
+                <Text key={i} style={styles.allergyItem}>
+                  • {line}
+                </Text>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.bodyText}>Nessuna segnalata</Text>
+          )}
+        </View>
 
         {/* Righe */}
         <View style={styles.section}>
@@ -261,8 +299,25 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
             </View>
           ))}
 
-          {/* Totali (prezzi IVA inclusa) */}
+          {/* Allestimento e note a sinistra, totali (prezzi IVA inclusa) a destra */}
           <View style={styles.totalsWrap} wrap={false}>
+            <View style={styles.besideTotals}>
+              {setup.colors.length > 0 || setup.notes ? (
+                <View style={styles.besideBlock}>
+                  <Text style={styles.eyebrow}>Allestimento</Text>
+                  {setup.colors.length > 0 ? (
+                    <KeyValue label="Colori" value={setup.colors.join(", ")} />
+                  ) : null}
+                  {setup.notes ? <Text style={styles.bodyText}>{setup.notes}</Text> : null}
+                </View>
+              ) : null}
+              {model.notes ? (
+                <View style={styles.besideBlock}>
+                  <Text style={styles.eyebrow}>Note</Text>
+                  <Text style={styles.bodyText}>{model.notes}</Text>
+                </View>
+              ) : null}
+            </View>
             <View style={styles.totalsBox}>
               <View style={styles.totalsRow}>
                 <Text style={styles.totalsLabel}>{totals.subtotalLabel}</Text>
@@ -290,20 +345,8 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
           </View>
         </View>
 
-        {/* Note */}
-        {model.notes ? (
-          <View style={styles.section} wrap={false}>
-            <Text style={styles.eyebrow}>Note</Text>
-            <Text style={styles.bodyText}>{model.notes}</Text>
-          </View>
-        ) : null}
-
-        {/* Condizioni e firma */}
+        {/* Firme */}
         <View style={styles.section} wrap={false}>
-          <Text style={styles.eyebrow}>Condizioni</Text>
-          {model.conditions.map((c, i) => (
-            <Text key={i} style={styles.conditionText}>- {c}</Text>
-          ))}
           <View style={styles.signatureRow}>
             <View style={styles.signatureBox}>
               <View style={styles.signatureLine} />
@@ -316,22 +359,12 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
           </View>
         </View>
 
-        {/* Footer con numerazione pagine */}
-        <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>
-            {issuer.name} · {issuer.addressLines.join(", ")} · {issuer.phone}
-          </Text>
-          <Text
-            style={styles.footerText}
-            render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}
-          />
-        </View>
       </Page>
     </Document>
   );
 }
 
-/** Renderizza il modello del preventivo in un PDF A4 (Buffer). */
+/** Renderizza il modello dell'ordine di servizio in un PDF A4 (Buffer). */
 export async function renderQuotePdf(model: QuoteDocumentModel): Promise<Buffer> {
   const logo = await loadLogo();
   return renderToBuffer(<QuoteDocument model={model} logo={logo} />);

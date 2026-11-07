@@ -2,7 +2,7 @@ import type { HTMLAttributes } from "react";
 import { SETUP_COLOR_HEX, SETUP_COLORS, STATUS_LABELS, type BookingStatus } from "@/lib/types";
 import { cn } from "./cn";
 
-export type BadgeTone = "neutral" | "petrol" | "bronze" | "success" | "warning" | "danger";
+export type BadgeTone = "neutral" | "petrol" | "bronze" | "success" | "warning" | "danger" | "dangerSolid";
 
 const TONES: Record<BadgeTone, string> = {
   neutral: "bg-cream text-slate-dark",
@@ -11,6 +11,8 @@ const TONES: Record<BadgeTone, string> = {
   success: "bg-success/10 text-success",
   warning: "bg-warning/20 text-ink",
   danger: "bg-danger/10 text-danger",
+  // Rosso pieno per gli stati da notare subito (testo bianco 6.9:1 su --color-danger).
+  dangerSolid: "bg-danger text-white",
 };
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
