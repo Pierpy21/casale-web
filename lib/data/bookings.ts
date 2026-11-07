@@ -191,6 +191,8 @@ export async function getReservationSheet(date: string): Promise<ReservationShee
       room: room?.name ? String(room.name) : null,
       table: tableOf(r),
       covers: num(r.adults) + num(r.kids_menus),
+      adults: num(r.adults),
+      kids_menus: num(r.kids_menus),
       meal: mealOf(r),
       phone: bookingPhone(personOf(r)),
     };

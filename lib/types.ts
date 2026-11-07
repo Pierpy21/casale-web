@@ -44,7 +44,7 @@ export interface Booking {
   status: BookingStatus; notes: string | null; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string;
 }
 /** Riga del foglio prenotazioni (export PDF/DOCX): prenotazioni normali del giorno. */
-export interface ReservationSheetRow { name: string; room: string | null; table: number | null; covers: number; meal: BookingMeal | null; phone: string | null; }
+export interface ReservationSheetRow { name: string; room: string | null; table: number | null; /** Adulti + menù bambini. */ covers: number; adults: number; kids_menus: number; meal: BookingMeal | null; phone: string | null; }
 /** Foglio prenotazioni di un giorno (`date` YYYY-MM-DD), già ordinato. */
 export interface ReservationSheet { date: string; rows: ReservationSheetRow[]; }
 /** Menù del giorno nel foglio eventi: adulti (menu) o bambini (kids), porzioni sommate sui banchetti. */
