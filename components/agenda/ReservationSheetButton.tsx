@@ -10,7 +10,7 @@ const COLUMNS: SheetPreviewColumn[] = [
   { label: "Nome" },
   { label: "Sala", widthPt: 95 },
   { label: "Tavolo", widthPt: 50, align: "center", strong: true },
-  { label: "Coperti", widthPt: 55, align: "center" },
+  { label: "Coperti", widthPt: 115, align: "center" },
   { label: "Pasto", widthPt: 55, align: "center" },
   { label: "Cellulare", widthPt: 100 },
 ];
