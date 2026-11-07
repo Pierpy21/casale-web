@@ -88,6 +88,7 @@ export async function getFloorPlan(date: string, meal: BookingMeal): Promise<Flo
         covers: adults + children,
         adults,
         children,
+        kids_menus: num(r.kids_menus),
         status: r.status as BookingStatus,
         room_id: nn(r.room),
         table_number: num(r.table_number) > 0 ? num(r.table_number) : null,
