@@ -19,7 +19,7 @@ const GRID_COLUMNS = {
 
 /**
  * Numeri della prenotazione sotto il titolo, stessa forma del riepilogo giornata (Stat + chip menù).
- * Eventi: coperti, menù bambini, totale previsto e residuo (admin). Normali: coperti, adulti/bambini, pasto.
+ * Eventi: coperti, menù bambini, totale previsto e residuo (admin). Normali: coperti, adulti/menù bambini, pasto.
  * Appuntamenti: ora e tipo evento.
  */
 export function BookingSummary({ booking, when, finance }: BookingSummaryProps) {
@@ -31,7 +31,7 @@ export function BookingSummary({ booking, when, finance }: BookingSummaryProps) 
       key: "covers",
       label: "Coperti totali",
       value: covers,
-      hint: `Adulti ${booking.adults} · Bambini ${booking.children}`,
+      hint: `Adulti ${booking.adults} · Seggioloni ${booking.children}`,
     });
     tiles.push({
       key: "kids",
@@ -57,7 +57,7 @@ export function BookingSummary({ booking, when, finance }: BookingSummaryProps) 
     }
   } else if (booking.kind === "normale") {
     tiles.push({ key: "covers", label: "Coperti", value: covers });
-    tiles.push({ key: "guests", label: "Adulti / bambini", value: `${booking.adults} / ${booking.children}` });
+    tiles.push({ key: "guests", label: "Adulti / menù bambini", value: `${booking.adults} / ${booking.kids_menus}` });
     tiles.push({ key: "when", label: "Pasto", value: when ?? "—" });
   } else {
     tiles.push({ key: "when", label: "Ora", value: when ?? "—" });
