@@ -17,10 +17,16 @@ import {
   WidthType,
   type ITableBordersOptions,
 } from "docx";
-import { buildReservationSheetView, type ReservationSheetView } from "@/lib/documents/reservations-view";
+import {
+  buildReservationSheetView,
+  type ReservationPdfRow,
+  type ReservationRoomSection,
+  type ReservationSheetView,
+} from "@/lib/documents/reservations-view";
 import type { ReservationSheet } from "@/lib/types";
 
 // Foglio prenotazioni del giorno in DOCX: stessa impostazione del preventivo DOCX (lib/documents/quote-docx.ts).
+// Come il PDF, una pagina per gruppo di sale (vedi ROOM_PAGES): ogni pagina è una sezione Word.
 
 const COLOR = {
   ink: "1C2B2D",
@@ -38,8 +44,8 @@ const PAGE_HEIGHT = 16838;
 const MARGIN = 800;
 const CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN; // 10306
 
-/** Larghezze colonne (twip): Nome | Sala | Tavolo | Coperti | Pasto | Cellulare. */
-const COL_WIDTHS = [3206, 1900, 1100, 1100, 1200, 1800];
+/** Larghezze colonne (twip): Nome | Tavolo | Coperti | Pasto | Cellulare. La sala è nel titolo della sezione. */
+const COL_WIDTHS = [5106, 1100, 1100, 1200, 1800];
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
 const NO_BORDERS: ITableBordersOptions = {
@@ -66,7 +72,15 @@ function loadLogo(): Promise<Buffer> {
 
 function text(
   value: string,
-  opts: { size?: number; bold?: boolean; italics?: boolean; color?: string; font?: string; caps?: boolean; spacing?: number } = {},
+  opts: {
+    size?: number;
+    bold?: boolean;
+    italics?: boolean;
+    color?: string;
+    font?: string;
+    caps?: boolean;
+    spacing?: number;
+  } = {},
 ): TextRun {
   return new TextRun({
     text: value,
@@ -111,6 +125,56 @@ function bodyCell(value: string, align: Align, width: number): TableCell {
   });
 }
 
+function linesTable(rows: ReservationPdfRow[]): Table {
+  return new Table({
+    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+    columnWidths: COL_WIDTHS,
+    rows: [
+      new TableRow({
+        tableHeader: true,
+        children: [
+          headerCell("Nome", AlignmentType.LEFT, COL_WIDTHS[0]),
+          headerCell("Tavolo", AlignmentType.CENTER, COL_WIDTHS[1]),
+          headerCell("Coperti", AlignmentType.CENTER, COL_WIDTHS[2]),
+          headerCell("Pasto", AlignmentType.CENTER, COL_WIDTHS[3]),
+          headerCell("Cellulare", AlignmentType.LEFT, COL_WIDTHS[4]),
+        ],
+      }),
+      ...rows.map(
+        (row) =>
+          new TableRow({
+            cantSplit: true,
+            children: [
+              bodyCell(row.name, AlignmentType.LEFT, COL_WIDTHS[0]),
+              bodyCell(row.table, AlignmentType.CENTER, COL_WIDTHS[1]),
+              bodyCell(row.covers, AlignmentType.CENTER, COL_WIDTHS[2]),
+              bodyCell(row.meal, AlignmentType.CENTER, COL_WIDTHS[3]),
+              bodyCell(row.phone, AlignmentType.LEFT, COL_WIDTHS[4]),
+            ],
+          }),
+      ),
+    ],
+  });
+}
+
+/** Una sala: nome e conteggio, poi la tabella o "Nessuna prenotazione". */
+function roomBlock(section: ReservationRoomSection): Array<Paragraph | Table> {
+  return [
+    para(
+      [
+        text(section.room, { size: 16, font: FONT.serif }),
+        text(`   ${section.countLabel}`, { size: 9, color: COLOR.slate }),
+      ],
+      { after: 80, keepNext: true },
+    ),
+    section.rows.length === 0
+      ? para([text("Nessuna prenotazione", { size: 9.5, italics: true, color: COLOR.slate, font: FONT.serif })], {
+          after: 60,
+        })
+      : linesTable(section.rows),
+  ];
+}
+
 /** Renderizza il foglio prenotazioni del giorno in un file DOCX (Buffer). */
 export async function renderReservationsDocx(sheet: ReservationSheet): Promise<Buffer> {
   const logo = await loadLogo();
@@ -133,9 +197,14 @@ async function renderSheetView(view: ReservationSheetView, logo: Buffer): Promis
             borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
             children: [
               para([text("Casale del Notaio", { size: 20, font: FONT.serif })], { after: 60 }),
-              para([text("Del gusto il Teatro.", { size: 9.5, italics: true, color: COLOR.petrol, font: FONT.serif })], { after: 120 }),
+              para(
+                [text("Del gusto il Teatro.", { size: 9.5, italics: true, color: COLOR.petrol, font: FONT.serif })],
+                { after: 120 },
+              ),
               para([text("Via Nicolosi 67, 95032 Belpasso (CT)", { size: 8.5, color: COLOR.slate })], { after: 10 }),
-              para([text("+39 340 109 0100 · info@casaledelnotaio.it", { size: 8.5, color: COLOR.slate })], { after: 0 }),
+              para([text("+39 340 109 0100 · info@casaledelnotaio.it", { size: 8.5, color: COLOR.slate })], {
+                after: 0,
+              }),
             ],
           }),
           new TableCell({
@@ -148,7 +217,11 @@ async function renderSheetView(view: ReservationSheetView, logo: Buffer): Promis
                     type: "png",
                     data: logo,
                     transformation: { width: 200, height: 67 },
-                    altText: { name: "Logo Casale del Notaio", title: "Casale del Notaio", description: "Logo del Casale del Notaio" },
+                    altText: {
+                      name: "Logo Casale del Notaio",
+                      title: "Casale del Notaio",
+                      description: "Logo del Casale del Notaio",
+                    },
                   }),
                 ],
                 { align: AlignmentType.RIGHT, after: 0 },
@@ -160,58 +233,57 @@ async function renderSheetView(view: ReservationSheetView, logo: Buffer): Promis
     ],
   });
 
-  // Titolo, data e totale
+  // Titolo, data e totale (solo prima pagina)
   const titleBlock = [
     para([text(view.title, { size: 22, font: FONT.serif })], { before: 280, after: 60 }),
     para([text(view.dateLong, { size: 13, italics: true, color: COLOR.petrol, font: FONT.serif })], { after: 60 }),
     para([text(view.countLabel, { size: 9, color: COLOR.slate })], { after: 240 }),
   ];
 
-  const linesTable = new Table({
-    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
-    columnWidths: COL_WIDTHS,
-    rows: [
-      new TableRow({
-        tableHeader: true,
-        children: [
-          headerCell("Nome", AlignmentType.LEFT, COL_WIDTHS[0]),
-          headerCell("Sala", AlignmentType.LEFT, COL_WIDTHS[1]),
-          headerCell("Tavolo", AlignmentType.CENTER, COL_WIDTHS[2]),
-          headerCell("Coperti", AlignmentType.CENTER, COL_WIDTHS[3]),
-          headerCell("Pasto", AlignmentType.CENTER, COL_WIDTHS[4]),
-          headerCell("Cellulare", AlignmentType.LEFT, COL_WIDTHS[5]),
-        ],
-      }),
-      ...view.rows.map(
-        (row) =>
-          new TableRow({
-            cantSplit: true,
-            children: [
-              bodyCell(row.name, AlignmentType.LEFT, COL_WIDTHS[0]),
-              bodyCell(row.room, AlignmentType.LEFT, COL_WIDTHS[1]),
-              bodyCell(row.table, AlignmentType.CENTER, COL_WIDTHS[2]),
-              bodyCell(row.covers, AlignmentType.CENTER, COL_WIDTHS[3]),
-              bodyCell(row.meal, AlignmentType.CENTER, COL_WIDTHS[4]),
-              bodyCell(row.phone, AlignmentType.LEFT, COL_WIDTHS[5]),
-            ],
-          }),
-      ),
-    ],
-  });
+  const firstPageHead = [
+    header,
+    para([], { after: 120 }),
+    new Paragraph({
+      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: COLOR.line, space: 1 } },
+      children: [],
+      spacing: { after: 120 },
+    }),
+    ...titleBlock,
+  ];
 
-  const footer = new Footer({
-    children: [
-      para(
-        [
-          text("Casale del Notaio · Via Nicolosi 67, Belpasso (CT)   |   Pagina ", { size: 7.5, color: COLOR.slate }),
-          new TextRun({ children: [PageNumber.CURRENT], size: 15, color: COLOR.slate, font: FONT.sans }),
-          text(" di ", { size: 7.5, color: COLOR.slate }),
-          new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 15, color: COLOR.slate, font: FONT.sans }),
-        ],
-        { align: AlignmentType.CENTER, after: 0 },
-      ),
-    ],
-  });
+  // Pagine successive: titolo e data su una riga.
+  const compactHead = [
+    para(
+      [
+        text(view.title, { size: 14, font: FONT.serif }),
+        text(`   ${view.dateLong}`, { size: 11, italics: true, color: COLOR.petrol, font: FONT.serif }),
+      ],
+      { after: 280 },
+    ),
+  ];
+
+  // Linea scura tra le sale della stessa pagina.
+  const divider = () =>
+    new Paragraph({
+      border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: COLOR.ink, space: 1 } },
+      children: [],
+      spacing: { before: 120, after: 280 },
+    });
+  // Un piè di pagina per sezione (ogni pagina è una sezione Word).
+  const footer = () =>
+    new Footer({
+      children: [
+        para(
+          [
+            text("Casale del Notaio · Via Nicolosi 67, Belpasso (CT)   |   Pagina ", { size: 7.5, color: COLOR.slate }),
+            new TextRun({ children: [PageNumber.CURRENT], size: 15, color: COLOR.slate, font: FONT.sans }),
+            text(" di ", { size: 7.5, color: COLOR.slate }),
+            new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 15, color: COLOR.slate, font: FONT.sans }),
+          ],
+          { align: AlignmentType.CENTER, after: 0 },
+        ),
+      ],
+    });
 
   const doc = new Document({
     creator: "Casale del Notaio",
@@ -221,30 +293,19 @@ async function renderSheetView(view: ReservationSheetView, logo: Buffer): Promis
         document: { run: { font: FONT.sans, size: 19, color: COLOR.ink } },
       },
     },
-    sections: [
-      {
-        properties: {
-          page: {
-            size: { width: PAGE_WIDTH, height: PAGE_HEIGHT },
-            margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN, footer: 400 },
-          },
+    sections: view.pages.map((page, pageIndex) => ({
+      properties: {
+        page: {
+          size: { width: PAGE_WIDTH, height: PAGE_HEIGHT },
+          margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN, footer: 400 },
         },
-        footers: { default: footer },
-        children: [
-          header,
-          para([], { after: 120 }),
-          new Paragraph({
-            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: COLOR.line, space: 1 } },
-            children: [],
-            spacing: { after: 120 },
-          }),
-          ...titleBlock,
-          ...(view.rows.length === 0
-            ? [para([text("Nessuna prenotazione", { size: 9.5, italics: true, color: COLOR.slate, font: FONT.serif })], { before: 120 })]
-            : [linesTable]),
-        ],
       },
-    ],
+      footers: { default: footer() },
+      children: [
+        ...(pageIndex === 0 ? firstPageHead : compactHead),
+        ...page.sections.flatMap((section, i) => [...(i > 0 ? [divider()] : []), ...roomBlock(section)]),
+      ],
+    })),
   });
 
   return Packer.toBuffer(doc);

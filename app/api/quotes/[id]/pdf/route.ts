@@ -19,11 +19,11 @@ async function handle(
 
   const { id } = await params;
   if (!isRecordId(id)) {
-    return documentError(400, "Identificativo preventivo non valido");
+    return documentError(400, "Identificativo ordine di servizio non valido");
   }
 
   const quote = await getQuote(id);
-  if (!quote) return documentError(404, "Preventivo non trovato");
+  if (!quote) return documentError(404, "Ordine di servizio non trovato");
 
   const buffer = await renderQuotePdf(buildQuoteDocumentModel(quote));
 

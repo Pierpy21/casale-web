@@ -24,7 +24,7 @@ export function DeleteBookingButton({
 }) {
   const router = useRouter();
   const linked = [
-    quotesCount > 0 ? plural(quotesCount, "preventivo", "preventivi") : null,
+    quotesCount > 0 ? plural(quotesCount, "ordine di servizio", "ordini di servizio") : null,
     paymentsCount > 0 ? plural(paymentsCount, "acconto registrato", "acconti registrati") : null,
   ].filter(Boolean);
   const description =

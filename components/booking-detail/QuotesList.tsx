@@ -9,7 +9,7 @@ export function QuotesList({ quotes, status }: { quotes: Quote[]; status: Bookin
   if (quotes.length === 0) {
     return (
       <p className="text-[13px] text-slate">
-        Nessun preventivo emesso. Crealo dal pulsante Preventivo accanto al nome dell’evento.
+        Nessun ordine di servizio emesso. Crealo dal pulsante Ordine di servizio accanto al nome dell’evento.
       </p>
     );
   }

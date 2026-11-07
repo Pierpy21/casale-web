@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { useOnline } from "@/components/offline/useOnline";
 import { whatsappUrl } from "@/components/bookings/format";
 import { cn } from "@/components/ui/cn";
-import { formatEUR, quoteDocumentTitle, quoteFileName } from "@/lib/quote-utils";
+import { formatEUR, quoteFileName } from "@/lib/quote-utils";
 import type { BookingStatus } from "@/lib/types";
 
 /** Chrome, Firefox ed Edge su iPhone/iPad: non condividono file con navigator.share (vedi DocumentDownload). */
@@ -16,20 +16,17 @@ function isIosOtherBrowser(): boolean {
 function quoteMessage({
   clientName,
   number,
-  status,
   eventDate,
   total,
 }: {
   clientName: string;
   number: string;
-  status: BookingStatus;
   eventDate: string;
   total: number | null;
 }): string {
-  const document = quoteDocumentTitle(status) === "Preventivo" ? "il preventivo" : "l'ordine di servizio";
   const lines = [
     clientName ? `Gentile ${clientName},` : "Buongiorno,",
-    `le invio in allegato ${document} n. ${number} per l'evento del ${eventDate}.`,
+    `le invio in allegato l'ordine di servizio n. ${number} per l'evento del ${eventDate}.`,
   ];
   if (total !== null && total > 0) lines.push(`Il totale è di ${formatEUR(total)} IVA inclusa.`);
   lines.push("Per qualsiasi domanda resto a disposizione.", "", "Casale del Notaio");
@@ -40,7 +37,7 @@ export interface WhatsAppQuoteShareProps {
   quoteId: string;
   /** Numero del preventivo, es. "2026-001" (serve anche per il nome del file). */
   number: string;
-  /** Stato dell'evento: decide se il documento è "Preventivo" o "Ordine di servizio" (messaggio e nome del file). */
+  /** Stato dell'evento: serve per il nome del file. */
   status: BookingStatus;
   /** Cellulare del cliente. Null: WhatsApp si apre senza numero, per scegliere il contatto. */
   phone: string | null;
@@ -91,7 +88,7 @@ export function WhatsAppQuoteShare({
   const href = `/api/quotes/${quoteId}/pdf`;
   const fileName = quoteFileName(number, "pdf", status);
 
-  const whatsAppHref = () => whatsappUrl(phone, quoteMessage({ clientName, number, status, eventDate, total }));
+  const whatsAppHref = () => whatsappUrl(phone, quoteMessage({ clientName, number, eventDate, total }));
 
   // Download normale del PDF (link programmatico), da allegare in WhatsApp Web o in altra app.
   const downloadPdf = () => {

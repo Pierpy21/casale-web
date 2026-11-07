@@ -202,7 +202,7 @@ export default async function BookingDetailPage({
         <div className="flex min-w-0 flex-col gap-5">
           <PaymentsPanel booking={booking} payments={payments} paymentsError={paymentsError} />
           <div className="flex min-w-0 flex-col gap-3 border-t border-sand pt-4">
-            <h3 className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-dark">Preventivi</h3>
+            <h3 className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-dark">Ordini di servizio</h3>
             <QuotesList quotes={quotes} status={booking.status} />
           </div>
         </div>

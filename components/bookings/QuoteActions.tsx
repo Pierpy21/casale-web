@@ -79,7 +79,7 @@ export function PreventivoMenu({ bookingId, status, latest, quotesCount, phone, 
     setError(null);
     startTransition(async () => {
       const result = await submitMutation("quotes.createQuoteFromBooking", createQuoteFromBooking, [bookingId], {
-        label: "Nuovo preventivo",
+        label: "Nuovo ordine di servizio",
         entity: { type: "booking", id: bookingId },
         createsTempId: true,
       });
@@ -134,7 +134,7 @@ export function PreventivoMenu({ bookingId, status, latest, quotesCount, phone, 
                 <span className="text-[14px] text-ink wrap-anywhere">n. {latest.number}</span>
                 {quotesCount > 1 && (
                   <span className="text-[12px] text-slate-dark">
-                    {quotesCount} preventivi: elenco in Pagamenti e acconti
+                    {quotesCount} ordini di servizio: elenco in Pagamenti e acconti
                   </span>
                 )}
               </div>
@@ -182,7 +182,7 @@ export function PreventivoMenu({ bookingId, status, latest, quotesCount, phone, 
           ) : (
             <button type="button" disabled={pending} onClick={create} className={cn(ITEM, "disabled:opacity-50")}>
               <FilePlus aria-hidden="true" className={ICON} />
-              Crea preventivo
+              Crea ordine di servizio
             </button>
           )}
           {error && (

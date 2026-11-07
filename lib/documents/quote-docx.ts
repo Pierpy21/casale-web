@@ -348,15 +348,18 @@ export async function renderQuoteDocx(model: QuoteDocumentModel): Promise<Buffer
     rows: totalsRows,
   });
 
-  // Note, condizioni, firme
+  // Allergie e intolleranze
+  const allergyParagraphs: Paragraph[] = [
+    eyebrow("Allergie e intolleranze"),
+    ...(model.allergies.length > 0
+      ? model.allergies.map((line) => para([text(`• ${line}`, { size: 9.5 })], { after: 20 }))
+      : [para([text("Nessuna segnalata", { size: 9.5 })], { after: 60 })]),
+  ];
+
+  // Note e firme
   const notesParagraphs: Paragraph[] = model.notes
     ? [eyebrow("Note"), para([text(model.notes, { size: 9.5 })], { after: 60 })]
     : [];
-
-  const conditionsParagraphs: Paragraph[] = [
-    eyebrow("Condizioni"),
-    ...model.conditions.map((c) => para([text(`- ${c}`, { size: 8, color: COLOR.slate })], { after: 40 })),
-  ];
 
   const signatureTable = new Table({
     width: { size: CONTENT_WIDTH, type: WidthType.DXA },
@@ -417,11 +420,11 @@ export async function renderQuoteDocx(model: QuoteDocumentModel): Promise<Buffer
           infoTable,
           ...(menuParagraphs.length ? [para([], { after: 60 }), ...menuParagraphs] : []),
           ...setupParagraphs,
+          ...allergyParagraphs,
           eyebrow("Dettaglio"),
           linesTable,
           totalsTable,
           ...notesParagraphs,
-          ...conditionsParagraphs,
           para([], { after: 200 }),
           signatureTable,
         ],

@@ -45,6 +45,8 @@ export interface SheetFrameProps {
    * Con un valore il foglio ha la sua larghezza reale e chi lo contiene scorre.
    */
   pxPerMm?: number;
+  /** Pagine dopo la prima: niente intestazione del Casale, solo titolo e sottotitolo su una riga (come nel PDF). */
+  compact?: boolean;
   children: ReactNode;
 }
 
@@ -77,33 +79,52 @@ function frameStyle(pxPerMm: number | undefined): CSSProperties | undefined {
  * Foglio A4 (210 × 297 mm) con intestazione, titolo e piè di pagina; il contenuto (tabella, schede) va nei children.
  * Stesse misure e tipografia dei PDF react-pdf (pt → mm). Di default il foglio si scala sulla larghezza disponibile.
  */
-export function SheetFrame({ title, subtitle, meta, issuer, footer, ariaLabel, pxPerMm, children }: SheetFrameProps) {
+export function SheetFrame({
+  title,
+  subtitle,
+  meta,
+  issuer,
+  footer,
+  ariaLabel,
+  pxPerMm,
+  compact = false,
+  children,
+}: SheetFrameProps) {
   return (
     <div className={styles.frame} style={frameStyle(pxPerMm)}>
       <article aria-label={ariaLabel} className={styles.sheet}>
-        <header className={styles.header}>
-          <div className={styles.issuer}>
-            <p className={styles.issuerName}>{issuer.name}</p>
-            {issuer.tagline ? <p className={styles.issuerTagline}>{issuer.tagline}</p> : null}
-            {issuer.lines.map((line) => (
-              <p key={line} className={styles.issuerText}>
-                {line}
-              </p>
-            ))}
+        {compact ? (
+          <div className={styles.compactHead}>
+            <h3 className={styles.compactTitle}>{title}</h3>
+            {subtitle ? <p className={styles.compactSubtitle}>{subtitle}</p> : null}
           </div>
-          {issuer.logoSrc ? (
-            <Image src={issuer.logoSrc} alt="" width={150} height={50} unoptimized className={styles.logo} />
-          ) : null}
-        </header>
-        <div className={styles.rule} aria-hidden="true" />
+        ) : (
+          <>
+            <header className={styles.header}>
+              <div className={styles.issuer}>
+                <p className={styles.issuerName}>{issuer.name}</p>
+                {issuer.tagline ? <p className={styles.issuerTagline}>{issuer.tagline}</p> : null}
+                {issuer.lines.map((line) => (
+                  <p key={line} className={styles.issuerText}>
+                    {line}
+                  </p>
+                ))}
+              </div>
+              {issuer.logoSrc ? (
+                <Image src={issuer.logoSrc} alt="" width={150} height={50} unoptimized className={styles.logo} />
+              ) : null}
+            </header>
+            <div className={styles.rule} aria-hidden="true" />
 
-        <div className={styles.titleRow}>
-          <div className={styles.titleBlock}>
-            <h3 className={styles.docTitle}>{title}</h3>
-            {subtitle ? <p className={styles.docSubtitle}>{subtitle}</p> : null}
-          </div>
-          {meta ? <p className={styles.metaText}>{meta}</p> : null}
-        </div>
+            <div className={styles.titleRow}>
+              <div className={styles.titleBlock}>
+                <h3 className={styles.docTitle}>{title}</h3>
+                {subtitle ? <p className={styles.docSubtitle}>{subtitle}</p> : null}
+              </div>
+              {meta ? <p className={styles.metaText}>{meta}</p> : null}
+            </div>
+          </>
+        )}
 
         {children}
 
@@ -117,48 +138,62 @@ export function SheetFrame({ title, subtitle, meta, issuer, footer, ariaLabel, p
   );
 }
 
-/** Foglio con una tabella (es. prenotazioni), eventuali totali in fondo. */
+/** Tabella del foglio (o il testo vuoto se non ci sono righe), riusabile dentro uno SheetFrame. */
+export function SheetTable({
+  columns,
+  rows,
+  caption,
+  emptyText = "Nessun dato",
+}: {
+  columns: SheetPreviewColumn[];
+  rows: string[][];
+  caption: string;
+  emptyText?: string;
+}) {
+  if (rows.length === 0) return <p className={styles.empty}>{emptyText}</p>;
+  return (
+    <table className={styles.table}>
+      <caption className="sr-only">{caption}</caption>
+      <colgroup>
+        {columns.map((column, i) => (
+          <col key={i} style={widthStyle(column.widthPt)} />
+        ))}
+      </colgroup>
+      <thead>
+        <tr>
+          {columns.map((column, i) => (
+            <th key={i} scope="col" className={cn(styles.th, ALIGN_CLASS[column.align ?? "left"])}>
+              {column.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((cells, r) => (
+          <tr key={r} className={styles.tr}>
+            {cells.map((cell, i) => {
+              const column = columns[i];
+              return (
+                <td
+                  key={i}
+                  className={cn(styles.td, ALIGN_CLASS[column?.align ?? "left"], column?.strong && styles.strong)}
+                >
+                  {cell}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** Foglio con una tabella (es. eventi), eventuali totali in fondo. */
 export function SheetPreview({ columns, rows, emptyText = "Nessun dato", totals, ...frame }: SheetPreviewProps) {
   return (
     <SheetFrame {...frame}>
-      {rows.length === 0 ? (
-        <p className={styles.empty}>{emptyText}</p>
-      ) : (
-        <table className={styles.table}>
-          <caption className="sr-only">{frame.title}</caption>
-          <colgroup>
-            {columns.map((column, i) => (
-              <col key={i} style={widthStyle(column.widthPt)} />
-            ))}
-          </colgroup>
-          <thead>
-            <tr>
-              {columns.map((column, i) => (
-                <th key={i} scope="col" className={cn(styles.th, ALIGN_CLASS[column.align ?? "left"])}>
-                  {column.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((cells, r) => (
-              <tr key={r} className={styles.tr}>
-                {cells.map((cell, i) => {
-                  const column = columns[i];
-                  return (
-                    <td
-                      key={i}
-                      className={cn(styles.td, ALIGN_CLASS[column?.align ?? "left"], column?.strong && styles.strong)}
-                    >
-                      {cell}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <SheetTable columns={columns} rows={rows} caption={frame.title} emptyText={emptyText} />
 
       {totals && totals.length > 0 ? (
         <div className={styles.totalsWrap}>

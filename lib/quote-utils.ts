@@ -88,11 +88,11 @@ export function formatEUR(n: number): string {
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 /**
- * Nome del documento secondo lo stato dell'evento: "Preventivo" finché è in attesa (o annullato),
- * "Ordine di servizio" quando è confermato o saldato.
+ * Nome del documento: sempre "Ordine di servizio", qualunque sia lo stato dell'evento.
  */
-export function quoteDocumentTitle(status: BookingStatus): "Preventivo" | "Ordine di servizio" {
-  return status === "confermato" || status === "saldato" ? "Ordine di servizio" : "Preventivo";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- lo stato resta nella firma per i chiamanti esistenti
+export function quoteDocumentTitle(_status: BookingStatus): "Ordine di servizio" {
+  return "Ordine di servizio";
 }
 
 /** Nome del file del documento (stesso nome usato dalle route PDF/DOCX), es. "Ordine-di-servizio-2026-001.pdf". */

@@ -34,7 +34,7 @@ export async function createQuoteFromBooking(bookingId: string, opts?: MutationO
 }
 
 export async function updateQuote(id: string, input: unknown, opts?: MutationOptions): Promise<ActionResult> {
-  if (!isRecordId(id)) return fail("Preventivo non valido.");
+  if (!isRecordId(id)) return fail("Ordine di servizio non valido.");
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
 
@@ -57,7 +57,7 @@ export async function updateQuote(id: string, input: unknown, opts?: MutationOpt
 }
 
 export async function deleteQuote(id: string, opts?: MutationOptions): Promise<ActionResult> {
-  if (!isRecordId(id)) return fail("Preventivo non valido.");
+  if (!isRecordId(id)) return fail("Ordine di servizio non valido.");
   const auth = await authorize(isAdmin);
   if (!auth.ok) return auth;
 

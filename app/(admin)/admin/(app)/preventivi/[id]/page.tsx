@@ -11,7 +11,7 @@ import { getQuote } from "@/lib/data/quotes";
 import { quoteDocumentTitle } from "@/lib/quote-utils";
 
 export const metadata: Metadata = {
-  title: "Preventivo · Casale del Notaio",
+  title: "Ordine di servizio · Casale del Notaio",
 };
 
 export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
