@@ -249,11 +249,11 @@ export function WeekOccupancy({
   const dayEvents = dataReady
     ? eventBookings.filter((b) => b.event_date === selectedDay && b.status !== "annullato").length
     : null;
-  // Coperti: adulti e bambini di eventi e prenotazioni normali (appuntamenti esclusi), non annullati.
+  // Coperti: adulti e menù bambini di eventi e prenotazioni normali (appuntamenti esclusi), non annullati.
   const dayCovers = dataReady
     ? data.bookings
         .filter((b) => b.event_date === selectedDay && b.kind !== "appuntamento" && b.status !== "annullato")
-        .reduce((sum, b) => sum + b.adults + b.children, 0)
+        .reduce((sum, b) => sum + b.adults + b.kids_menus, 0)
     : null;
   const dayTag = selectedDay === todayIso ? "Oggi" : capitalize(formatIt(toDate(selectedDay), "EEE d MMM"));
   // "Eventi nel mese" segue il mese del giorno selezionato: il mese corrente arriva dal server, gli altri si caricano e restano in cache.

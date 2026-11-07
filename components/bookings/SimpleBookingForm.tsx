@@ -197,7 +197,7 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
   };
 
   const eventType = resolveEventType(values.eventType);
-  const covers = values.adults + values.children;
+  const covers = values.adults + values.kids_menus;
   const roomOptions = rooms.filter((r) => r.active || r.id === values.room_id);
   const hasActiveRooms = rooms.some((r) => r.active);
   const warnings = roomWarnings({
@@ -442,7 +442,7 @@ export function SimpleBookingForm({ kind, mode, booking, clients, rooms, occupan
       {!isAppointment && (
         <>
           <FormCard label="Coperti">
-            {/* Come negli eventi: menù bambini subito dopo gli adulti, seggioloni indipendenti (contano nei coperti). */}
+            {/* Come negli eventi: menù bambini subito dopo gli adulti, seggioloni indipendenti (non contano nei coperti). */}
             <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-3">
               <CountStepper id="adults" label="Adulti" value={values.adults} onChange={(n) => change({ adults: n })} error={first(errors.adults)} />
               <CountStepper

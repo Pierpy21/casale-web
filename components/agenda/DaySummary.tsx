@@ -24,7 +24,8 @@ export interface DaySummaryData {
   /** Prenotazioni contate (esclusi annullati e appuntamenti). */
   bookingsCount: number;
   adults: number;
-  children: number;
+  /** Menù bambini (i seggioloni non contano). */
+  kidsMenus: number;
   /** Coperti totali: eventi + prenotazioni normali. */
   covers: number;
   /** Coperti delle sole prenotazioni normali (alla carta). */
@@ -43,7 +44,7 @@ export function summarizeDay(bookings: BookingListItem[]): DaySummaryData {
   const data: DaySummaryData = {
     bookingsCount: 0,
     adults: 0,
-    children: 0,
+    kidsMenus: 0,
     covers: 0,
     alCartaCovers: 0,
     eventCovers: 0,
@@ -59,10 +60,10 @@ export function summarizeDay(bookings: BookingListItem[]): DaySummaryData {
 
   for (const b of bookings) {
     if (b.status === "annullato" || b.kind === "appuntamento") continue;
-    const covers = b.adults + b.children;
+    const covers = b.adults + b.kids_menus;
     data.bookingsCount += 1;
     data.adults += b.adults;
-    data.children += b.children;
+    data.kidsMenus += b.kids_menus;
     data.covers += covers;
 
     if (b.kind === "normale") {
@@ -154,7 +155,7 @@ export function DaySummary({ bookings, menuSize = "md", className }: DaySummaryP
             </>
           }
         />
-        <Stat label="Adulti / bambini" value={`${summary.adults} / ${summary.children}`} />
+        <Stat label="Adulti / menù bambini" value={`${summary.adults} / ${summary.kidsMenus}`} />
       </div>
       <MenuChips menus={summary.menus} size={menuSize} />
     </section>

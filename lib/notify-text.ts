@@ -42,8 +42,9 @@ export function formatEventDay(isoDate: string): string {
   return capitalize(format(new Date(y, m - 1, d), "EEE d MMM", { locale: it }));
 }
 
-export function totalCovers(b: Pick<BookingBrief, "adults" | "children">): number {
-  return b.adults + b.children;
+/** Coperti = adulti + menù bambini; i seggioloni non contano. */
+export function totalCovers(b: Pick<BookingBrief, "adults" | "kids_menus">): number {
+  return b.adults + b.kids_menus;
 }
 
 function allergyText(n: number): string {
@@ -120,7 +121,7 @@ export function buildReminderNotice(b: BookingBrief): { title: string; body: str
   const title = `Domani · ${b.menu_name ?? "Evento"}`;
   const parts = [
     b.room_name ?? "sala da definire",
-    `${totalCovers(b)} coperti (A ${b.adults} + B ${b.children})`,
+    `${totalCovers(b)} coperti (${b.kids_menus > 0 ? `A ${b.adults} + B ${b.kids_menus}` : `A ${b.adults}`})`,
     allergyText(b.allergy_count),
   ].filter(Boolean);
   return { title: clip(title, TITLE_MAX), body: clip(parts.join(" · "), BODY_MAX) };

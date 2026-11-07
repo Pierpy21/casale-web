@@ -46,7 +46,7 @@ export function bookingTimeSortKey(b: BookingWhenSource): string {
   return "1";
 }
 
-/** Notazione del Casale: A = adulti, B = menù bambini (non i seggioloni, che restano nel totale coperti). */
+/** Notazione del Casale: A = adulti, B = menù bambini (i seggioloni non sono coperti). */
 export function formatCovers(b: Pick<BookingListItem, "adults" | "kids_menus">): string {
   return b.kids_menus > 0 ? `A ${b.adults} + B ${b.kids_menus}` : `A ${b.adults}`;
 }
@@ -58,8 +58,9 @@ export function formatCoversDetail(b: Pick<BookingListItem, "adults" | "kids_men
   return parts.join(" · ");
 }
 
-export function totalCovers(b: Pick<BookingListItem, "adults" | "children">): number {
-  return b.adults + b.children;
+/** Coperti = adulti + menù bambini; i seggioloni non contano. */
+export function totalCovers(b: Pick<BookingListItem, "adults" | "kids_menus">): number {
+  return b.adults + b.kids_menus;
 }
 
 /**

@@ -231,7 +231,7 @@ export function EventForm({
   };
 
   const eventType = resolveEventType(values.eventType);
-  const covers = values.adults + values.children;
+  const covers = values.adults + values.kids_menus;
   const adultMenus = menus.filter((m) => !m.is_kids && (m.active || m.id === values.menu_id));
   const kidsMenuOptions = menus.filter((m) => m.is_kids && (m.active || m.id === values.kids_menu_id));
   const roomOptions = rooms.filter((r) => r.active || r.id === values.room_id);
@@ -524,7 +524,7 @@ export function EventForm({
           <FormCard label="Coperti">
             <div className="grid grid-cols-1 items-start gap-5 sm:grid-cols-3">
               <CountStepper id="adults" label="Adulti" value={values.adults} onChange={(n) => change({ adults: n })} error={first(errors.adults)} />
-              {/* Menù bambini subito dopo gli adulti; i seggioloni sono indipendenti (contano nei coperti). */}
+              {/* Menù bambini subito dopo gli adulti; i seggioloni sono indipendenti (non contano nei coperti). */}
               <CountStepper
                 id="kids_menus"
                 label="Menù bambini"

@@ -85,7 +85,7 @@ export async function getFloorPlan(date: string, meal: BookingMeal): Promise<Flo
         id: r.id,
         name: bookingPersonName(person),
         phone: bookingPhone(person),
-        covers: adults + children,
+        covers: adults + num(r.kids_menus),
         adults,
         children,
         kids_menus: num(r.kids_menus),
@@ -108,7 +108,7 @@ export async function getFloorPlan(date: string, meal: BookingMeal): Promise<Flo
       table_number: tableNumber,
       table_numbers: tableNumber === null ? [] : [tableNumber, ...extras.filter((n) => n !== tableNumber)],
       title: floorEventTitle(r),
-      covers: num(r.adults) + num(r.children),
+      covers: num(r.adults) + num(r.kids_menus),
       status: r.status as BookingStatus,
     };
   });
