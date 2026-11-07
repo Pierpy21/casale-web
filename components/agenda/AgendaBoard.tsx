@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PinnedBar, StatusLegend, cn } from "@/components/ui";
 import type { BookingListItem, NextEventBrief, Room } from "@/lib/types";
 import { AgendaToolbar } from "./AgendaToolbar";
@@ -10,6 +10,7 @@ import { MonthView } from "./MonthView";
 import { DayView, WeekView } from "./PeriodViews";
 import { nextEventFrom } from "./NextEventHint";
 import {
+  SALA_PARAM,
   agendaHref,
   filterBookings,
   groupByDate,
@@ -38,6 +39,8 @@ export interface AgendaBoardProps {
   rooms: Room[];
   /** `canAssignRoom(profile, "normale")`: senza, le sale sono in sola lettura. */
   canAssignRooms: boolean;
+  /** Vista per sale (ruolo sala): il giorno mostra una griglia di sale invece della lista. */
+  roomsView?: boolean;
   /** Primo evento oltre la griglia caricata (null se non c'è). */
   nextEventAfterRange: NextEventBrief | null;
 }
@@ -60,13 +63,17 @@ export function AgendaBoard({
   isAdmin,
   rooms,
   canAssignRooms,
+  roomsView = false,
   nextEventAfterRange,
 }: AgendaBoardProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [selected, setSelected] = useState(initialDate);
   const [view, setView] = useState<AgendaView>(initialView);
   const [kind, setKind] = useState<AgendaKindFilter>(initialKind);
+  /** Sala aperta nella vista sale (query `sala`): si conserva quando si cambia giorno, vista o tipo. */
+  const openRoom = roomsView ? searchParams.get(SALA_PARAM) : null;
 
   // Pallini del calendario mensile mobile (allByDate): contano solo gli eventi.
   // Vista mese desktop, settimana, giorno e liste (byDate): pill filtrate dal filtro tipo.
@@ -78,7 +85,7 @@ export function AgendaBoard({
 
   const navigate = useCallback(
     (target: string, nextView: AgendaView, nextKind: AgendaKindFilter = kind) => {
-      const href = agendaHref({ date: target, view: nextView, kind: nextKind });
+      const href = agendaHref({ date: target, view: nextView, kind: nextKind, sala: openRoom });
       if (isRangeInside(monthGridRange(target), loadedRange)) {
         setSelected(target);
         setView(nextView);
@@ -90,7 +97,7 @@ export function AgendaBoard({
         router.push(href, { scroll: false });
       });
     },
-    [kind, loadedRange, router],
+    [kind, loadedRange, openRoom, router],
   );
 
   const onKindChange = (next: AgendaKindFilter) => navigate(selected, view, next);
@@ -124,6 +131,7 @@ export function AgendaBoard({
           canAssignRooms={canAssignRooms}
           canDeleteBookings={isAdmin}
           kind={kind}
+          roomsView={roomsView}
           onNavigate={(iso) => navigate(iso, view)}
           nextEvent={nextEvent}
           onOpenNextEvent={(iso) => navigate(iso, view)}
@@ -164,6 +172,7 @@ export function AgendaBoard({
               rooms={rooms}
               canAssignRooms={canAssignRooms}
               canDeleteBookings={isAdmin}
+              roomsView={roomsView}
               selected={selected}
               kind={kind}
               nextEvent={nextEvent}

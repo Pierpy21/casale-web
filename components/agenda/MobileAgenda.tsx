@@ -5,6 +5,7 @@ import { DaySummary } from "./DaySummary";
 import { MobileCalendar } from "./MobileCalendar";
 import { EmptyDay } from "./NextEventHint";
 import { ReservationList } from "./ReservationList";
+import { RoomDayBoard } from "./RoomDayBoard";
 import { SwipeDay } from "./SwipeDay";
 import { capitalize, dayCountLabel, formatIt, shiftPeriod, toDate, type AgendaKindFilter } from "./agenda-utils";
 
@@ -22,6 +23,8 @@ export interface MobileAgendaProps {
   canDeleteBookings: boolean;
   /** Filtro per tipo corrente (la scelta sta nella barra sopra, in AgendaBoard). */
   kind: AgendaKindFilter;
+  /** Vista per sale (ruolo sala): il giorno mostra le sale invece della lista. */
+  roomsView?: boolean;
   onNavigate: (iso: string) => void;
   /** Prossimo evento dopo il giorno selezionato (null se non ce n'è). */
   nextEvent?: NextEventBrief | null;
@@ -38,6 +41,7 @@ export function MobileAgenda({
   canAssignRooms,
   canDeleteBookings,
   kind,
+  roomsView = false,
   onNavigate,
   nextEvent = null,
   onOpenNextEvent,
@@ -78,6 +82,8 @@ export function MobileAgenda({
         >
           {items.length === 0 ? (
             <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={onOpenNextEvent} />
+          ) : roomsView ? (
+            <RoomDayBoard items={items} rooms={rooms} selected={selected} canAssignRooms={canAssignRooms} canDeleteBookings={canDeleteBookings} />
           ) : (
             <div className="flex min-w-0 flex-col gap-4">
               {cards.map((booking) => (

@@ -6,6 +6,7 @@ import { dayCountLabel, formatIt, toISO, type AgendaKindFilter } from "./agenda-
 import { DaySummary } from "./DaySummary";
 import { EmptyDay } from "./NextEventHint";
 import { ReservationList } from "./ReservationList";
+import { RoomDayBoard } from "./RoomDayBoard";
 
 /** Vista settimana desktop: 7 colonne con card ricche (menù per portata, allergie). */
 export function WeekView({
@@ -71,6 +72,7 @@ export function DayView({
   rooms,
   canAssignRooms,
   canDeleteBookings,
+  roomsView = false,
   selected,
   kind,
   nextEvent = null,
@@ -81,6 +83,8 @@ export function DayView({
   canAssignRooms: boolean;
   /** Permesso di eliminare le prenotazioni normali (solo admin). */
   canDeleteBookings: boolean;
+  /** Vista per sale (ruolo sala): eventi e prenotazioni diventano la griglia delle sale. */
+  roomsView?: boolean;
   /** Giorno selezionato (ISO): riferimento per il riquadro "Prossimo evento". */
   selected: string;
   nextEvent?: NextEventBrief | null;
@@ -90,6 +94,14 @@ export function DayView({
 }) {
   if (items.length === 0) {
     return <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={onOpenNextEvent} />;
+  }
+  if (roomsView) {
+    return (
+      <div className="flex min-w-0 flex-col gap-5">
+        <DaySummary bookings={items} />
+        <RoomDayBoard items={items} rooms={rooms} selected={selected} canAssignRooms={canAssignRooms} canDeleteBookings={canDeleteBookings} />
+      </div>
+    );
   }
   const cards = items.filter((b) => b.kind !== "normale");
   const reservations = items.filter((b) => b.kind === "normale");
