@@ -50,7 +50,8 @@ export function buildReservationSheetView(sheet: ReservationSheet): ReservationS
       name: row.name || DASH,
       room: row.room || DASH,
       table: row.table === null ? DASH : String(row.table),
-      covers: row.covers > 0 ? String(row.covers) : DASH,
+      // Sempre diviso: "23 (A 20 + B 3)", B = menù bambini anche se 0.
+      covers: row.covers > 0 ? `${row.covers} (A ${row.adults} + B ${row.kids_menus})` : DASH,
       meal: row.meal ? BOOKING_MEAL_LABELS[row.meal] : DASH,
       phone: row.phone || DASH,
     })),
