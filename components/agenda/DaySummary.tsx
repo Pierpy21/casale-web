@@ -24,7 +24,7 @@ export interface DaySummaryData {
   /** Prenotazioni contate (esclusi annullati e appuntamenti). */
   bookingsCount: number;
   adults: number;
-  /** Menù bambini (non i seggioloni, che contano solo nei coperti). */
+  /** Menù bambini (i seggioloni non contano). */
   kidsMenus: number;
   /** Coperti totali: eventi + prenotazioni normali. */
   covers: number;
@@ -60,7 +60,7 @@ export function summarizeDay(bookings: BookingListItem[]): DaySummaryData {
 
   for (const b of bookings) {
     if (b.status === "annullato" || b.kind === "appuntamento") continue;
-    const covers = b.adults + b.children;
+    const covers = b.adults + b.kids_menus;
     data.bookingsCount += 1;
     data.adults += b.adults;
     data.kidsMenus += b.kids_menus;

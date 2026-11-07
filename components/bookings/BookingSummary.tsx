@@ -23,7 +23,7 @@ const GRID_COLUMNS = {
  * Appuntamenti: ora e tipo evento.
  */
 export function BookingSummary({ booking, when, finance }: BookingSummaryProps) {
-  const covers = booking.adults + booking.children;
+  const covers = booking.adults + booking.kids_menus;
   const tiles: { key: string; label: string; value: string | number; hint?: string; highlight?: boolean }[] = [];
 
   if (booking.kind === "evento") {

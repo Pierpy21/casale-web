@@ -190,7 +190,7 @@ export async function getReservationSheet(date: string): Promise<ReservationShee
       name: nameOf(r),
       room: room?.name ? String(room.name) : null,
       table: tableOf(r),
-      covers: num(r.adults) + num(r.children),
+      covers: num(r.adults) + num(r.kids_menus),
       meal: mealOf(r),
       phone: bookingPhone(personOf(r)),
     };
@@ -260,7 +260,7 @@ export async function getEventSheet(date: string): Promise<EventSheet | null> {
       adults,
       children,
       kids_menus: kidsMenus,
-      covers: adults + children,
+      covers: adults + kidsMenus,
       menus: [...menus.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name, "it")),
     },
   };
@@ -400,11 +400,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       "bookings",
       // Coperti: eventi e prenotazioni, appuntamenti esclusi (stessa regola di getCoversStats).
       `${db.filter("event_date >= {:from} && event_date <= {:to} && kind != {:k}", { from: dayStartPb(today), to: dayEndPb(weekEnd), k: "appuntamento" })} && ${notCancelled}`,
-      { fields: "adults,children" },
+      { fields: "adults,kids_menus" },
     ),
   ]);
 
-  const coversNext7Days = week.reduce((acc, b) => acc + num(b.adults) + num(b.children), 0);
+  const coversNext7Days = week.reduce((acc, b) => acc + num(b.adults) + num(b.kids_menus), 0);
   return { eventsThisMonth, eventsToday, pendingOptions, coversNext7Days };
 }
 
@@ -598,7 +598,7 @@ export async function getCoversStats(opts: { from: string; to: string; kind?: St
     const weekKey = mondayOf(date);
     const week = weeks.get(weekKey);
     if (!week) continue;
-    const covers = num(r.adults) + num(r.children);
+    const covers = num(r.adults) + num(r.kids_menus);
     dayCovers.set(date, (dayCovers.get(date) ?? 0) + covers);
     if (k === "evento") {
       week.event_covers += covers;

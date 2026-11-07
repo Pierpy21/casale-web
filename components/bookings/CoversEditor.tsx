@@ -78,7 +78,7 @@ export function CoversEditor({ bookingId, adults, childCount, kidsMenus, expecte
           onChange={(n) => setValues((v) => ({ ...v, adults: n }))}
           error={errors.adults?.[0]}
         />
-        {/* Menù bambini subito dopo gli adulti; i seggioloni sono indipendenti (contano nei coperti). */}
+        {/* Menù bambini subito dopo gli adulti; i seggioloni sono indipendenti (non contano nei coperti). */}
         <CountStepper
           id="covers-kids-menus"
           label="Menù bambini"

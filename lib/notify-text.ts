@@ -42,8 +42,9 @@ export function formatEventDay(isoDate: string): string {
   return capitalize(format(new Date(y, m - 1, d), "EEE d MMM", { locale: it }));
 }
 
-export function totalCovers(b: Pick<BookingBrief, "adults" | "children">): number {
-  return b.adults + b.children;
+/** Coperti = adulti + menù bambini; i seggioloni non contano. */
+export function totalCovers(b: Pick<BookingBrief, "adults" | "kids_menus">): number {
+  return b.adults + b.kids_menus;
 }
 
 function allergyText(n: number): string {

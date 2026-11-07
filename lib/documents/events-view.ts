@@ -46,7 +46,7 @@ function linesOf(value: string | null | undefined): string[] {
   return lines.length > 0 ? lines : [DASH];
 }
 
-/** "A 40 + B 4" (notazione del Casale: A = adulti, B = menù bambini; i seggioloni contano solo nel totale). */
+/** "A 40 + B 4" (notazione del Casale: A = adulti, B = menù bambini; i seggioloni non sono coperti). */
 function coversNotation(adults: number, kidsMenus: number): string {
   return kidsMenus > 0 ? `A ${adults} + B ${kidsMenus}` : `A ${adults}`;
 }
@@ -71,7 +71,7 @@ function allergyLine(allergy: { subject: string | null; condition: string; notes
 }
 
 function blockOf(row: EventSheetRow): EventBlockView {
-  const covers = row.adults + row.children;
+  const covers = row.adults + row.kids_menus;
   const hasKidsMenu = row.kids_menus > 0;
   const setupLines: string[] = [];
   if (row.setup_colors.length > 0) setupLines.push(`Colori: ${row.setup_colors.join(", ")}`);

@@ -206,7 +206,7 @@ const coversShape = {
   kids_menus: intMin0Default,
 };
 
-// Coperti: nessun minimo di ospiti e nessun legame tra i campi. `children` sono i seggioloni,
+// Coperti: nessun minimo di ospiti e nessun legame tra i campi. `children` sono i seggioloni (non contano nei coperti),
 // indipendenti dai menù bambini, in eventi e prenotazioni.
 export const CoversInput = z.object(coversShape);
 export type CoversInputType = z.infer<typeof CoversInput>;
