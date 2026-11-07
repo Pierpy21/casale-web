@@ -46,9 +46,9 @@ function linesOf(value: string | null | undefined): string[] {
   return lines.length > 0 ? lines : [DASH];
 }
 
-/** "A 40 + B 4" (notazione del Casale: A = adulti, B = bambini). */
-function coversNotation(adults: number, children: number): string {
-  return children > 0 ? `A ${adults} + B ${children}` : `A ${adults}`;
+/** "A 40 + B 4" (notazione del Casale: A = adulti, B = menù bambini; i seggioloni contano solo nel totale). */
+function coversNotation(adults: number, kidsMenus: number): string {
+  return kidsMenus > 0 ? `A ${adults} + B ${kidsMenus}` : `A ${adults}`;
 }
 
 /** Data di una nota in fuso Europe/Rome ("1 nov, 14:30"); timestamp non valido = "—". */
@@ -84,7 +84,7 @@ function blockOf(row: EventSheetRow): EventBlockView {
     fields: [
       { label: "Cliente", lines: [orDash(row.client_name)] },
       { label: "Sala", lines: [orDash(row.room)] },
-      { label: "Coperti", lines: [`${covers} · ${coversNotation(row.adults, row.children)}`] },
+      { label: "Coperti", lines: [`${covers} · ${coversNotation(row.adults, row.kids_menus)}`] },
       { label: "Menù", lines: [orDash(row.menu)] },
       {
         label: "Menù bambini",
@@ -134,7 +134,7 @@ export function buildEventSheetView(sheet: EventSheet): EventSheetView {
       { label: "Eventi", lines: [String(totals.events)] },
       {
         label: "Coperti",
-        lines: [`${totals.covers} · ${coversNotation(totals.adults, totals.children)}`],
+        lines: [`${totals.covers} · ${coversNotation(totals.adults, totals.kids_menus)}`],
       },
       { label: "Menù del giorno", lines: menuLines },
     ],

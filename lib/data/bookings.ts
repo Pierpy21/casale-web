@@ -214,6 +214,7 @@ export async function getEventSheet(date: string): Promise<EventSheet | null> {
 
   let adults = 0;
   let children = 0;
+  let kidsMenus = 0;
   const menus = new Map<string, EventSheetMenuTotal>();
   const addMenu = (key: string, name: string, kind: EventSheetMenuTotal["kind"], quantity: number) => {
     if (quantity <= 0) return;
@@ -225,6 +226,7 @@ export async function getEventSheet(date: string): Promise<EventSheet | null> {
   const rows: EventSheetRow[] = events.map((b) => {
     adults += b.adults;
     children += b.children;
+    kidsMenus += b.kids_menus;
     if (b.menu) addMenu(`menu:${b.menu.id}`, b.menu.name, "menu", b.adults);
     if (b.kids_menu) addMenu(`kids:${b.kids_menu.id}`, b.kids_menu.name, "kids", b.kids_menus);
 
@@ -257,6 +259,7 @@ export async function getEventSheet(date: string): Promise<EventSheet | null> {
       events: events.length,
       adults,
       children,
+      kids_menus: kidsMenus,
       covers: adults + children,
       menus: [...menus.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name, "it")),
     },

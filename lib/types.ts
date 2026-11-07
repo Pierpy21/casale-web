@@ -50,7 +50,7 @@ export interface ReservationSheet { date: string; rows: ReservationSheetRow[]; }
 /** Menù del giorno nel foglio eventi: adulti (menu) o bambini (kids), porzioni sommate sui banchetti. */
 export interface EventSheetMenuTotal { name: string; kind: "menu" | "kids"; quantity: number; }
 /** Totali del foglio eventi: solo banchetti (kind evento) non annullati del giorno. */
-export interface EventSheetTotals { events: number; adults: number; children: number; covers: number; menus: EventSheetMenuTotal[]; }
+export interface EventSheetTotals { events: number; adults: number; children: number; /** Menù bambini (B nella notazione). */ kids_menus: number; covers: number; menus: EventSheetMenuTotal[]; }
 export interface EventSheetAllergy { subject: string | null; condition: string; notes: string | null; }
 export interface EventSheetDishGroup { course: Course; label: string; items: string[]; }
 /** Nota cucina (booking_notes) del banchetto. `created_at` è il timestamp PocketBase. */
