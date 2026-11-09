@@ -7,7 +7,7 @@ import { isRecordId, dayEndPb, dayStartPb, nn, num, toDateOnly, type PbRecord } 
 import { mapChange, mealOf } from "@/lib/pocketbase/mappers";
 import { listAll, listByParents, fetchOne } from "@/lib/pocketbase/queries";
 import { addDaysISO, monthBounds, romeToday } from "@/lib/dates";
-import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, canViewStats, isAdmin, isKitchenRole } from "@/lib/permissions";
+import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, canViewStats, isAdmin, isKitchenRole, canSeeClientPhone } from "@/lib/permissions";
 import { mondayOf } from "@/lib/stats-period";
 import {
   BOOKING_KINDS,
@@ -72,6 +72,7 @@ function zeroMenuPrices<T extends WithMenus>(item: T): T {
 
 /**
  * La cucina non riceve dati di contatto: telefono ed email del cliente, e il cellulare dell'ospite, azzerati.
+ * L'amministratore cucina riceve i telefoni (cliente e ospite) ma non l'email.
  * Il nome resta (serve in cucina). Il campo resta presente con valore vuoto o null.
  */
 function hideKitchenPhone<T extends { client: { phone: string; email?: string | null } | null; guest_phone: string | null }>(
@@ -79,6 +80,8 @@ function hideKitchenPhone<T extends { client: { phone: string; email?: string | 
   me: Profile,
 ): T {
   if (!isKitchenRole(me)) return item;
+  // L'amministratore cucina vede il telefono (cliente e ospite), non l'email; la cucina semplice nessuno dei due.
+  if (canSeeClientPhone(me)) return { ...item, client: item.client ? { ...item.client, email: null } : null };
   const client = item.client ? { ...item.client, phone: "", email: null } : null;
   return { ...item, client, guest_phone: null };
 }

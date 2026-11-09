@@ -15,6 +15,14 @@ export function isKitchenRole(p: Pick<Profile, "role">): boolean {
   return p.role === "cucina" || p.role === "amministratore_cucina";
 }
 
+/**
+ * Telefono del cliente e dell'ospite nelle prenotazioni (dettaglio, agenda, pulsanti Chiama/WhatsApp):
+ * tutti tranne la cucina semplice. L'amministratore cucina lo vede (crea prenotazioni ed eventi); l'email no.
+ */
+export function canSeeClientPhone(p: Pick<Profile, "role">): boolean {
+  return p.role !== "cucina";
+}
+
 /** Amministratore cucina attivo. */
 export function isKitchenAdmin(p: Profile): boolean {
   return p.active && p.role === "amministratore_cucina";

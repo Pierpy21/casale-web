@@ -30,7 +30,7 @@ import { PaymentsPanel } from "@/components/payments/PaymentsPanel";
 import { PendingChanges } from "@/components/offline/PendingChanges";
 import { Alert, Badge, ButtonLink, Card, Disclosure, PhoneLink, StatusBadge, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
-import { canAddBookingNote, canEditAllergies, canEditCovers, canEditDishes, isAdmin, isKitchenRole } from "@/lib/permissions";
+import { canAddBookingNote, canEditAllergies, canEditCovers, canEditDishes, isAdmin, isKitchenRole, canSeeClientPhone } from "@/lib/permissions";
 import { requireProfile } from "@/lib/auth";
 import { getBooking, getBookingChanges, getBookingNotes } from "@/lib/data/bookings";
 import { getPayments } from "@/lib/data/payments";
@@ -67,6 +67,7 @@ export default async function BookingDetailPage({
   const dishesEditable = canEditDishes(profile);
   const allergiesEditable = canEditAllergies(profile, booking.kind);
   const kitchen = isKitchenRole(profile);
+  const showPhone = canSeeClientPhone(profile);
   // Preventivi, acconti e prezzi esistono solo per gli eventi, e si gestiscono solo dall'admin.
   const isEvent = booking.kind === "evento";
   // Tavolo: solo per le prenotazioni normali, solo se assegnato.
@@ -281,7 +282,7 @@ export default async function BookingDetailPage({
             )}
           </div>
           {/* Telefono subito sotto il nome: chiamata, WhatsApp e copia senza scendere alla sezione Cliente. */}
-          {!kitchen && phone && <PhoneLink phone={phone} className="-my-1 text-[16px]" />}
+          {showPhone && phone && <PhoneLink phone={phone} className="-my-1 text-[16px]" />}
           <div className="flex flex-wrap items-center gap-3">
             <KindBadge kind={booking.kind} />
             <StatusBadge status={booking.status} />
@@ -370,7 +371,7 @@ export default async function BookingDetailPage({
               </h3>
             </div>
             <dl className="flex min-w-0 flex-col gap-4">
-              {!kitchen && phone && (
+              {showPhone && phone && (
                 <InfoRow label="Telefono">
                   {/* -my-3: il link alto 44 px (tocco) resta sulla riga dell'etichetta. */}
                   <PhoneLink phone={phone} whatsapp={false} className="-my-3" />
@@ -401,7 +402,7 @@ export default async function BookingDetailPage({
               )}
             </dl>
             <div className="no-print flex flex-wrap gap-3">
-              {!kitchen && phone && (
+              {showPhone && phone && (
                 <>
                   <a href={telHref(phone)} className={CALL_BUTTON}>
                     <Phone aria-hidden="true" className="size-4" />
