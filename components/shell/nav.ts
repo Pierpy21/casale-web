@@ -1,4 +1,4 @@
-import { canUseInventory, canViewActivityLog, canViewFloorPlan, canViewStats, isAdmin } from "@/lib/permissions";
+import { canCreateBooking, canUseInventory, canViewActivityLog, canViewFloorPlan, canViewStats, isAdmin } from "@/lib/permissions";
 import type { Profile } from "@/lib/types";
 
 export type NavIcon = "event" | "agenda" | "floor" | "dashboard" | "clients" | "operators" | "catalog" | "inventory" | "activity" | "stats" | "sync";
@@ -26,7 +26,7 @@ export const CREATE_EVENT_HREF = "/admin/prenotazioni/nuova?tipo=evento";
 export const SYNC_HREF = "/admin/sincronizzazione";
 
 const LINKS: NavDefinition[] = [
-  { href: CREATE_EVENT_HREF, label: "Crea evento", icon: "event", prominent: true, mobileBar: false, visible: isAdmin },
+  { href: CREATE_EVENT_HREF, label: "Crea evento", icon: "event", prominent: true, mobileBar: false, visible: (p) => canCreateBooking(p, "evento") },
   { href: "/admin/agenda", label: "Agenda", icon: "agenda", visible: (p) => p.active },
   { href: "/admin/sala", label: "Mappa sala", icon: "floor", visible: canViewFloorPlan },
   { href: "/admin/dashboard", label: "Dashboard", icon: "dashboard", visible: isAdmin },

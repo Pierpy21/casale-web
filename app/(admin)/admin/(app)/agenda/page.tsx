@@ -3,7 +3,7 @@ import { requireProfile } from "@/lib/auth";
 import { getRooms } from "@/lib/data/catalog";
 import { getBookingsInRange, getNextEventAfter } from "@/lib/data/bookings";
 import { getBookingNotesFor } from "@/lib/data/notes";
-import { canAddBookingNote, canAssignRoom, isAdmin } from "@/lib/permissions";
+import { canAddBookingNote, canAssignRoom, isAdmin, isKitchenRole } from "@/lib/permissions";
 import { AgendaBoard } from "@/components/agenda/AgendaBoard";
 import { KitchenAgenda } from "@/components/agenda/KitchenAgenda";
 import {
@@ -27,7 +27,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const kind = parseKindFilter(params.tipo);
 
   // Cucina: calendario con schede dei banchetti (uguali a sala e admin), note cucina in tendina.
-  if (profile.role === "cucina") {
+  if (isKitchenRole(profile)) {
     const day = parseDateParam(params.date);
     const kitchenRange = monthGridRange(day);
     const [kitchenBookings, kitchenNextEvent] = await Promise.all([

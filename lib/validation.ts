@@ -10,6 +10,7 @@ import {
   SETUP_COLORS,
   TABLE_SHAPES,
 } from "./types";
+import { isKitchenRole } from "./permissions";
 
 // ---------------------------------------------------------------------
 // Limiti
@@ -524,20 +525,20 @@ export const OperatorInput = z
       .pipe(z.email({ message: "Email non valida" }))
       .transform((s) => s.toLowerCase()),
     password: passwordSchema,
-    role: z.enum(["sala", "cucina"], { message: "Ruolo non valido" }),
+    role: z.enum(["sala", "cucina", "amministratore_cucina"], { message: "Ruolo non valido" }),
     is_chef: z.boolean().default(false),
   })
-  .transform((v) => ({ ...v, is_chef: v.role === "cucina" ? v.is_chef : false }));
+  .transform((v) => ({ ...v, is_chef: isKitchenRole(v) ? v.is_chef : false }));
 export type OperatorInputType = z.infer<typeof OperatorInput>;
 
 export const OperatorUpdateInput = z
   .object({
     full_name: z.string().trim().min(2, "Nome troppo corto").max(MAX_TEXT, "Nome troppo lungo"),
-    role: z.enum(["sala", "cucina"], { message: "Ruolo non valido" }),
+    role: z.enum(["sala", "cucina", "amministratore_cucina"], { message: "Ruolo non valido" }),
     is_chef: z.boolean().default(false),
     active: z.boolean(),
   })
-  .transform((v) => ({ ...v, is_chef: v.role === "cucina" ? v.is_chef : false }));
+  .transform((v) => ({ ...v, is_chef: isKitchenRole(v) ? v.is_chef : false }));
 export type OperatorUpdateInputType = z.infer<typeof OperatorUpdateInput>;
 
 // ---------------------------------------------------------------------
