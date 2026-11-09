@@ -5,9 +5,10 @@ import { isRecordId, toDateOnly } from "@/lib/pocketbase/helpers";
 import { mapClient } from "@/lib/pocketbase/mappers";
 import { fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { romeToday } from "@/lib/dates";
-import { canSeeAppointments } from "@/lib/permissions";
+import { canSeeAppointments, isAdmin } from "@/lib/permissions";
 import type { Client, ClientOption, ClientWithStats, BookingListItem } from "@/lib/types";
 import { BOOKING_LIST_EXPAND, bookingListItems, sortBookingRecords } from "./shared";
+import { zeroMenuPrices } from "./bookings";
 
 /** Rimuove i caratteri con significato nei filtri (LIKE / ~) e nelle stringhe. */
 function sanitizeSearch(term: string | undefined): string {
@@ -101,5 +102,7 @@ export async function getClientBookings(clientId: string): Promise<BookingListIt
     const dbDate = toDateOnly(b.event_date);
     return da === dbDate ? 0 : da < dbDate ? 1 : -1;
   });
-  return bookingListItems(db, sorted);
+  const items = await bookingListItems(db, sorted);
+  // Prezzi dei menù e prezzo proprio dell'evento: solo admin (sala e cucina li vedono azzerati).
+  return items.map((i) => (isAdmin(me) ? i : zeroMenuPrices(i)));
 }

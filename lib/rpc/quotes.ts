@@ -85,10 +85,14 @@ export async function createQuote(
     const kidsId = nn(booking.kids_menu);
     const menu = menuId ? await fetchOne(db, "menus", menuId) : null;
     const kids = kidsId ? await fetchOne(db, "menus", kidsId) : null;
+    // Prezzo proprio dell'evento (bookings.menu_price, solo admin) se > 0; altrimenti il prezzo di catalogo.
+    const eventMenuPrice = num(booking.menu_price);
     lines = buildDefaultQuoteLines({
       adults: num(booking.adults),
       kids_menus: num(booking.kids_menus),
-      menu: menu ? { name: String(menu.name), price_per_person: num(menu.price_per_person) } : null,
+      menu: menu
+        ? { name: String(menu.name), price_per_person: eventMenuPrice > 0 ? eventMenuPrice : num(menu.price_per_person) }
+        : null,
       kids_menu: kids ? { name: String(kids.name), price_per_person: num(kids.price_per_person) } : null,
     });
   }

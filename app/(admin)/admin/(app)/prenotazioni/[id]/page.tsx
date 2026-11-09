@@ -134,7 +134,9 @@ export default async function BookingDetailPage({
         key: "expected",
         label: "Totale previsto",
         value: formatEUR(finance.expected_total),
-        hint: booking.menu ? `${formatEUR(booking.menu.price_per_person)} a persona` : "Menù non scelto",
+        hint: booking.menu
+          ? `${formatEUR(booking.menu.price_per_person)} a persona${booking.menu_price !== null ? " (personalizzato)" : ""}`
+          : "Menù non scelto",
         panel: "prezzo",
         cta: "Vedi prezzo",
       });
@@ -221,7 +223,16 @@ export default async function BookingDetailPage({
           ? "pagamenti"
           : null;
 
-  const menuPrice = admin && booking.menu ? formatEUR(booking.menu.price_per_person) : null;
+  // Prezzo a persona effettivo del menù (proprio dell'evento o di catalogo), con la nota se è personalizzato.
+  const menuPrice =
+    admin && booking.menu
+      ? `${formatEUR(booking.menu.price_per_person)} a persona${booking.menu_price !== null ? " (personalizzato)" : ""}`
+      : null;
+  // Editor dei piatti: prezzo dell'evento solo per l'admin (con un menù scelto), prezzo di catalogo per il ripristino.
+  const dishesPrice =
+    admin && booking.menu
+      ? { value: booking.menu_price, catalog: booking.menu.catalog_price_per_person ?? booking.menu.price_per_person }
+      : undefined;
 
   // Riepilogo sempre visibile della tendina "Dettagli e menù".
   const detailsSummary = (
@@ -246,7 +257,7 @@ export default async function BookingDetailPage({
             {booking.menu ? <MenuBadge menuId={booking.menu.id} name={booking.menu.name} /> : "Non scelto"}
           </SummaryItem>
         )}
-        {menuPrice && <SummaryItem label="Costo">{`${menuPrice} a persona`}</SummaryItem>}
+        {menuPrice && <SummaryItem label="Costo">{menuPrice}</SummaryItem>}
       </span>
     </span>
   );
@@ -333,7 +344,7 @@ export default async function BookingDetailPage({
                   ) : (
                     <p className="font-serif text-2xl text-slate-dark">Menù non selezionato</p>
                   )}
-                  {menuPrice && <p className="text-[15px] tabular-nums text-slate-dark">{menuPrice} a persona</p>}
+                  {menuPrice && <p className="text-[15px] tabular-nums text-slate-dark">{menuPrice}</p>}
                 </div>
               </header>
 
@@ -344,6 +355,7 @@ export default async function BookingDetailPage({
                 canEdit={dishesEditable}
                 catalog={catalog}
                 expectedUpdated={booking.updated_at}
+                price={dishesPrice}
               />
 
               {booking.kids_menu && (
