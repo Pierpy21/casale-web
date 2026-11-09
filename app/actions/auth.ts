@@ -13,7 +13,7 @@ const LoginSchema = z.object({
   password: z.string().min(1, "Password obbligatoria"),
 });
 
-const ROLES = ["admin", "sala", "cucina"];
+const ROLES = ["admin", "sala", "cucina", "amministratore_cucina"];
 
 export async function signIn(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const parsed = LoginSchema.safeParse({

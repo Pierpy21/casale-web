@@ -173,7 +173,7 @@ function EditOperatorForm({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [role, setRole] = useState<EditableRole>(operator.role === "cucina" ? "cucina" : "sala");
+  const [role, setRole] = useState<EditableRole>(operator.role === "admin" ? "sala" : operator.role);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const nameId = `edit-name-${operator.id}`;
@@ -229,6 +229,7 @@ function EditOperatorForm({
           <Select id={roleId} value={role} onChange={(e) => setRole(e.target.value as EditableRole)}>
             <option value="sala">Sala</option>
             <option value="cucina">Cucina</option>
+            <option value="amministratore_cucina">Amministratore cucina</option>
           </Select>
         </Field>
 

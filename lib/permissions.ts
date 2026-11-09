@@ -6,6 +6,19 @@ import type { BookingKind, Profile } from "./types";
 // - sala: vede tutte le prenotazioni; modifica solo i coperti; crea solo prenotazioni normali (cliente via nuovo cliente);
 //   nella Mappa sala ha gli stessi poteri dell'admin (disposizione, tavoli generati, eventi sui tavoli).
 // - cucina: sola lettura delle prenotazioni; usa la giacenza. Il flag is_chef non dà più permessi.
+// - amministratore_cucina: tutto ciò che ha la cucina, più: crea prenotazioni normali ed eventi (mai appuntamenti, mai
+//   preventivi/pagamenti/acconti), assegna la sala alle normali, allergie su normali ed eventi, e nella giacenza sceglie
+//   se raggruppare per categoria o per fornitore.
+
+/** Ruoli di cucina (cucina e amministratore cucina): stessa vista "cucina" di agenda e prenotazioni, niente contatti. */
+export function isKitchenRole(p: Pick<Profile, "role">): boolean {
+  return p.role === "cucina" || p.role === "amministratore_cucina";
+}
+
+/** Amministratore cucina attivo. */
+export function isKitchenAdmin(p: Profile): boolean {
+  return p.active && p.role === "amministratore_cucina";
+}
 
 /**
  * Allergie e intolleranze di una prenotazione: admin sempre; sala attiva solo su eventi e prenotazioni normali
@@ -14,7 +27,7 @@ import type { BookingKind, Profile } from "./types";
 export function canEditAllergies(p: Profile, kind: BookingKind): boolean {
   if (!p.active) return false;
   if (p.role === "admin") return true;
-  return p.role === "sala" && kind !== "appuntamento";
+  return (p.role === "sala" || p.role === "amministratore_cucina") && kind !== "appuntamento";
 }
 
 /** Gli appuntamenti sono visibili solo all'admin: mai a sala e cucina (letture, notifiche, modifiche). */
@@ -37,16 +50,17 @@ export function canEditDishes(p: Profile): boolean {
   return isAdmin(p);
 }
 
-/** Creazione prenotazione di un tipo: admin tutti; sala solo prenotazioni normali. */
+/** Creazione prenotazione di un tipo: admin tutti; sala solo prenotazioni normali; amministratore cucina normali ed eventi. */
 export function canCreateBooking(p: Profile, kind: BookingKind): boolean {
   if (!p.active) return false;
   if (p.role === "admin") return true;
+  if (p.role === "amministratore_cucina") return kind === "normale" || kind === "evento";
   return p.role === "sala" && kind === "normale";
 }
 
 /** Può creare almeno un tipo di prenotazione (controllo iniziale prima di leggere il tipo). */
 export function canCreateAnyBooking(p: Profile): boolean {
-  return p.active && (p.role === "admin" || p.role === "sala");
+  return p.active && (p.role === "admin" || p.role === "sala" || p.role === "amministratore_cucina");
 }
 
 /** Modifica completa, cambio stato, eliminazione: solo admin. */
@@ -70,27 +84,32 @@ export function canManageQuotesAndPayments(p: Profile): boolean {
  */
 export function canAssignRoom(p: Profile, kind: BookingKind): boolean {
   if (kind !== "normale") return false;
-  return isAdmin(p) || (p.active && p.role === "sala");
+  return isAdmin(p) || (p.active && (p.role === "sala" || p.role === "amministratore_cucina"));
 }
 
 /** Foglio eventi del giorno (export PDF/DOCX per la cucina): admin e cucina attivi. La sala non lo esporta. */
 export function canViewEventSheet(p: Profile): boolean {
-  return p.active && (p.role === "admin" || p.role === "cucina");
+  return p.active && (p.role === "admin" || isKitchenRole(p));
 }
 
-/** Giacenza: admin e cucina (leggere, inviare report). */
+/** Giacenza: admin, cucina e amministratore cucina (leggere, inviare report). */
 export function canUseInventory(p: Profile): boolean {
-  return p.active && (p.role === "admin" || p.role === "cucina");
+  return p.active && (p.role === "admin" || isKitchenRole(p));
 }
 
 /** Statistiche (coperti e menù, nessun importo): admin e cucina. */
 export function canViewStats(p: Profile): boolean {
-  return p.active && (p.role === "admin" || p.role === "cucina");
+  return p.active && (p.role === "admin" || isKitchenRole(p));
 }
 
 /** Modifica di un report di giacenza già inviato: chiunque usi la giacenza (admin e tutta la cucina). */
 export function canEditInventoryReport(p: Profile): boolean {
   return canUseInventory(p);
+}
+
+/** Giacenza: scelta del raggruppamento (categoria o fornitore) nel compilare e consultare: admin e amministratore cucina. */
+export function canChooseInventoryGrouping(p: Profile): boolean {
+  return isAdmin(p) || isKitchenAdmin(p);
 }
 
 /** Gestione del catalogo giacenza (disattivare prodotti) e segnatura dei report come visti: solo admin. */
@@ -100,7 +119,7 @@ export function canManageInventory(p: Profile): boolean {
 
 /** Note interne sulle prenotazioni: admin e cucina attiva. */
 export function canAddBookingNote(p: Profile): boolean {
-  return isAdmin(p) || (p.active && p.role === "cucina");
+  return isAdmin(p) || (p.active && isKitchenRole(p));
 }
 
 /** Registro delle modifiche alle prenotazioni: solo admin (la sala non lo vede). */

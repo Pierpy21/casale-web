@@ -205,7 +205,8 @@ export function MenuChoice({
 }: {
   name: string;
   title: string;
-  price: string;
+  /** Prezzo mostrato sulla card: omesso per chi non vede gli importi (sala, amministratore cucina, cucina). */
+  price?: string;
   items: Parameters<typeof CourseList>[0]["items"];
   checked: boolean;
   onSelect: () => void;
@@ -246,7 +247,7 @@ export function MenuChoice({
             className="sr-only"
           />
           <span className="min-w-0 wrap-anywhere font-serif text-xl leading-tight text-ink">{title}</span>
-          <span className="text-[14px] font-medium text-petrol">{price}</span>
+          {price && <span className="text-[14px] font-medium text-petrol">{price}</span>}
           <span className="text-[13px] text-slate-dark">
             {count} {count === 1 ? "piatto" : "piatti"}
           </span>

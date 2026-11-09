@@ -23,7 +23,7 @@ function toFieldErrors(raw: Record<string, string[]> | undefined): FieldErrors {
   return out;
 }
 
-/** Crea un operatore di sala o cucina con password temporanea. */
+/** Crea un operatore di sala, cucina o amministratore cucina con password temporanea. */
 export function CreateOperatorForm() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -134,6 +134,7 @@ export function CreateOperatorForm() {
         >
           <option value="sala">Sala</option>
           <option value="cucina">Cucina</option>
+          <option value="amministratore_cucina">Amministratore cucina</option>
         </Select>
       </Field>
 

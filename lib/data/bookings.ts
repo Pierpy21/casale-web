@@ -7,7 +7,7 @@ import { isRecordId, dayEndPb, dayStartPb, nn, num, toDateOnly, type PbRecord } 
 import { mapChange, mealOf } from "@/lib/pocketbase/mappers";
 import { listAll, listByParents, fetchOne } from "@/lib/pocketbase/queries";
 import { addDaysISO, monthBounds, romeToday } from "@/lib/dates";
-import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, canViewStats, isAdmin } from "@/lib/permissions";
+import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, canViewStats, isAdmin, isKitchenRole } from "@/lib/permissions";
 import { mondayOf } from "@/lib/stats-period";
 import {
   BOOKING_KINDS,
@@ -78,7 +78,7 @@ function hideKitchenPhone<T extends { client: { phone: string; email?: string | 
   item: T,
   me: Profile,
 ): T {
-  if (me.role !== "cucina") return item;
+  if (!isKitchenRole(me)) return item;
   const client = item.client ? { ...item.client, phone: "", email: null } : null;
   return { ...item, client, guest_phone: null };
 }

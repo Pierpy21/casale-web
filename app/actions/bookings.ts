@@ -8,7 +8,7 @@ import { toISO } from "@/components/agenda/agenda-utils";
 import { BookingAllergiesInput, BookingInput, BookingNoteBody, CoversInput, DishesInput, type DishInputType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } from "@/lib/action-utils";
 import { createQuote } from "@/lib/rpc/quotes";
-import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canSeeAppointments, isAdmin } from "@/lib/permissions";
+import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canManageQuotesAndPayments, canSeeAppointments, isAdmin } from "@/lib/permissions";
 import { fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { dayEndPb, dayStartPb, nn, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
 import { loadBookingBrief, notifyBookingDeleted, notifyBookingEvent } from "@/lib/notify";
@@ -174,9 +174,11 @@ export async function createBooking(
       }
     }
 
-    // Preventivo (solo eventi, se richiesto). La prenotazione e' gia' salvata: un errore qui e' un avviso, non un annullamento.
+    // Preventivo (solo eventi, se richiesto, solo admin: preventivi e acconti sono economici). Il controllo e' qui, lato server:
+    // la richiesta del client (create_quote / quote) non conta per chi non e' admin. La prenotazione e' gia' salvata:
+    // un errore qui e' un avviso, non un annullamento.
     let quoteId: string | null = null;
-    if (parsed.data.kind === "evento" && parsed.data.create_quote) {
+    if (canManageQuotesAndPayments(auth.profile) && parsed.data.kind === "evento" && parsed.data.create_quote) {
       try {
         quoteId = await createQuote(auth.db, id, { id: auth.profile.id }, parsed.data.quote ?? null);
       } catch (err) {
@@ -395,7 +397,7 @@ export async function assignBookingRoom(bookingId: string, roomId: string | null
   if (!isRecordId(bookingId)) return fail("Prenotazione non valida.");
   if (roomId !== null && !isRecordId(roomId)) return fail("Sala non valida.");
   const auth = await authorize(
-    (p) => isAdmin(p) || (p.active && p.role === "sala"),
+    (p) => canAssignRoom(p, "normale"),
     "Non sei autorizzato ad assegnare la sala.",
   );
   if (!auth.ok) return auth;

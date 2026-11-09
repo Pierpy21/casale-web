@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { capitalize, formatIt, toDate, todayISO } from "@/components/agenda/agenda-utils";
 import { buttonClasses } from "@/components/ui";
+import type { BookingKind } from "@/lib/types";
 import { BookingDatePicker } from "./BookingDatePicker";
 
 // Il "+" del tasto di creazione è un carattere in Montserrat regular (non un'icona).
@@ -15,33 +16,35 @@ const montserrat = Montserrat({ subsets: ["latin"], weight: ["400"], display: "s
 const NEW_BOOKING_BASE = "/admin/prenotazioni/nuova";
 
 interface CreateOption {
-  href: string;
+  kind: BookingKind;
   label: string;
   description: string;
   Icon: LucideIcon;
 }
 
-/** Ordine fisso: Prenotazione, Evento, Appuntamento. */
-const ADMIN_OPTIONS: CreateOption[] = [
+/** Ordine fisso: Prenotazione, Evento, Appuntamento. Ogni ruolo vede solo i tipi che può creare (prop kinds). */
+const CREATE_OPTIONS: CreateOption[] = [
   {
-    href: `${NEW_BOOKING_BASE}?tipo=normale`,
+    kind: "normale",
     label: "Prenotazione",
     description: "Tavolo con pranzo o cena e coperti.",
     Icon: Armchair,
   },
   {
-    href: `${NEW_BOOKING_BASE}?tipo=evento`,
+    kind: "evento",
     label: "Evento",
     description: "Banchetto con menù, sala e ordine di servizio.",
     Icon: PartyPopper,
   },
   {
-    href: `${NEW_BOOKING_BASE}?tipo=appuntamento`,
+    kind: "appuntamento",
     label: "Appuntamento",
     description: "Incontro con un cliente, senza menù.",
     Icon: CalendarClock,
   },
 ];
+
+const newBookingHref = (kind: BookingKind) => `${NEW_BOOKING_BASE}?tipo=${kind}`;
 
 /** Passi del foglio: admin sceglie prima la data, poi il tipo. Sala resta sul passo data (Continua va alla prenotazione). */
 type SheetStep = "date" | "type";
@@ -66,15 +69,21 @@ function withDate(href: string, date: string): string {
 }
 
 export interface CreateBookingFabProps {
-  /** Admin: data, poi Prenotazione / Evento / Appuntamento. Sala: data, poi il pulsante apre la prenotazione. */
-  canCreateEvent: boolean;
+  /**
+   * Tipi di prenotazione che il ruolo può creare. Più di uno: data, poi scelta del tipo.
+   * Uno solo (sala): data, poi il pulsante apre direttamente la prenotazione.
+   */
+  kinds: BookingKind[];
 }
 
 /**
- * Pulsante + flottante per creare prenotazioni (tutte le pagine admin e sala, non cucina).
+ * Pulsante + flottante per creare prenotazioni (admin, sala e amministratore cucina; non cucina).
  * Posizionato sopra la barra inferiore mobile e rispettando il safe-area inferiore.
  */
-export function CreateBookingFab({ canCreateEvent }: CreateBookingFabProps) {
+export function CreateBookingFab({ kinds }: CreateBookingFabProps) {
+  const canCreateEvent = kinds.length > 1;
+  const singleKind: BookingKind = kinds[0] ?? "normale";
+  const options = CREATE_OPTIONS.filter((option) => kinds.includes(option.kind));
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<SheetStep>("date");
@@ -171,7 +180,7 @@ export function CreateBookingFab({ canCreateEvent }: CreateBookingFabProps) {
                   </button>
                 ) : (
                   <Link
-                    href={withDate(`${NEW_BOOKING_BASE}?tipo=normale`, date)}
+                    href={withDate(newBookingHref(singleKind), date)}
                     onClick={() => setOpen(false)}
                     className={buttonClasses("primary", "md", "w-full")}
                   >
@@ -185,10 +194,10 @@ export function CreateBookingFab({ canCreateEvent }: CreateBookingFabProps) {
                   Cosa vuoi creare?
                 </p>
                 <ul className="flex flex-col gap-2">
-                  {ADMIN_OPTIONS.map(({ href, label, description, Icon }) => (
-                    <li key={href}>
+                  {options.map(({ kind, label, description, Icon }) => (
+                    <li key={kind}>
                       <Link
-                        href={withDate(href, date)}
+                        href={withDate(newBookingHref(kind), date)}
                         onClick={() => setOpen(false)}
                         className="flex min-h-16 items-center gap-4 rounded-[2px] border border-sand bg-paper px-4 py-3 transition-colors duration-200 hover:bg-cream active:bg-sand/60"
                       >

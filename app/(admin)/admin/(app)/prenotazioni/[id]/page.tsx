@@ -30,7 +30,7 @@ import { PaymentsPanel } from "@/components/payments/PaymentsPanel";
 import { PendingChanges } from "@/components/offline/PendingChanges";
 import { Alert, Badge, ButtonLink, Card, Disclosure, PhoneLink, StatusBadge, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
-import { canAddBookingNote, canEditAllergies, canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
+import { canAddBookingNote, canEditAllergies, canEditCovers, canEditDishes, isAdmin, isKitchenRole } from "@/lib/permissions";
 import { requireProfile } from "@/lib/auth";
 import { getBooking, getBookingChanges, getBookingNotes } from "@/lib/data/bookings";
 import { getPayments } from "@/lib/data/payments";
@@ -66,7 +66,7 @@ export default async function BookingDetailPage({
   const covers = canEditCovers(profile);
   const dishesEditable = canEditDishes(profile);
   const allergiesEditable = canEditAllergies(profile, booking.kind);
-  const kitchen = profile.role === "cucina";
+  const kitchen = isKitchenRole(profile);
   // Preventivi, acconti e prezzi esistono solo per gli eventi, e si gestiscono solo dall'admin.
   const isEvent = booking.kind === "evento";
   // Tavolo: solo per le prenotazioni normali, solo se assegnato.

@@ -15,6 +15,10 @@ const RULES: Array<{ role: Role; text: string }> = [
     role: "cucina",
     text: "Consulta tutte le prenotazioni senza modificarle. Usa la giacenza: segnala i prodotti presenti o da ordinare.",
   },
+  {
+    role: "amministratore_cucina",
+    text: "Tutto ciò che fa la cucina, in più crea prenotazioni normali ed eventi (senza preventivi, pagamenti e prezzi) e compila la giacenza raggruppata per categoria o per fornitore.",
+  },
 ];
 
 /** Riepilogo sintetico dei permessi per ruolo (SPEC §3). */
@@ -30,7 +34,7 @@ export function PermissionsInfo() {
           Permessi per ruolo
         </h2>
       </div>
-      <dl className="mt-4 grid gap-4 md:grid-cols-3">
+      <dl className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {RULES.map((rule) => (
           <div key={rule.role} className="flex flex-col gap-2">
             <dt>

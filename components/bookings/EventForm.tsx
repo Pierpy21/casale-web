@@ -178,7 +178,8 @@ export function EventForm({
   const [clientId, setClientId] = useState<string | null>(booking?.client_id ?? null);
   const [newClient, setNewClient] = useState<NewClientDraft>(prefill ?? { full_name: "", phone: "", email: "" });
   const [linkedClient, setLinkedClient] = useState<ClientSuggestion | null>(null);
-  const [createQuote, setCreateQuote] = useState(true);
+  // Il preventivo si crea solo per l'admin: sala e amministratore cucina creano l'evento senza parte economica.
+  const [createQuote, setCreateQuote] = useState(isAdmin);
   const [quote, setQuote] = useState<QuoteDraft>(EMPTY_QUOTE_DRAFT);
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -191,6 +192,10 @@ export function EventForm({
   const [depositErrors, setDepositErrors] = useState<DraftErrors>({});
   const depositAllowed = !isEdit && isAdmin;
   const depositActive = depositAllowed && depositOpen;
+  // Preventivo (creazione, solo admin): prezzi e pannello economico. Sala e amministratore cucina non li vedono.
+  const showQuote = !isEdit && isAdmin;
+  // Piatti personalizzati per l'evento in creazione: solo admin (il server li accetta solo da lui).
+  const canCustomizeDishes = !isEdit && isAdmin;
 
   /** Ogni modifica dell'utente toglie gli errori visibili: si ricalcolano alla prossima pressione di "salva". */
   const change = (changes: Partial<EventValues>) => {
@@ -451,7 +456,7 @@ export function EventForm({
 
       {formError && <Alert tone="danger">{formError}</Alert>}
 
-      <div className={cn("grid min-w-0 gap-6", !isEdit && "deskxl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] deskxl:items-start")}>
+      <div className={cn("grid min-w-0 gap-6", showQuote && "deskxl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] deskxl:items-start")}>
         <div className="flex min-w-0 flex-col gap-6">
           <FormCard>
             <ClientSection
@@ -575,11 +580,11 @@ export function EventForm({
                     key={menu.id}
                     name="menu_id"
                     title={menu.name}
-                    price={`${formatEUR(menu.price_per_person)} a persona`}
+                    price={isAdmin ? `${formatEUR(menu.price_per_person)} a persona` : undefined}
                     items={values.menu_id === menu.id && customDishes ? customPreview : menu.items}
                     checked={values.menu_id === menu.id}
                     onSelect={() => selectMenu(menu.id)}
-                    onEdit={isEdit ? undefined : () => setDishesEditorOpen(true)}
+                    onEdit={canCustomizeDishes ? () => setDishesEditorOpen(true) : undefined}
                     customized={values.menu_id === menu.id && customDishes !== null}
                     onReset={() => setCustomDishes(null)}
                   />
@@ -600,7 +605,7 @@ export function EventForm({
                     key={menu.id}
                     name="kids_menu_id"
                     title={menu.name}
-                    price={`${formatEUR(menu.price_per_person)} a bambino`}
+                    price={isAdmin ? `${formatEUR(menu.price_per_person)} a bambino` : undefined}
                     items={menu.items}
                     checked={values.kids_menu_id === menu.id}
                     onSelect={() => change({ kids_menu_id: menu.id })}
@@ -611,11 +616,13 @@ export function EventForm({
               {first(errors.kids_menu_id) && <p className="text-[13px] text-danger">{first(errors.kids_menu_id)}</p>}
             </div>
 
-            <p className="rounded-btn bg-cream/70 px-4 py-3 text-[14px] leading-relaxed text-slate-dark">
-              {isEdit
-                ? "Cambiando menù, i piatti dell’evento vengono riallineati al nuovo menù. Le personalizzazioni si gestiscono dalla pagina della prenotazione."
-                : "Con la matita sul menù selezionato cambi i piatti solo per questo evento: il menù in catalogo non cambia."}
-            </p>
+            {(isEdit || isAdmin) && (
+              <p className="rounded-btn bg-cream/70 px-4 py-3 text-[14px] leading-relaxed text-slate-dark">
+                {isEdit
+                  ? "Cambiando menù, i piatti dell’evento vengono riallineati al nuovo menù. Le personalizzazioni si gestiscono dalla pagina della prenotazione."
+                  : "Con la matita sul menù selezionato cambi i piatti solo per questo evento: il menù in catalogo non cambia."}
+              </p>
+            )}
 
             {/* Portale nel body: l'editor è un form e non può stare dentro il form dell'evento. */}
             {dishesEditorOpen &&
@@ -708,7 +715,7 @@ export function EventForm({
           )}
         </div>
 
-        {!isEdit && (
+        {showQuote && (
           <div className="min-w-0 deskxl:sticky deskxl:top-6">
             <QuotePanel
               enabled={createQuote}
