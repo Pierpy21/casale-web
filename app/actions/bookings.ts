@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { toISO } from "@/components/agenda/agenda-utils";
 import { BookingAllergiesInput, BookingInput, BookingNoteBody, CoversInput, DishesInput, DishesUpdateInput, type DishInputType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } from "@/lib/action-utils";
-import { createQuote } from "@/lib/rpc/quotes";
+import { createQuote, eventMenuRefs, syncQuotesWithBooking, type EventMenuRefs } from "@/lib/rpc/quotes";
 import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canManageQuotesAndPayments, canSeeAppointments, isAdmin } from "@/lib/permissions";
 import { fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { dayEndPb, dayStartPb, nn, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
@@ -41,6 +41,34 @@ function revalidateBooking(id?: string, clientId?: string): void {
 function kindOf(record: Record<string, unknown> | null): BookingKind {
   const k = String(record?.kind || "evento");
   return k === "normale" || k === "appuntamento" ? k : "evento";
+}
+
+/**
+ * Menù dell'evento PRIMA di una modifica (prezzi effettivi), da passare a syncQuotesWithBooking. Null se la prenotazione
+ * non è un evento o se la lettura fallisce: in quel caso il riallineamento viene saltato (la modifica resta valida).
+ */
+async function quoteSyncBase(db: PocketBase, before: PbRecord): Promise<EventMenuRefs | null> {
+  if (kindOf(before) !== "evento") return null;
+  try {
+    return await eventMenuRefs(db, before);
+  } catch (err) {
+    console.error("[bookings] menù per gli ordini di servizio non letto:", err);
+    return null;
+  }
+}
+
+/**
+ * Riallinea le righe automatiche degli ordini di servizio dell'evento dopo una modifica (best-effort: un errore
+ * finisce nel log e non cambia l'esito dell'azione). Le pagine dei preventivi cambiati vengono revalidate.
+ */
+async function resyncEventQuotes(db: PocketBase, bookingId: string, previous: EventMenuRefs | null): Promise<void> {
+  if (!previous) return;
+  try {
+    const updated = await syncQuotesWithBooking(db, bookingId, previous);
+    for (const quoteId of updated) revalidatePath(`/admin/preventivi/${quoteId}`);
+  } catch (err) {
+    console.error("[bookings] ordini di servizio non riallineati:", err);
+  }
 }
 
 /**
@@ -223,6 +251,8 @@ export async function updateBooking(id: string, input: unknown, opts?: MutationO
 
     // Prezzo proprio del menù: solo admin (la modifica completa è già solo admin). Assente = resta quello salvato.
     const menuPriceInput = { ...parsed.data, menu_price: isAdmin(auth.profile) ? parsed.data.menu_price : undefined };
+    // Menù dell'evento prima della modifica: serve a riallineare gli ordini di servizio (menù, coperti, prezzo).
+    const quoteBase = await quoteSyncBase(auth.db, previous);
 
     try {
       await upsertBooking(auth.db, menuPriceInput, id, { id: auth.profile.id, full_name: auth.profile.full_name });
@@ -231,6 +261,7 @@ export async function updateBooking(id: string, input: unknown, opts?: MutationO
     }
 
     revalidateBooking(id, parsed.data.client_id ?? undefined);
+    await resyncEventQuotes(auth.db, id, quoteBase);
     // Lo stato degli eventi è ricalcolato dal server (acconti): si legge quello salvato.
     const saved = await fetchOne(auth.db, "bookings", id);
     const newStatus = String(saved?.status ?? parsed.data.status);
@@ -296,6 +327,8 @@ export async function updateBookingCovers(id: string, input: unknown, opts?: Mut
 
     const parsed = CoversInput.safeParse(input);
     if (!parsed.success) return invalidInput(parsed.error);
+    // Menù prima della modifica (i coperti non cambiano i menù, ma le quantità delle righe sì).
+    const quoteBase = await quoteSyncBase(auth.db, booking);
 
     try {
       await writeCovers(auth.db, id, parsed.data, { id: auth.profile.id, full_name: auth.profile.full_name });
@@ -304,6 +337,7 @@ export async function updateBookingCovers(id: string, input: unknown, opts?: Mut
     }
 
     revalidateBooking(id);
+    await resyncEventQuotes(auth.db, id, quoteBase);
     const actor = auth.profile;
     after(() => notifyBookingEvent({ type: "covers_updated", bookingId: id, actor }));
     return { ok: true, data: undefined };
@@ -332,6 +366,8 @@ export async function updateBookingDishes(id: string, dishes: unknown, opts?: Mu
     const dishList = Array.isArray(payload) ? payload : payload.dishes;
     // Undefined = prezzo non indicato (non si tocca); null = torna al catalogo (salvato come 0).
     const menuPrice = Array.isArray(payload) ? undefined : payload.menu_price;
+    // Il riallineamento dei preventivi serve solo se cambia il prezzo del menù: menù dell'evento prima della modifica.
+    const quoteBase = menuPrice !== undefined ? await quoteSyncBase(auth.db, booking) : null;
 
     try {
       await saveBookingDishes(
@@ -346,6 +382,7 @@ export async function updateBookingDishes(id: string, dishes: unknown, opts?: Mu
     }
 
     revalidateBooking(id);
+    await resyncEventQuotes(auth.db, id, quoteBase);
     const actor = auth.profile;
     after(() => notifyBookingEvent({ type: "dishes_updated", bookingId: id, actor }));
     return { ok: true, data: undefined };

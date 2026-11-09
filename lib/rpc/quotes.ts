@@ -4,8 +4,9 @@ import { ClientResponseError } from "pocketbase";
 import { UserFacingError } from "@/lib/action-utils";
 import { addDaysISO, romeToday } from "@/lib/dates";
 import { dayStartPb, nn, num, type PbRecord } from "@/lib/pocketbase/helpers";
-import { fetchOne } from "@/lib/pocketbase/queries";
-import { buildDefaultQuoteLines, formatEUR } from "@/lib/quote-utils";
+import { normalizeQuoteLines } from "@/lib/pocketbase/mappers";
+import { fetchOne, listAll } from "@/lib/pocketbase/queries";
+import { buildDefaultQuoteLines, formatEUR, syncAutoQuoteLines, type QuoteMenuRef } from "@/lib/quote-utils";
 import type { QuoteLine } from "@/lib/types";
 import type { QuoteDraftInputType, QuoteInputType } from "@/lib/validation";
 
@@ -60,6 +61,30 @@ async function bumpCounter(db: PocketBase, year: number, sequence: number): Prom
   }
 }
 
+/** Menù adulti e bambini dell'evento per le righe automatiche (prezzi effettivi). */
+export interface EventMenuRefs {
+  menu: QuoteMenuRef | null;
+  kids_menu: QuoteMenuRef | null;
+}
+
+/**
+ * Menù dell'evento con i prezzi effettivi: prezzo proprio della prenotazione (bookings.menu_price, solo admin) se > 0,
+ * altrimenti il prezzo di catalogo del menù adulti; il menù bambini ha sempre il prezzo di catalogo.
+ */
+export async function eventMenuRefs(db: PocketBase, booking: PbRecord): Promise<EventMenuRefs> {
+  const menuId = nn(booking.menu);
+  const kidsId = nn(booking.kids_menu);
+  const menu = menuId ? await fetchOne(db, "menus", menuId) : null;
+  const kids = kidsId ? await fetchOne(db, "menus", kidsId) : null;
+  const eventMenuPrice = num(booking.menu_price);
+  return {
+    menu: menu
+      ? { name: String(menu.name), price_per_person: eventMenuPrice > 0 ? eventMenuPrice : num(menu.price_per_person) }
+      : null,
+    kids_menu: kids ? { name: String(kids.name), price_per_person: num(kids.price_per_person) } : null,
+  };
+}
+
 /**
  * Crea un preventivo per un evento. Senza `draft`: righe automatiche dai menu della prenotazione,
  * IVA 10%, sconto 0. Con `draft`: righe, sconto, IVA, validita' e note indicati.
@@ -81,19 +106,12 @@ export async function createQuote(
   if (draft) {
     lines = draft.lines;
   } else {
-    const menuId = nn(booking.menu);
-    const kidsId = nn(booking.kids_menu);
-    const menu = menuId ? await fetchOne(db, "menus", menuId) : null;
-    const kids = kidsId ? await fetchOne(db, "menus", kidsId) : null;
-    // Prezzo proprio dell'evento (bookings.menu_price, solo admin) se > 0; altrimenti il prezzo di catalogo.
-    const eventMenuPrice = num(booking.menu_price);
+    const refs = await eventMenuRefs(db, booking);
     lines = buildDefaultQuoteLines({
       adults: num(booking.adults),
       kids_menus: num(booking.kids_menus),
-      menu: menu
-        ? { name: String(menu.name), price_per_person: eventMenuPrice > 0 ? eventMenuPrice : num(menu.price_per_person) }
-        : null,
-      kids_menu: kids ? { name: String(kids.name), price_per_person: num(kids.price_per_person) } : null,
+      menu: refs.menu,
+      kids_menu: refs.kids_menu,
     });
   }
   // Nessuna riga (evento senza menù e senza voci): il preventivo si crea comunque, con 0 righe, come quello automatico.
@@ -202,4 +220,43 @@ export async function setEventFinalTotal(
   });
   await batch.send();
   return quoteId;
+}
+
+/**
+ * Riallinea le righe automatiche (menù adulti e bambini, quantità e prezzi) di tutti gli ordini di servizio di un evento
+ * dopo una modifica della prenotazione. `previous` = menù dell'evento PRIMA della modifica (vedi eventMenuRefs), usato per
+ * conservare i prezzi scritti a mano. Non tocca sconto, IVA, prezzo finale, note né le righe manuali.
+ * Solo eventi. Ritorna gli id dei preventivi effettivamente cambiati (per la revalidazione delle pagine).
+ * Lancia in caso di errore di lettura: il chiamante decide se ignorarlo (le scritture già fatte restano).
+ */
+export async function syncQuotesWithBooking(
+  db: PocketBase,
+  bookingId: string,
+  previous: EventMenuRefs | null,
+): Promise<string[]> {
+  const booking = await fetchOne(db, "bookings", bookingId);
+  if (!booking || String(booking.kind || "evento") !== "evento") return [];
+
+  const refs = await eventMenuRefs(db, booking);
+  const next = {
+    adults: num(booking.adults),
+    kids_menus: num(booking.kids_menus),
+    menu: refs.menu,
+    kids_menu: refs.kids_menu,
+  };
+
+  const quotes = await listAll(db, "quotes", db.filter("booking = {:id}", { id: bookingId }), { fields: "id,lines" });
+  const updated: string[] = [];
+  for (const quote of quotes) {
+    const synced = syncAutoQuoteLines(normalizeQuoteLines(quote.lines), next, previous);
+    if (!synced) continue;
+    try {
+      await db.collection("quotes").update(String(quote.id), { lines: synced });
+      updated.push(String(quote.id));
+    } catch (err) {
+      // Un preventivo che non si aggiorna non blocca gli altri: l'errore resta nel log.
+      console.error(`[quotes] righe automatiche non riallineate (${String(quote.id)}):`, err);
+    }
+  }
+  return updated;
 }
