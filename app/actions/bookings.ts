@@ -5,7 +5,7 @@ import { differenceInDays, isValid, parseISO } from "date-fns";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { toISO } from "@/components/agenda/agenda-utils";
-import { BookingAllergiesInput, BookingInput, BookingNoteBody, CoversInput, DishesInput, type DishInputType } from "@/lib/validation";
+import { BookingAllergiesInput, BookingInput, BookingNoteBody, CoversInput, DishesInput, DishesUpdateInput, type DishInputType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } from "@/lib/action-utils";
 import { createQuote } from "@/lib/rpc/quotes";
 import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canManageQuotesAndPayments, canSeeAppointments, isAdmin } from "@/lib/permissions";
@@ -151,9 +151,15 @@ export async function createBooking(
       return fail("Inserisci il cliente come nuovo cliente (nome, cognome, telefono).");
     }
 
+    // Prezzo proprio del menù: solo admin e solo eventi. Per gli altri (anche l'amministratore cucina) resta 0 = catalogo.
+    const menuPriceInput = {
+      ...parsed.data,
+      menu_price: isAdmin(auth.profile) && parsed.data.kind === "evento" ? parsed.data.menu_price : undefined,
+    };
+
     let id: string;
     try {
-      id = await upsertBooking(auth.db, parsed.data, null, { id: auth.profile.id, full_name: auth.profile.full_name });
+      id = await upsertBooking(auth.db, menuPriceInput, null, { id: auth.profile.id, full_name: auth.profile.full_name });
     } catch (err) {
       return dbFail(err);
     }
@@ -215,8 +221,11 @@ export async function updateBooking(id: string, input: unknown, opts?: MutationO
     const conflict = await checkConflict(auth.db, opts, previous);
     if (conflict) return conflict;
 
+    // Prezzo proprio del menù: solo admin (la modifica completa è già solo admin). Assente = resta quello salvato.
+    const menuPriceInput = { ...parsed.data, menu_price: isAdmin(auth.profile) ? parsed.data.menu_price : undefined };
+
     try {
-      await upsertBooking(auth.db, parsed.data, id, { id: auth.profile.id, full_name: auth.profile.full_name });
+      await upsertBooking(auth.db, menuPriceInput, id, { id: auth.profile.id, full_name: auth.profile.full_name });
     } catch (err) {
       return dbFail(err);
     }
@@ -301,7 +310,10 @@ export async function updateBookingCovers(id: string, input: unknown, opts?: Mut
   });
 }
 
-/** Piatti: solo admin, e solo per gli eventi (con audit). */
+/**
+ * Piatti (e, facoltativo, prezzo del menù dell'evento): solo admin, e solo per gli eventi (con audit).
+ * `dishes` è l'elenco piatti (formato originale) oppure `{ dishes, menu_price? }`; menu_price presente (anche null) salva il prezzo, null o 0 = catalogo.
+ */
 export async function updateBookingDishes(id: string, dishes: unknown, opts?: MutationOptions): Promise<ActionResult> {
   if (!isRecordId(id)) return fail("Prenotazione non valida.");
   const auth = await authorize(canEditDishes, "Solo l'amministratore può modificare i piatti.");
@@ -314,15 +326,20 @@ export async function updateBookingDishes(id: string, dishes: unknown, opts?: Mu
     const conflict = await checkConflict(auth.db, opts, booking);
     if (conflict) return conflict;
 
-    const parsed = DishesInput.safeParse(dishes);
+    const parsed = DishesUpdateInput.safeParse(dishes);
     if (!parsed.success) return invalidInput(parsed.error);
+    const payload = parsed.data;
+    const dishList = Array.isArray(payload) ? payload : payload.dishes;
+    // Undefined = prezzo non indicato (non si tocca); null = torna al catalogo (salvato come 0).
+    const menuPrice = Array.isArray(payload) ? undefined : payload.menu_price;
 
     try {
       await saveBookingDishes(
         auth.db,
         id,
-        parsed.data.map((d, index) => ({ ...d, sort: index })),
+        dishList.map((d, index) => ({ ...d, sort: index })),
         { id: auth.profile.id, full_name: auth.profile.full_name },
+        menuPrice,
       );
     } catch (err) {
       return dbFail(err);

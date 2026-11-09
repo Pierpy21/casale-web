@@ -204,6 +204,7 @@ export function mapBooking(r: PbRecord): Booking {
     children: num(r.children),
     kids_menus: num(r.kids_menus),
     menu_id: nn(r.menu),
+    menu_price: num(r.menu_price) > 0 ? num(r.menu_price) : null,
     kids_menu_id: nn(r.kids_menu),
     setup_colors: Array.isArray(r.setup_colors) ? (r.setup_colors as string[]) : [],
     setup_notes: nn(r.setup_notes),

@@ -185,6 +185,8 @@ export function EventForm({
   const [formError, setFormError] = useState<string | null>(null);
   // Solo creazione: piatti personalizzati per questo evento (null = copia del menù scelto). Il catalogo non cambia.
   const [customDishes, setCustomDishes] = useState<DishPayload[] | null>(null);
+  // Stesso ciclo di customDishes: prezzo a persona del menù solo per questo evento (null = prezzo di catalogo).
+  const [customMenuPrice, setCustomMenuPrice] = useState<number | null>(null);
   const [dishesEditorOpen, setDishesEditorOpen] = useState(false);
   // Solo creazione, admin: acconto facoltativo, registrato subito dopo l'evento. Chiuso di default.
   const [depositOpen, setDepositOpen] = useState(false);
@@ -242,11 +244,13 @@ export function EventForm({
   const roomOptions = rooms.filter((r) => r.active || r.id === values.room_id);
   const selectedMenu = menus.find((m) => m.id === values.menu_id) ?? null;
   const selectedKidsMenu = menus.find((m) => m.id === values.kids_menu_id) ?? null;
+  // Prezzo a persona del menù scelto per questo evento: quello personalizzato (solo admin) o quello di catalogo.
+  const eventMenuPrice = selectedMenu ? (customMenuPrice ?? selectedMenu.price_per_person) : 0;
   const autoLines = autoQuoteLines(
     {
       adults: values.adults,
       kids_menus: values.kids_menus,
-      menu: selectedMenu,
+      menu: selectedMenu ? { ...selectedMenu, price_per_person: eventMenuPrice } : null,
       kids_menu: selectedKidsMenu,
     },
     quote.priceOverrides,
@@ -275,6 +279,13 @@ export function EventForm({
     if (menuId === values.menu_id) return;
     change({ menu_id: menuId });
     setCustomDishes(null);
+    setCustomMenuPrice(null);
+  };
+  /** Prezzo a persona sulla card del menù adulti (solo admin): per il menù scelto, quello dell'evento. */
+  const adultMenuPriceLabel = (menu: Menu) => {
+    if (!isAdmin) return undefined;
+    if (menu.id !== values.menu_id) return `${formatEUR(menu.price_per_person)} a persona`;
+    return `${formatEUR(eventMenuPrice)} a persona${customMenuPrice !== null ? " · prezzo personalizzato" : ""}`;
   };
   const menuDishes: DishPayload[] = (selectedMenu?.items ?? [])
     .slice()
@@ -358,6 +369,8 @@ export function EventForm({
       kids_menus: values.kids_menus,
       menu_id: values.menu_id,
       kids_menu_id: values.kids_menu_id,
+      // Prezzo del menù solo per questo evento: solo admin in creazione (null = catalogo).
+      ...(canCustomizeDishes ? { menu_price: customMenuPrice } : {}),
       setup_colors: values.setup_colors,
       setup_notes: values.setup_notes.trim() || null,
       status: values.status,
@@ -580,7 +593,7 @@ export function EventForm({
                     key={menu.id}
                     name="menu_id"
                     title={menu.name}
-                    price={isAdmin ? `${formatEUR(menu.price_per_person)} a persona` : undefined}
+                    price={adultMenuPriceLabel(menu)}
                     items={values.menu_id === menu.id && customDishes ? customPreview : menu.items}
                     checked={values.menu_id === menu.id}
                     onSelect={() => selectMenu(menu.id)}
@@ -633,7 +646,11 @@ export function EventForm({
                     hasMenu={false}
                     catalog={dishCatalog}
                     submitLabel="Applica piatti"
-                    onApply={(dishes) => setCustomDishes(dishes)}
+                    price={canCustomizeDishes && selectedMenu ? { value: customMenuPrice, catalog: selectedMenu.price_per_person } : undefined}
+                    onApply={(dishes, menuPrice) => {
+                      setCustomDishes(dishes);
+                      if (menuPrice !== undefined) setCustomMenuPrice(menuPrice);
+                    }}
                     onClose={() => setDishesEditorOpen(false)}
                   />
                 </Modal>,

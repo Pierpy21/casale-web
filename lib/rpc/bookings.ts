@@ -6,6 +6,7 @@ import { generateRecordId, dayStartPb, nn, num, toDateOnly, type PbRecord } from
 import { countWhere, fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { mapBooking } from "@/lib/pocketbase/mappers";
 import { bookingPersonName } from "@/components/bookings/format";
+import { formatEUR } from "@/lib/quote-utils";
 import { eventStatusFor, statusAfterPayments } from "@/lib/booking-status";
 import {
   allergiesSummary,
@@ -58,6 +59,18 @@ export function queueAudit(
 
 function queueAuditEntries(batch: Batch, actor: Actor, bookingId: string, entries: AuditEntry[]): void {
   for (const e of entries) queueAudit(batch, actor, { bookingId, field: e.field, old: e.old, new: e.new });
+}
+
+/** Prezzo a persona del menù proprio dell'evento, come salvato: 0 = nessun prezzo proprio (vale il catalogo). */
+function storedMenuPriceOf(r: PbRecord): number {
+  return num(r.menu_price) > 0 ? num(r.menu_price) : 0;
+}
+
+/** Riga di registro "Prezzo menù" solo se il prezzo proprio dell'evento cambia (0 = prezzo di catalogo). */
+function queueMenuPriceAudit(batch: Batch, actor: Actor, bookingId: string, oldPrice: number, newPrice: number): void {
+  if (oldPrice === newPrice) return;
+  const label = (p: number) => (p > 0 ? formatEUR(p) : "prezzo di catalogo");
+  queueAudit(batch, actor, { bookingId, field: "Prezzo menù", old: label(oldPrice), new: label(newPrice) });
 }
 
 async function loadBooking(db: PocketBase, id: string): Promise<PbRecord> {
@@ -262,6 +275,18 @@ export async function upsertBooking(
     Object.assign(fields, { table_number: 0, extra_tables: [] });
   }
 
+  // Prezzo proprio del menù (solo eventi; 0 = catalogo). Assente in modifica: resta quello salvato, salvo cambio di menù (torna al catalogo).
+  // Il controllo "solo admin" è nell'azione (app/actions/bookings.ts): qui arriva già filtrato.
+  const storedMenuPrice = before ? storedMenuPriceOf(before) : 0;
+  const menuPrice = !isEvent
+    ? 0
+    : input.menu_price !== undefined
+      ? (input.menu_price ?? 0)
+      : !id || menuId !== nn(before?.menu)
+        ? 0
+        : storedMenuPrice;
+  Object.assign(fields, { menu_price: menuPrice });
+
   if (!id) {
     batch.collection("bookings").create({ id: bookingId, ...fields, created_by: actor.id });
     queueAudit(batch, actor, {
@@ -294,6 +319,7 @@ export async function upsertBooking(
       notes: input.notes ?? null,
     });
     queueAuditEntries(batch, actor, bookingId, diffBookingFields(before_, after_));
+    queueMenuPriceAudit(batch, actor, bookingId, storedMenuPrice, menuPrice);
     // Tavolo: stessa riga di registro di assignBookingTable, solo se il payload lo cambia.
     if ("table_number" in fields) {
       const oldTable = mapBooking(before as PbRecord).table_number;
@@ -523,13 +549,28 @@ export async function saveBookingAllergies(
   return true;
 }
 
-/** Sostituisce i piatti della prenotazione (admin o chef) con audit. */
-export async function saveBookingDishes(db: PocketBase, id: string, dishes: DishLike[], actor: Actor): Promise<void> {
-  await loadBooking(db, id);
+/**
+ * Sostituisce i piatti della prenotazione (admin o chef) con audit. `menuPrice` facoltativo: se presente (anche null)
+ * salva anche il prezzo proprio del menù nella stessa batch (null o 0 = catalogo); assente = non si tocca.
+ */
+export async function saveBookingDishes(
+  db: PocketBase,
+  id: string,
+  dishes: DishLike[],
+  actor: Actor,
+  menuPrice?: number | null,
+): Promise<void> {
+  const booking = await loadBooking(db, id);
   const oldRows = await bookingDishRows(db, id);
   const batch = db.createBatch();
   queueDishes(batch, actor, id, oldRows, dishes);
-  batch.collection("bookings").update(id, { updated_by: actor.id });
+  const patch: Record<string, unknown> = { updated_by: actor.id };
+  if (menuPrice !== undefined) {
+    const next = menuPrice ?? 0;
+    queueMenuPriceAudit(batch, actor, id, storedMenuPriceOf(booking), next);
+    patch.menu_price = next;
+  }
+  batch.collection("bookings").update(id, patch);
   await batch.send();
 }
 
