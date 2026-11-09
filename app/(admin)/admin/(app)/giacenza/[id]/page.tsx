@@ -5,13 +5,19 @@ import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { inventoryPdfFileName, inventoryPdfHref } from "@/components/inventory/inventory-links";
 import { InventoryReportSections } from "@/components/inventory/InventoryReportSections";
 import { InventoryGroupingToggle, resolveInventoryGrouping } from "@/components/inventory/InventoryGroupingToggle";
-import { MarkSeenButton } from "@/components/inventory/ReportActions";
+import { DeleteReportButton, MarkSeenButton } from "@/components/inventory/ReportActions";
 import { Badge, ButtonLink, DocumentDownload, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
 import { requireProfile } from "@/lib/auth";
 import { mergeReportLines, reportSuppliers } from "@/lib/inventory-utils";
 import { getInventoryReport, getInventorySuppliers } from "@/lib/data/inventory";
-import { canChooseInventoryGrouping, canEditInventoryReport, canManageInventory, canUseInventory } from "@/lib/permissions";
+import {
+  canChooseInventoryGrouping,
+  canDeleteInventoryReport,
+  canEditInventoryReport,
+  canManageInventory,
+  canUseInventory,
+} from "@/lib/permissions";
 
 export const metadata: Metadata = {
   title: "Giacenza · Casale del Notaio",
@@ -96,6 +102,7 @@ export default async function InventoryReportPage({
             </ButtonLink>
           )}
           {admin && <MarkSeenButton reportId={report.id} seen={seen} />}
+          {canDeleteInventoryReport(profile) && <DeleteReportButton reportId={report.id} reportDate={report.report_date} />}
         </div>
       </header>
 
