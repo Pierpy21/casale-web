@@ -71,4 +71,5 @@ export const ACTION_REGISTRY: Record<string, RegisteredAction> = {
   "inventory.submitInventoryReport": inventory.submitInventoryReport,
   "inventory.updateInventoryReport": inventory.updateInventoryReport,
   "inventory.markInventoryReportSeen": inventory.markInventoryReportSeen,
+  "inventory.deleteInventoryReport": inventory.deleteInventoryReport,
 };

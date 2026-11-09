@@ -3,7 +3,9 @@
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { markInventoryReportSeen } from "@/app/actions/inventory";
+import { deleteInventoryReport, markInventoryReportSeen } from "@/app/actions/inventory";
+import { formatIt, toDate } from "@/components/agenda/agenda-utils";
+import { ConfirmAction } from "@/components/bookings/ConfirmAction";
 import { Alert, Button } from "@/components/ui";
 import { isBrowserOnline } from "@/lib/offline/network";
 import { isQueued, submitMutation } from "@/lib/offline/submit";
@@ -50,5 +52,35 @@ export function MarkSeenButton({ reportId, seen }: { reportId: string; seen: boo
       </Button>
       {error && <Alert tone="danger">{error}</Alert>}
     </div>
+  );
+}
+
+/**
+ * Elimina la giacenza (testata e righe), solo admin e amministratore cucina. Dopo la conferma (anche se la modifica
+ * è in coda offline) si torna all'elenco delle giacenze.
+ */
+export function DeleteReportButton({ reportId, reportDate }: { reportId: string; reportDate: string }) {
+  const router = useRouter();
+  const day = formatIt(toDate(reportDate), "EEEE d MMMM yyyy");
+
+  return (
+    <ConfirmAction
+      label="Elimina giacenza"
+      variant="danger"
+      title="Eliminare la giacenza?"
+      description={`La giacenza del ${day} e tutte le sue righe verranno eliminate. L’operazione non si può annullare.`}
+      confirmLabel="Elimina definitivamente"
+      pendingLabel="Eliminazione…"
+      run={() =>
+        submitMutation("inventory.deleteInventoryReport", deleteInventoryReport, [reportId], {
+          label: "Giacenza eliminata",
+          entity: { type: "inventory_report", id: reportId },
+        })
+      }
+      onSuccess={() => {
+        router.replace("/admin/giacenza");
+        router.refresh();
+      }}
+    />
   );
 }

@@ -120,6 +120,11 @@ export function canChooseInventoryGrouping(p: Profile): boolean {
   return isAdmin(p) || isKitchenAdmin(p);
 }
 
+/** Eliminazione di un report di giacenza (testata e righe): admin e amministratore cucina. */
+export function canDeleteInventoryReport(p: Profile): boolean {
+  return isAdmin(p) || isKitchenAdmin(p);
+}
+
 /** Gestione del catalogo giacenza (disattivare prodotti) e segnatura dei report come visti: solo admin. */
 export function canManageInventory(p: Profile): boolean {
   return isAdmin(p);
