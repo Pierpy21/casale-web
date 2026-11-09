@@ -44,6 +44,71 @@ export function buildDefaultQuoteLines(input: {
 
 export const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
 
+/** Riga automatica adulti ("<Menù> — adulti"). */
+const isAdultAutoLine = (l: QuoteLine): boolean => /\s—\sadulti$/.test(l.description);
+/** Riga automatica bambini ("Menù bambini" o "Menù bambini — <nome>"). */
+const isKidsAutoLine = (l: QuoteLine): boolean => /^men[uù]\s+bambini\b/i.test(l.description.trim());
+
+/** Menù dell'evento per le righe automatiche: adulti, menù bambini, menù e prezzi effettivi. */
+export interface QuoteAutoInput {
+  adults: number;
+  kids_menus: number;
+  menu: QuoteMenuRef | null;
+  kids_menu: QuoteMenuRef | null;
+}
+
+/**
+ * Allinea le righe automatiche di un ordine di servizio già emesso all'evento (menù aggiunto, cambiato o tolto,
+ * coperti cambiati, prezzo del menù cambiato). Le righe aggiunte a mano restano com'erano, nello stesso ordine.
+ * - Riga adulti / bambini: quantità e descrizione dall'evento; aggiunta se manca (adulti in cima, bambini subito dopo),
+ *   tolta se il menù non c'è più o la quantità è 0.
+ * - Prezzo: se la riga esisteva per lo stesso menù e il prezzo di quel menù non è cambiato (`previous`), resta il prezzo
+ *   della riga (eventuale prezzo scritto a mano nel preventivo); altrimenti il prezzo attuale del menù.
+ * Ritorna null se non cambia nulla.
+ */
+export function syncAutoQuoteLines(
+  lines: QuoteLine[],
+  next: QuoteAutoInput,
+  previous: Pick<QuoteAutoInput, "menu" | "kids_menu"> | null,
+): QuoteLine[] | null {
+  const wanted = buildDefaultQuoteLines(next);
+  const wantedAdult = next.menu && next.adults > 0 ? wanted[0] : null;
+  const wantedKids = next.kids_menu && next.kids_menus > 0 ? wanted[wanted.length - 1] : null;
+
+  const samePrice = (a: QuoteMenuRef | null | undefined, b: QuoteMenuRef | null) =>
+    !!a && !!b && a.name === b.name && round2(a.price_per_person) === round2(b.price_per_person);
+
+  const merge = (current: QuoteLine | undefined, target: QuoteLine, keepPrice: boolean): QuoteLine =>
+    current && keepPrice && current.description === target.description ? { ...target, unit_price: current.unit_price } : target;
+
+  const result: QuoteLine[] = [];
+  let adultDone = false;
+  let kidsDone = false;
+  for (const line of lines) {
+    if (isAdultAutoLine(line)) {
+      if (adultDone || !wantedAdult) continue; // doppione o menù tolto: la riga sparisce
+      result.push(merge(line, wantedAdult, samePrice(previous?.menu, next.menu)));
+      adultDone = true;
+    } else if (isKidsAutoLine(line)) {
+      if (kidsDone || !wantedKids) continue;
+      result.push(merge(line, wantedKids, samePrice(previous?.kids_menu, next.kids_menu)));
+      kidsDone = true;
+    } else {
+      result.push(line);
+    }
+  }
+  if (wantedAdult && !adultDone) result.unshift(wantedAdult);
+  if (wantedKids && !kidsDone) {
+    const adultIndex = result.findIndex(isAdultAutoLine);
+    result.splice(adultIndex + 1, 0, wantedKids);
+  }
+
+  const unchanged =
+    result.length === lines.length &&
+    result.every((l, i) => l.description === lines[i].description && l.quantity === lines[i].quantity && l.unit_price === lines[i].unit_price);
+  return unchanged ? null : result;
+}
+
 /**
  * Totali del preventivo. Prezzi IVA inclusa:
  * subtotal = Σ quantity × unit_price; discount è un importo in EUR (limitato al subtotale);
