@@ -68,7 +68,7 @@ function buildPushPayload(payload: { title: string; body: string; url: string; t
 /** Ruoli esclusi dalle notifiche di una prenotazione: gli appuntamenti non arrivano alla sala. */
 export function excludedRolesFor(kind: BookingKind): Role[] | undefined {
   // Gli appuntamenti riguardano solo l'admin (vedi canSeeAppointments).
-  return kind === "appuntamento" ? ["sala", "cucina"] : undefined;
+  return kind === "appuntamento" ? ["sala", "cucina", "amministratore_cucina"] : undefined;
 }
 
 /** Crea le notifiche in-app per i destinatari e invia il push alle loro sottoscrizioni. Ritorna i destinatari. */

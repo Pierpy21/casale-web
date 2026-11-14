@@ -10,6 +10,7 @@ import {
   SETUP_COLORS,
   TABLE_SHAPES,
 } from "./types";
+import { isKitchenRole } from "./permissions";
 
 // ---------------------------------------------------------------------
 // Limiti
@@ -114,6 +115,32 @@ const finalTotalSchema = z.preprocess(
     .nullable(),
 );
 
+/**
+ * Prezzo a persona del menù per un solo evento (bookings.menu_price). Facoltativo (assente = non modificare);
+ * null, vuoto o 0 = prezzo di catalogo. Virgola o punto accettati ("35,50" → 35.5), 2 decimali.
+ */
+const menuPriceSchema = z
+  .preprocess(
+    (v) => {
+      if (v === null) return null;
+      if (typeof v === "string") {
+        // Formato italiano: "1.250,50" → 1250.50; anche "35,5" e "35.5".
+        const raw = v.trim();
+        if (raw === "") return null;
+        const t = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+        return toNumber(t);
+      }
+      return v;
+    },
+    z
+      .number(numberError("Prezzo del menù non valido"))
+      .min(0, "Il prezzo del menù non può essere negativo")
+      .max(10000, "Prezzo del menù troppo alto (massimo 10.000 € a persona)")
+      .transform(round2)
+      .nullable(),
+  )
+  .optional();
+
 // ---------------------------------------------------------------------
 // Cliente
 // ---------------------------------------------------------------------
@@ -205,6 +232,19 @@ export const CustomMenuInput = z.object({
   price_per_person: priceSchema,
 });
 export type CustomMenuInputType = z.infer<typeof CustomMenuInput>;
+
+/**
+ * Payload di updateBookingDishes: l'elenco piatti (formato originale, coda offline) oppure
+ * `{ dishes, menu_price? }`. `menu_price` presente (anche null) = salva il prezzo del menù dell'evento (null o 0 = catalogo).
+ */
+export const DishesUpdateInput = z.union([
+  DishesInput,
+  z.object({
+    dishes: DishesInput,
+    menu_price: menuPriceSchema,
+  }),
+]);
+export type DishesUpdateInputType = z.infer<typeof DishesUpdateInput>;
 
 // ---------------------------------------------------------------------
 // Coperti (sala e admin)
@@ -348,6 +388,8 @@ const BookingObject = z
     ...coversShape,
     menu_id: optUuid,
     kids_menu_id: optUuid,
+    /** Prezzo a persona del menù solo per questo evento. Assente = non modificare; null o 0 = prezzo di catalogo. Solo admin (l'azione lo scarta per gli altri). */
+    menu_price: menuPriceSchema,
     setup_colors: z.array(z.enum(SETUP_COLORS, { message: "Colore non valido" })).max(MAX_ITEMS).default([]),
     setup_notes: optLongText,
     /** Stato richiesto. Gli eventi lo ricalcolano dagli acconti (vedi lib/booking-status); le normali sono sempre confermate. */
@@ -551,20 +593,20 @@ export const OperatorInput = z
       .pipe(z.email({ message: "Email non valida" }))
       .transform((s) => s.toLowerCase()),
     password: passwordSchema,
-    role: z.enum(["sala", "cucina"], { message: "Ruolo non valido" }),
+    role: z.enum(["sala", "cucina", "amministratore_cucina"], { message: "Ruolo non valido" }),
     is_chef: z.boolean().default(false),
   })
-  .transform((v) => ({ ...v, is_chef: v.role === "cucina" ? v.is_chef : false }));
+  .transform((v) => ({ ...v, is_chef: isKitchenRole(v) ? v.is_chef : false }));
 export type OperatorInputType = z.infer<typeof OperatorInput>;
 
 export const OperatorUpdateInput = z
   .object({
     full_name: z.string().trim().min(2, "Nome troppo corto").max(MAX_TEXT, "Nome troppo lungo"),
-    role: z.enum(["sala", "cucina"], { message: "Ruolo non valido" }),
+    role: z.enum(["sala", "cucina", "amministratore_cucina"], { message: "Ruolo non valido" }),
     is_chef: z.boolean().default(false),
     active: z.boolean(),
   })
-  .transform((v) => ({ ...v, is_chef: v.role === "cucina" ? v.is_chef : false }));
+  .transform((v) => ({ ...v, is_chef: isKitchenRole(v) ? v.is_chef : false }));
 export type OperatorUpdateInputType = z.infer<typeof OperatorUpdateInput>;
 
 // ---------------------------------------------------------------------

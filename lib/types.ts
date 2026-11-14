@@ -1,4 +1,4 @@
-export type Role = "admin" | "sala" | "cucina";
+export type Role = "admin" | "sala" | "cucina" | "amministratore_cucina";
 export type Course = "antipasto" | "primo" | "secondo" | "contorno" | "dolce" | "bevande";
 export type BookingStatus = "opzione" | "confermato" | "saldato" | "annullato";
 
@@ -42,7 +42,10 @@ export interface Booking {
   /** Orario HH:MM: solo per l'appuntamento. Null per evento e prenotazione normale. */
   event_time: string | null;
   room_id: string | null; /** Tavolo (solo prenotazioni normali): null se non assegnato. */ table_number: number | null; adults: number; children: number; kids_menus: number;
-  menu_id: string | null; kids_menu_id: string | null;
+  menu_id: string | null;
+  /** Prezzo a persona del menù solo per questo evento (null = prezzo del menù in catalogo). Solo l'admin lo imposta. */
+  menu_price: number | null;
+  kids_menu_id: string | null;
   /** Piatti dell'evento modificati rispetto al suo menù (scelta dell'admin). Sempre false con menù composto o senza menù. */
   dishes_customized: boolean;
   setup_colors: string[]; setup_notes: string | null;
@@ -103,9 +106,14 @@ export interface ClientSuggestion { id: string; first_name: string; last_name: s
 export interface NextEventBrief { id: string; event_date: string; meal: BookingMeal | null; title: string; }
 /** Slot di occupazione sala per la vista agenda (select minima, senza annullati). */
 export interface RoomBookingSlot { id: string; event_date: string; room_id: string; client_name: string; adults: number; children: number; }
+/**
+ * Menù adulti nel dettaglio prenotazione: `price_per_person` è il prezzo effettivo dell'evento (menu_price se impostato,
+ * altrimenti il catalogo). `catalog_price_per_person` è sempre il prezzo di catalogo (per "prezzo di catalogo" e ripristino).
+ */
+export type BookingDetailMenu = Menu & { catalog_price_per_person?: number };
 export interface BookingDetail extends Booking {
   /** Cliente di rubrica (evento e appuntamento); null per le prenotazioni normali. */
-  client: Client | null; room: Room | null; menu: Menu | null; kids_menu: Menu | null;
+  client: Client | null; room: Room | null; menu: BookingDetailMenu | null; kids_menu: Menu | null;
   dishes: BookingDish[]; allergies: BookingAllergy[];
 }
 export interface BookingChange { id: string; booking_id: string | null; booking_label: string | null; changed_by: string | null; changed_by_name: string; table_name: string; field: string; old_value: string | null; new_value: string | null; created_at: string; }
@@ -150,7 +158,7 @@ export const SETUP_COLOR_HEX: Record<(typeof SETUP_COLORS)[number], string> = {
 };
 export const COURSE_ORDER: Course[] = ["antipasto","primo","secondo","contorno","dolce","bevande"];
 export const COURSE_LABELS: Record<Course, string> = { antipasto: "Antipasto", primo: "Primo", secondo: "Secondo", contorno: "Contorno", dolce: "Dolce", bevande: "Bevande" };
-export const ROLE_LABELS: Record<Role, string> = { admin: "Amministratore", sala: "Sala", cucina: "Cucina" };
+export const ROLE_LABELS: Record<Role, string> = { admin: "Amministratore", sala: "Sala", cucina: "Cucina", amministratore_cucina: "Amministratore cucina" };
 export const STATUS_LABELS: Record<BookingStatus, string> = { opzione: "Attesa", confermato: "Confermato", saldato: "Saldato", annullato: "Annullato" };
 export const STATUS_COLORS: Record<BookingStatus, string> = { opzione: "#A9792B", confermato: "#355A63", saldato: "#4F6B45", annullato: "#9B3B32" };
 

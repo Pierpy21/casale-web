@@ -5,10 +5,10 @@ import { differenceInDays, isValid, parseISO } from "date-fns";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { toISO } from "@/components/agenda/agenda-utils";
-import { BookingAllergiesInput, BookingInput, BookingNoteBody, CoversInput, DishesInput, type DishInputType } from "@/lib/validation";
+import { BookingAllergiesInput, BookingInput, BookingNoteBody, CoversInput, DishesInput, DishesUpdateInput, type DishInputType } from "@/lib/validation";
 import { authorize, dbFail, fail, invalidInput, isRecordId, UserFacingError } from "@/lib/action-utils";
-import { createQuote } from "@/lib/rpc/quotes";
-import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canSeeAppointments, isAdmin } from "@/lib/permissions";
+import { createQuote, eventMenuRefs, syncQuotesWithBooking, type EventMenuRefs } from "@/lib/rpc/quotes";
+import { canAddBookingNote, canAssignRoom, canCreateAnyBooking, canCreateBooking, canEditAllergies, canEditBookingFully, canEditCovers, canEditDishes, canManageQuotesAndPayments, canSeeAppointments, isAdmin } from "@/lib/permissions";
 import { fetchOne, listAll } from "@/lib/pocketbase/queries";
 import { dayEndPb, dayStartPb, nn, toDateOnly, type PbRecord } from "@/lib/pocketbase/helpers";
 import { loadBookingBrief, notifyBookingDeleted, notifyBookingEvent } from "@/lib/notify";
@@ -42,6 +42,34 @@ function revalidateBooking(id?: string, clientId?: string): void {
 function kindOf(record: Record<string, unknown> | null): BookingKind {
   const k = String(record?.kind || "evento");
   return k === "normale" || k === "appuntamento" ? k : "evento";
+}
+
+/**
+ * Menù dell'evento PRIMA di una modifica (prezzi effettivi), da passare a syncQuotesWithBooking. Null se la prenotazione
+ * non è un evento o se la lettura fallisce: in quel caso il riallineamento viene saltato (la modifica resta valida).
+ */
+async function quoteSyncBase(db: PocketBase, before: PbRecord): Promise<EventMenuRefs | null> {
+  if (kindOf(before) !== "evento") return null;
+  try {
+    return await eventMenuRefs(db, before);
+  } catch (err) {
+    console.error("[bookings] menù per gli ordini di servizio non letto:", err);
+    return null;
+  }
+}
+
+/**
+ * Riallinea le righe automatiche degli ordini di servizio dell'evento dopo una modifica (best-effort: un errore
+ * finisce nel log e non cambia l'esito dell'azione). Le pagine dei preventivi cambiati vengono revalidate.
+ */
+async function resyncEventQuotes(db: PocketBase, bookingId: string, previous: EventMenuRefs | null): Promise<void> {
+  if (!previous) return;
+  try {
+    const updated = await syncQuotesWithBooking(db, bookingId, previous);
+    for (const quoteId of updated) revalidatePath(`/admin/preventivi/${quoteId}`);
+  } catch (err) {
+    console.error("[bookings] ordini di servizio non riallineati:", err);
+  }
 }
 
 /**
@@ -171,9 +199,16 @@ export async function createBooking(
           }
         : null;
 
+    // Prezzo proprio del menù: solo admin e solo eventi. Per gli altri (anche l'amministratore cucina) resta 0 = catalogo.
+    // Con il menù composto il prezzo è già quello del menù dell'evento: nessun prezzo proprio.
+    const menuPriceInput = {
+      ...parsed.data,
+      menu_price: isAdmin(auth.profile) && parsed.data.kind === "evento" && !customMenu ? parsed.data.menu_price : undefined,
+    };
+
     let id: string;
     try {
-      id = await upsertBooking(auth.db, parsed.data, null, { id: auth.profile.id, full_name: auth.profile.full_name }, customMenu);
+      id = await upsertBooking(auth.db, menuPriceInput, null, { id: auth.profile.id, full_name: auth.profile.full_name }, customMenu);
     } catch (err) {
       return dbFail(err);
     }
@@ -195,9 +230,11 @@ export async function createBooking(
       }
     }
 
-    // Preventivo (solo eventi, se richiesto). La prenotazione e' gia' salvata: un errore qui e' un avviso, non un annullamento.
+    // Preventivo (solo eventi, se richiesto, solo admin: preventivi e acconti sono economici). Il controllo e' qui, lato server:
+    // la richiesta del client (create_quote / quote) non conta per chi non e' admin. La prenotazione e' gia' salvata:
+    // un errore qui e' un avviso, non un annullamento.
     let quoteId: string | null = null;
-    if (parsed.data.kind === "evento" && parsed.data.create_quote) {
+    if (canManageQuotesAndPayments(auth.profile) && parsed.data.kind === "evento" && parsed.data.create_quote) {
       try {
         quoteId = await createQuote(auth.db, id, { id: auth.profile.id }, parsed.data.quote ?? null);
       } catch (err) {
@@ -236,13 +273,19 @@ export async function updateBooking(id: string, input: unknown, opts?: MutationO
     const conflict = await checkConflict(auth.db, opts, previous);
     if (conflict) return conflict;
 
+    // Prezzo proprio del menù: solo admin (la modifica completa è già solo admin). Assente = resta quello salvato.
+    const menuPriceInput = { ...parsed.data, menu_price: isAdmin(auth.profile) ? parsed.data.menu_price : undefined };
+    // Menù dell'evento prima della modifica: serve a riallineare gli ordini di servizio (menù, coperti, prezzo).
+    const quoteBase = await quoteSyncBase(auth.db, previous);
+
     try {
-      await upsertBooking(auth.db, parsed.data, id, { id: auth.profile.id, full_name: auth.profile.full_name });
+      await upsertBooking(auth.db, menuPriceInput, id, { id: auth.profile.id, full_name: auth.profile.full_name });
     } catch (err) {
       return dbFail(err);
     }
 
     revalidateBooking(id, parsed.data.client_id ?? undefined);
+    await resyncEventQuotes(auth.db, id, quoteBase);
     // Lo stato degli eventi è ricalcolato dal server (acconti): si legge quello salvato.
     const saved = await fetchOne(auth.db, "bookings", id);
     const newStatus = String(saved?.status ?? parsed.data.status);
@@ -308,6 +351,8 @@ export async function updateBookingCovers(id: string, input: unknown, opts?: Mut
 
     const parsed = CoversInput.safeParse(input);
     if (!parsed.success) return invalidInput(parsed.error);
+    // Menù prima della modifica (i coperti non cambiano i menù, ma le quantità delle righe sì).
+    const quoteBase = await quoteSyncBase(auth.db, booking);
 
     try {
       await writeCovers(auth.db, id, parsed.data, { id: auth.profile.id, full_name: auth.profile.full_name });
@@ -316,13 +361,17 @@ export async function updateBookingCovers(id: string, input: unknown, opts?: Mut
     }
 
     revalidateBooking(id);
+    await resyncEventQuotes(auth.db, id, quoteBase);
     const actor = auth.profile;
     after(() => notifyBookingEvent({ type: "covers_updated", bookingId: id, actor }));
     return { ok: true, data: undefined };
   });
 }
 
-/** Piatti: solo admin, e solo per gli eventi (con audit). */
+/**
+ * Piatti (e, facoltativo, prezzo del menù dell'evento): solo admin, e solo per gli eventi (con audit).
+ * `dishes` è l'elenco piatti (formato originale) oppure `{ dishes, menu_price? }`; menu_price presente (anche null) salva il prezzo, null o 0 = catalogo.
+ */
 export async function updateBookingDishes(id: string, dishes: unknown, opts?: MutationOptions): Promise<ActionResult> {
   if (!isRecordId(id)) return fail("Prenotazione non valida.");
   const auth = await authorize(canEditDishes, "Solo l'amministratore può modificare i piatti.");
@@ -335,21 +384,29 @@ export async function updateBookingDishes(id: string, dishes: unknown, opts?: Mu
     const conflict = await checkConflict(auth.db, opts, booking);
     if (conflict) return conflict;
 
-    const parsed = DishesInput.safeParse(dishes);
+    const parsed = DishesUpdateInput.safeParse(dishes);
     if (!parsed.success) return invalidInput(parsed.error);
+    const payload = parsed.data;
+    const dishList = Array.isArray(payload) ? payload : payload.dishes;
+    // Undefined = prezzo non indicato (non si tocca); null = torna al catalogo (salvato come 0).
+    const menuPrice = Array.isArray(payload) ? undefined : payload.menu_price;
+    // Il riallineamento dei preventivi serve solo se cambia il prezzo del menù: menù dell'evento prima della modifica.
+    const quoteBase = menuPrice !== undefined ? await quoteSyncBase(auth.db, booking) : null;
 
     try {
       await saveBookingDishes(
         auth.db,
         id,
-        parsed.data.map((d, index) => ({ ...d, sort: index })),
+        dishList.map((d, index) => ({ ...d, sort: index })),
         { id: auth.profile.id, full_name: auth.profile.full_name },
+        menuPrice,
       );
     } catch (err) {
       return dbFail(err);
     }
 
     revalidateBooking(id);
+    await resyncEventQuotes(auth.db, id, quoteBase);
     const actor = auth.profile;
     after(() => notifyBookingEvent({ type: "dishes_updated", bookingId: id, actor }));
     return { ok: true, data: undefined };
@@ -418,7 +475,7 @@ export async function assignBookingRoom(bookingId: string, roomId: string | null
   if (!isRecordId(bookingId)) return fail("Prenotazione non valida.");
   if (roomId !== null && !isRecordId(roomId)) return fail("Sala non valida.");
   const auth = await authorize(
-    (p) => isAdmin(p) || (p.active && p.role === "sala"),
+    (p) => canAssignRoom(p, "normale"),
     "Non sei autorizzato ad assegnare la sala.",
   );
   if (!auth.ok) return auth;

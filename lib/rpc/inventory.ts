@@ -1,5 +1,6 @@
 import "server-only";
 import type PocketBase from "pocketbase";
+import { ClientResponseError } from "pocketbase";
 import { UserFacingError } from "@/lib/action-utils";
 import {
   DEFAULT_INVENTORY_CATEGORY,
@@ -12,7 +13,7 @@ import {
   type InventoryToOrderCount,
 } from "@/lib/inventory-utils";
 import { mapInventorySupplier } from "@/lib/pocketbase/mappers";
-import { dayStartPb, generateRecordId, nn, num, type PbRecord } from "@/lib/pocketbase/helpers";
+import { chunk, dayStartPb, generateRecordId, nn, num, type PbRecord } from "@/lib/pocketbase/helpers";
 import { countWhere, fetchOne, listAll } from "@/lib/pocketbase/queries";
 import type { InventoryReportInputType, InventoryProductUpdateInputType } from "@/lib/validation";
 import type { InventoryCategory, InventorySupplier } from "@/lib/types";
@@ -400,4 +401,42 @@ export async function markReportSeen(db: PocketBase, id: string, actor: Inventor
     seen_by: actor.id,
     seen_at: new Date().toISOString(),
   });
+}
+
+/** Url delle notifiche di un report (stesso formato usato da submitInventoryReport e updateInventoryReport). */
+function reportNotificationUrl(reportId: string): string {
+  return `/admin/giacenza/${reportId}`;
+}
+
+/**
+ * Elimina un report di giacenza. Le righe vanno con lui (relazione `report` con cascadeDelete).
+ * Report mancante (anche se sparito durante la richiesta) → `deleted: false`, senza errore: idempotente per la coda offline.
+ * Le notifiche che puntano al report si eliminano dopo, best-effort: un errore si logga e non fa fallire l'eliminazione.
+ */
+export async function deleteReport(db: PocketBase, id: string): Promise<{ deleted: boolean }> {
+  const report = await fetchOne(db, "inventory_reports", id);
+  if (!report) return { deleted: false };
+  try {
+    await db.collection("inventory_reports").delete(id);
+  } catch (err) {
+    if (err instanceof ClientResponseError && err.status === 404) return { deleted: false };
+    throw err;
+  }
+  await deleteReportNotifications(db, id);
+  return { deleted: true };
+}
+
+/** Elimina le notifiche in-app che puntano al report. Best-effort: non lancia. */
+async function deleteReportNotifications(db: PocketBase, reportId: string): Promise<void> {
+  try {
+    const rows = await listAll(db, "notifications", db.filter("url = {:u}", { u: reportNotificationUrl(reportId) }), { fields: "id" });
+    // Gruppi piccoli: ogni richiesta della batch conta nel rate limit di PocketBase.
+    for (const group of chunk(rows.map((r) => r.id), 20)) {
+      const batch = db.createBatch();
+      for (const notificationId of group) batch.collection("notifications").delete(notificationId);
+      await batch.send();
+    }
+  } catch (err) {
+    console.error(`[inventory] notifiche del report ${reportId} non eliminate:`, err);
+  }
 }

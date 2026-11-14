@@ -113,8 +113,13 @@ export async function bookingListItems(db: PocketBase, records: PbRecord[]): Pro
       // Prenotazioni normali (ospite sulla prenotazione): nessun cliente.
       client: client ? listClient(mapClient(client)) : null,
       room: room ? mapRoom(room) : null,
+      // Prezzo effettivo dell'evento: il prezzo proprio della prenotazione (menu_price) oppure quello di catalogo.
       menu: menu
-        ? { id: menu.id, name: String(menu.name ?? ""), price_per_person: Number(menu.price_per_person ?? 0) }
+        ? {
+            id: menu.id,
+            name: String(menu.name ?? ""),
+            price_per_person: b.menu_price ?? Number(menu.price_per_person ?? 0),
+          }
         : null,
       kids_menu: kidsMenu
         ? { id: kidsMenu.id, name: String(kidsMenu.name ?? "") }
@@ -138,12 +143,19 @@ export async function bookingDetail(db: PocketBase, record: PbRecord): Promise<B
   ]);
   const client = record.expand?.client as PbRecord | undefined;
   const room = record.expand?.room as PbRecord | undefined;
+  const catalogMenu = b.menu_id ? menusById.get(b.menu_id) ?? null : null;
 
   return {
     ...b,
     client: client ? mapClient(client) : null,
     room: room ? mapRoom(room) : null,
-    menu: b.menu_id ? menusById.get(b.menu_id) ?? null : null,
+    menu: catalogMenu
+      ? {
+          ...catalogMenu,
+          price_per_person: b.menu_price ?? catalogMenu.price_per_person,
+          catalog_price_per_person: catalogMenu.price_per_person,
+        }
+      : null,
     kids_menu: b.kids_menu_id ? menusById.get(b.kids_menu_id) ?? null : null,
     dishes: sortDishes(dishRecords.map(mapDish)),
     allergies: allergyRecords.map(mapAllergy),

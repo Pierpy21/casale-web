@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { todayISO } from "@/components/agenda/agenda-utils";
 import { InventoryHistory, type InventoryHistoryRow } from "@/components/inventory/InventoryHistory";
+import { InventoryGroupingToggle, resolveInventoryGrouping } from "@/components/inventory/InventoryGroupingToggle";
 import { InventoryReportForm } from "@/components/inventory/InventoryReportForm";
 import { ButtonLink, PageHeader } from "@/components/ui";
 import { requireProfile } from "@/lib/auth";
 import { getInventoryProducts, getInventoryReport, getInventoryReports, getInventorySuppliers } from "@/lib/data/inventory";
-import { canManageInventory, canUseInventory } from "@/lib/permissions";
+import { canChooseInventoryGrouping, canManageInventory, canUseInventory } from "@/lib/permissions";
 import { countToOrderBySupplier, formatToOrderSummary, mergeReportLines } from "@/lib/inventory-utils";
 
 export const metadata: Metadata = {
@@ -16,13 +17,14 @@ export const metadata: Metadata = {
 const PER_PAGE = 10;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-type SearchParams = Promise<{ page?: string; from?: string; to?: string }>;
+type SearchParams = Promise<{ page?: string; from?: string; to?: string; raggruppa?: string }>;
 
 export default async function InventoryPage({ searchParams }: { searchParams: SearchParams }) {
   const profile = await requireProfile();
   if (!canUseInventory(profile)) redirect("/admin/agenda");
 
   const params = await searchParams;
+  const grouping = resolveInventoryGrouping(profile, params.raggruppa);
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
   const from = params.from && ISO_DATE.test(params.from) ? params.from : undefined;
   const to = params.to && ISO_DATE.test(params.to) ? params.to : undefined;
@@ -72,12 +74,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
             Nuova giacenza
           </h2>
         </div>
-        <InventoryReportForm
-          products={products}
-          suppliers={suppliers}
-          today={todayISO()}
-          groupBy={canManageInventory(profile) ? "supplier" : "category"}
-        />
+        {canChooseInventoryGrouping(profile) && <InventoryGroupingToggle grouping={grouping} basePath="/admin/giacenza" />}
+        <InventoryReportForm products={products} suppliers={suppliers} today={todayISO()} groupBy={grouping} />
       </section>
 
       <InventoryHistory

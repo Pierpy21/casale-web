@@ -196,12 +196,15 @@ export function EventForm({
   const [clientId, setClientId] = useState<string | null>(booking?.client_id ?? null);
   const [newClient, setNewClient] = useState<NewClientDraft>(prefill ?? { full_name: "", phone: "", email: "" });
   const [linkedClient, setLinkedClient] = useState<ClientSuggestion | null>(null);
-  const [createQuote, setCreateQuote] = useState(true);
+  // Il preventivo si crea solo per l'admin: sala e amministratore cucina creano l'evento senza parte economica.
+  const [createQuote, setCreateQuote] = useState(isAdmin);
   const [quote, setQuote] = useState<QuoteDraft>(EMPTY_QUOTE_DRAFT);
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
   // Solo creazione: piatti personalizzati per questo evento (null = copia del menù scelto). Il catalogo non cambia.
   const [customDishes, setCustomDishes] = useState<DishPayload[] | null>(null);
+  // Stesso ciclo di customDishes: prezzo a persona del menù solo per questo evento (null = prezzo di catalogo).
+  const [customMenuPrice, setCustomMenuPrice] = useState<number | null>(null);
   const [dishesEditorOpen, setDishesEditorOpen] = useState(false);
   // Solo creazione, admin: menù composto per questo evento (null = non scelto). I piatti stanno in customDishes.
   const composedAllowed = !isEdit && isAdmin;
@@ -212,6 +215,10 @@ export function EventForm({
   const [depositErrors, setDepositErrors] = useState<DraftErrors>({});
   const depositAllowed = !isEdit && isAdmin;
   const depositActive = depositAllowed && depositOpen;
+  // Preventivo (creazione, solo admin): prezzi e pannello economico. Sala e amministratore cucina non li vedono.
+  const showQuote = !isEdit && isAdmin;
+  // Piatti personalizzati per l'evento in creazione: solo admin (il server li accetta solo da lui).
+  const canCustomizeDishes = !isEdit && isAdmin;
 
   /** Ogni modifica dell'utente toglie gli errori visibili: si ricalcolano alla prossima pressione di "salva". */
   const change = (changes: Partial<EventValues>) => {
@@ -259,13 +266,17 @@ export function EventForm({
   const roomOptions = rooms.filter((r) => r.active || r.id === values.room_id);
   const selectedMenu = menus.find((m) => m.id === values.menu_id) ?? null;
   const selectedKidsMenu = menus.find((m) => m.id === values.kids_menu_id) ?? null;
+  // Prezzo a persona del menù scelto per questo evento: quello personalizzato (solo admin) o quello di catalogo.
+  const eventMenuPrice = selectedMenu ? (customMenuPrice ?? selectedMenu.price_per_person) : 0;
   // Menù composto: il preventivo usa nome e prezzo inseriti (senza prezzo valido non c'è riga automatica).
   const composedPrice = composed ? parseAmount(composed.price) : Number.NaN;
   const quoteMenu: QuoteMenuRef | null = composed
     ? Number.isFinite(composedPrice) && composedPrice >= 0
       ? { name: composed.name.trim() || COMPOSED_MENU_NAME, price_per_person: composedPrice }
       : null
-    : selectedMenu;
+    : selectedMenu
+      ? { ...selectedMenu, price_per_person: eventMenuPrice }
+      : null;
   const autoLines = autoQuoteLines(
     {
       adults: values.adults,
@@ -308,6 +319,7 @@ export function EventForm({
     setComposed(null);
     setCustomDishes(null);
     resetAdultPrice();
+    setCustomMenuPrice(null);
   };
   // Menù composto: nessun menù dell'elenco. Nome, prezzo e piatti si inseriscono sotto la scelta, partendo da zero.
   const selectComposed = () => {
@@ -316,10 +328,17 @@ export function EventForm({
     setComposed({ name: "", price: "" });
     setCustomDishes(null);
     resetAdultPrice();
+    setCustomMenuPrice(null);
   };
   const changeComposed = (changes: Partial<ComposedMenuDraft>) => {
     setErrors({});
     setComposed((c) => (c ? { ...c, ...changes } : c));
+  };
+  /** Prezzo a persona sulla card del menù adulti (solo admin): per il menù scelto, quello dell'evento. */
+  const adultMenuPriceLabel = (menu: Menu) => {
+    if (!isAdmin) return undefined;
+    if (menu.id !== values.menu_id) return `${formatEUR(menu.price_per_person)} a persona`;
+    return `${formatEUR(eventMenuPrice)} a persona${customMenuPrice !== null ? " · prezzo personalizzato" : ""}`;
   };
   const menuDishes: DishPayload[] = (selectedMenu?.items ?? [])
     .slice()
@@ -410,6 +429,8 @@ export function EventForm({
       kids_menus: values.kids_menus,
       menu_id: values.menu_id,
       kids_menu_id: values.kids_menu_id,
+      // Prezzo del menù solo per questo evento: solo admin in creazione (null = catalogo).
+      ...(canCustomizeDishes ? { menu_price: customMenuPrice } : {}),
       setup_colors: values.setup_colors,
       setup_notes: values.setup_notes.trim() || null,
       status: values.status,
@@ -515,7 +536,7 @@ export function EventForm({
 
       {formError && <Alert tone="danger">{formError}</Alert>}
 
-      <div className={cn("grid min-w-0 gap-6", !isEdit && "deskxl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] deskxl:items-start")}>
+      <div className={cn("grid min-w-0 gap-6", showQuote && "deskxl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] deskxl:items-start")}>
         <div className="flex min-w-0 flex-col gap-6">
           <FormCard>
             <ClientSection
@@ -644,11 +665,11 @@ export function EventForm({
                     key={menu.id}
                     name="menu_id"
                     title={menu.name}
-                    price={`${formatEUR(menu.price_per_person)} a persona`}
+                    price={adultMenuPriceLabel(menu)}
                     items={values.menu_id === menu.id && customDishes ? customPreview : menu.items}
                     checked={values.menu_id === menu.id}
                     onSelect={() => selectMenu(menu.id)}
-                    onEdit={isEdit ? undefined : () => setDishesEditorOpen(true)}
+                    onEdit={canCustomizeDishes ? () => setDishesEditorOpen(true) : undefined}
                     customized={values.menu_id === menu.id && customDishes !== null}
                     onReset={() => setCustomDishes(null)}
                   />
@@ -742,7 +763,7 @@ export function EventForm({
                     key={menu.id}
                     name="kids_menu_id"
                     title={menu.name}
-                    price={`${formatEUR(menu.price_per_person)} a bambino`}
+                    price={isAdmin ? `${formatEUR(menu.price_per_person)} a bambino` : undefined}
                     items={menu.items}
                     checked={values.kids_menu_id === menu.id}
                     onSelect={() => change({ kids_menu_id: menu.id })}
@@ -753,11 +774,13 @@ export function EventForm({
               {first(errors.kids_menu_id) && <p className="text-[13px] text-danger">{first(errors.kids_menu_id)}</p>}
             </div>
 
-            <p className="rounded-btn bg-cream/70 px-4 py-3 text-[14px] leading-relaxed text-slate-dark">
-              {isEdit
-                ? "Cambiando menù, i piatti dell’evento vengono riallineati al nuovo menù. Le personalizzazioni si gestiscono dalla pagina della prenotazione."
-                : "Con la matita sul menù selezionato cambi i piatti solo per questo evento: il menù in catalogo non cambia."}
-            </p>
+            {(isEdit || isAdmin) && (
+              <p className="rounded-btn bg-cream/70 px-4 py-3 text-[14px] leading-relaxed text-slate-dark">
+                {isEdit
+                  ? "Cambiando menù, i piatti dell’evento vengono riallineati al nuovo menù. Le personalizzazioni si gestiscono dalla pagina della prenotazione."
+                  : "Con la matita sul menù selezionato cambi i piatti solo per questo evento: il menù in catalogo non cambia."}
+              </p>
+            )}
 
             {/* Portale nel body: l'editor è un form e non può stare dentro il form dell'evento. */}
             {dishesEditorOpen &&
@@ -774,7 +797,11 @@ export function EventForm({
                     hasMenu={false}
                     catalog={dishCatalog}
                     submitLabel="Applica piatti"
-                    onApply={(dishes) => setCustomDishes(dishes)}
+                    price={canCustomizeDishes && selectedMenu ? { value: customMenuPrice, catalog: selectedMenu.price_per_person } : undefined}
+                    onApply={(dishes, menuPrice) => {
+                      setCustomDishes(dishes);
+                      if (menuPrice !== undefined) setCustomMenuPrice(menuPrice);
+                    }}
                     onClose={() => setDishesEditorOpen(false)}
                   />
                 </Modal>,
@@ -856,7 +883,7 @@ export function EventForm({
           )}
         </div>
 
-        {!isEdit && (
+        {showQuote && (
           <div className="min-w-0 deskxl:sticky deskxl:top-6">
             <QuotePanel
               enabled={createQuote}

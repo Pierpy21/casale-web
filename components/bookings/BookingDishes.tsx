@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui";
 import type { BookingDish, Dish } from "@/lib/types";
 import { CourseList } from "./MenuPreview";
-import { DishesEditor } from "./DishesEditor";
+import { DishesEditor, type DishesMenuPrice } from "./DishesEditor";
 
 export interface BookingDishesProps {
   bookingId: string;
@@ -16,6 +16,8 @@ export interface BookingDishesProps {
   catalog: Dish[];
   /** `updated_at` della prenotazione letto con la pagina (controllo di conflitto offline). */
   expectedUpdated?: string;
+  /** Prezzo del menù per questo evento (solo admin, dalla pagina): se passato l'editor mostra la sezione prezzo. */
+  price?: DishesMenuPrice;
 }
 
 /**
@@ -23,7 +25,7 @@ export interface BookingDishesProps {
  * l'editor; "Annulla" o "Salva piatti" lo chiudono. L'editor è montato solo mentre è aperto,
  * quindi ogni apertura parte dai dati salvati sul server.
  */
-export function BookingDishes({ bookingId, dishes, hasMenu, canEdit, catalog, expectedUpdated }: BookingDishesProps) {
+export function BookingDishes({ bookingId, dishes, hasMenu, canEdit, catalog, expectedUpdated, price }: BookingDishesProps) {
   const [editing, setEditing] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [queuedNotice, setQueuedNotice] = useState(false);
@@ -45,6 +47,7 @@ export function BookingDishes({ bookingId, dishes, hasMenu, canEdit, catalog, ex
         hasMenu={hasMenu}
         catalog={catalog}
         expectedUpdated={expectedUpdated}
+        price={price}
         onClose={(saved) => {
           setEditing(false);
           setSavedNotice(saved);

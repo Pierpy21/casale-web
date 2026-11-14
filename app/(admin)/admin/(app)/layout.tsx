@@ -17,9 +17,13 @@ import { todayISO } from "@/components/agenda/agenda-utils";
 import { getNotifications, getUnreadCount } from "@/lib/data/notifications";
 import { getMenuColors } from "@/lib/data/catalog";
 import { getUpcomingBookingIds } from "@/lib/data/bookings";
+import type { BookingKind } from "@/lib/types";
 
 /** Giorni di prenotazioni da tenere disponibili offline. */
 const WARM_DAYS = 14;
+
+/** Tipi di prenotazione, nell'ordine di creazione (Prenotazione, Evento, Appuntamento). */
+const BOOKING_KINDS: BookingKind[] = ["normale", "evento", "appuntamento"];
 
 export default async function AppLayout({
   children,
@@ -40,8 +44,7 @@ export default async function AppLayout({
     ...(isAdmin(profile) ? ["/admin/dashboard", "/admin/clienti", "/admin/catalogo"] : []),
     ...(canUseInventory(profile) ? ["/admin/giacenza"] : []),
     // Pagine di creazione senza data: offline il service worker le usa per qualsiasi data (vedi NewBookingForm).
-    ...(["normale", "evento", "appuntamento"] as const)
-      .filter((kind) => canCreateBooking(profile, kind))
+    ...BOOKING_KINDS.filter((kind) => canCreateBooking(profile, kind))
       .map((kind) => `/admin/prenotazioni/nuova?tipo=${kind}`),
     // Anteprime dei fogli della settimana (foglio eventi per admin e cucina, foglio prenotazioni per admin e sala).
     ...(canViewEventSheet(profile) ? buildSheetWarmUrls(today, "/api/events") : []),
@@ -82,8 +85,10 @@ export default async function AppLayout({
             </main>
 
             <BottomNav items={links} />
-            {/* Pulsante + per admin e sala (la cucina non crea prenotazioni). */}
-            {canCreateAnyBooking(profile) && <CreateBookingFab canCreateEvent={isAdmin(profile)} />}
+            {/* Pulsante + per admin, sala e amministratore cucina (la cucina non crea prenotazioni). */}
+            {canCreateAnyBooking(profile) && (
+              <CreateBookingFab kinds={BOOKING_KINDS.filter((kind) => canCreateBooking(profile, kind))} />
+            )}
             {/* Pillola della coda offline: fissa, fuori dal flusso della griglia. */}
             <SyncStatus />
             <InstallPrompt />

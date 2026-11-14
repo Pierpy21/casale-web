@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { capitalize, formatIt, toDate, todayISO } from "@/components/agenda/agenda-utils";
+import { InventoryGroupingToggle, resolveInventoryGrouping } from "@/components/inventory/InventoryGroupingToggle";
 import { InventoryReportForm } from "@/components/inventory/InventoryReportForm";
 import type { InventoryDraftCount } from "@/components/inventory/inventory-draft";
 import { isUuid } from "@/lib/action-utils";
 import { requireProfile } from "@/lib/auth";
 import { getInventoryProducts, getInventoryReport, getInventorySuppliers } from "@/lib/data/inventory";
 import { compareInventoryProducts } from "@/lib/inventory-utils";
-import { canEditInventoryReport, canManageInventory, canUseInventory } from "@/lib/permissions";
+import { canChooseInventoryGrouping, canEditInventoryReport, canUseInventory } from "@/lib/permissions";
 import type { InventoryProduct } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -16,12 +17,19 @@ export const metadata: Metadata = {
 };
 
 /** Modifica di un report già inviato: stesso modulo della nuova giacenza, compilato con le righe salvate. */
-export default async function EditInventoryReportPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditInventoryReportPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ raggruppa?: string }>;
+}) {
   const profile = await requireProfile();
   if (!canUseInventory(profile)) redirect("/admin/agenda");
 
   const { id } = await params;
   if (!isUuid(id)) notFound();
+  const grouping = resolveInventoryGrouping(profile, (await searchParams).raggruppa);
 
   const [report, activeProducts, suppliers] = await Promise.all([
     getInventoryReport(id),
@@ -67,11 +75,12 @@ export default async function EditInventoryReportPage({ params }: { params: Prom
           {capitalize(formatIt(toDate(report.report_date), "EEEE d MMMM yyyy"))}
         </h1>
       </header>
+      {canChooseInventoryGrouping(profile) && <InventoryGroupingToggle grouping={grouping} basePath={`/admin/giacenza/${report.id}/modifica`} />}
       <InventoryReportForm
         products={products}
         suppliers={suppliers}
         today={todayISO()}
-        groupBy={canManageInventory(profile) ? "supplier" : "category"}
+        groupBy={grouping}
         edit={{ reportId: report.id, reportDate: report.report_date, notes: report.notes ?? "", counts }}
       />
     </div>

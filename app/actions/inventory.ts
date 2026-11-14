@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authorize, dbFail, fail, invalidInput, isRecordId } from "@/lib/action-utils";
-import { canEditInventoryReport, canManageInventory, canUseInventory, isAdmin } from "@/lib/permissions";
+import { canDeleteInventoryReport, canEditInventoryReport, canManageInventory, canUseInventory, isAdmin } from "@/lib/permissions";
 import { getInventoryProducts, getInventoryReport, getInventoryReports, getInventorySuppliers } from "@/lib/data/inventory";
 import { formatToOrderSummary, type InventoryToOrderCount } from "@/lib/inventory-utils";
 import { checkConflictById, withMutation } from "@/lib/mutations";
@@ -15,6 +15,7 @@ import {
   InventoryNameTakenError,
   createSupplier,
   deactivateProduct,
+  deleteReport,
   ensureProduct,
   markReportSeen,
   removeSupplier,
@@ -412,5 +413,29 @@ export async function markInventoryReportSeen(id: string, opts?: MutationOptions
     }
     revalidateInventory();
     return { ok: true, data: undefined };
+  });
+}
+
+/**
+ * Elimina un report di giacenza con le sue righe e le notifiche che lo riguardano. Admin e amministratore cucina.
+ * Coda offline: report già eliminato (anche nel reinvio) = `deleted: false`, non un errore.
+ */
+export async function deleteInventoryReport(id: string, opts?: MutationOptions): Promise<ActionResult<{ deleted: boolean }>> {
+  if (!isRecordId(id)) return fail("Report non valido.");
+  const auth = await authorize(canDeleteInventoryReport, "Solo l'amministratore e l'amministratore cucina possono eliminare una giacenza.");
+  if (!auth.ok) return auth;
+
+  return withMutation(auth.db, opts, "inventory.deleteInventoryReport", auth.profile.id, async (): Promise<ActionResult<{ deleted: boolean }>> => {
+    const conflict = await checkConflictById(auth.db, "inventory_reports", id, opts);
+    if (conflict) return conflict;
+
+    try {
+      const result = await deleteReport(auth.db, id);
+      revalidateInventory();
+      revalidatePath(`/admin/giacenza/${id}`);
+      return { ok: true, data: result };
+    } catch (err) {
+      return dbFail(err);
+    }
   });
 }

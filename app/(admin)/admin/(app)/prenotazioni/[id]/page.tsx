@@ -30,7 +30,7 @@ import { PaymentsPanel } from "@/components/payments/PaymentsPanel";
 import { PendingChanges } from "@/components/offline/PendingChanges";
 import { Alert, Badge, ButtonLink, Card, Disclosure, PhoneLink, StatusBadge, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
-import { canAddBookingNote, canEditAllergies, canEditCovers, canEditDishes, isAdmin } from "@/lib/permissions";
+import { canAddBookingNote, canEditAllergies, canEditCovers, canEditDishes, isAdmin, isKitchenRole, canSeeClientPhone } from "@/lib/permissions";
 import { requireProfile } from "@/lib/auth";
 import { getBooking, getBookingChanges, getBookingNotes } from "@/lib/data/bookings";
 import { getPayments } from "@/lib/data/payments";
@@ -66,7 +66,8 @@ export default async function BookingDetailPage({
   const covers = canEditCovers(profile);
   const dishesEditable = canEditDishes(profile);
   const allergiesEditable = canEditAllergies(profile, booking.kind);
-  const kitchen = profile.role === "cucina";
+  const kitchen = isKitchenRole(profile);
+  const showPhone = canSeeClientPhone(profile);
   // Preventivi, acconti e prezzi esistono solo per gli eventi, e si gestiscono solo dall'admin.
   const isEvent = booking.kind === "evento";
   // Tavolo: solo per le prenotazioni normali, solo se assegnato.
@@ -134,7 +135,9 @@ export default async function BookingDetailPage({
         key: "expected",
         label: "Totale previsto",
         value: formatEUR(finance.expected_total),
-        hint: booking.menu ? `${formatEUR(booking.menu.price_per_person)} a persona` : "Menù non scelto",
+        hint: booking.menu
+          ? `${formatEUR(booking.menu.price_per_person)} a persona${booking.menu_price !== null ? " (personalizzato)" : ""}`
+          : "Menù non scelto",
         panel: "prezzo",
         cta: "Vedi prezzo",
       });
@@ -221,7 +224,16 @@ export default async function BookingDetailPage({
           ? "pagamenti"
           : null;
 
-  const menuPrice = admin && booking.menu ? formatEUR(booking.menu.price_per_person) : null;
+  // Prezzo a persona effettivo del menù (proprio dell'evento o di catalogo), con la nota se è personalizzato.
+  const menuPrice =
+    admin && booking.menu
+      ? `${formatEUR(booking.menu.price_per_person)} a persona${booking.menu_price !== null ? " (personalizzato)" : ""}`
+      : null;
+  // Editor dei piatti: prezzo dell'evento solo per l'admin (con un menù scelto), prezzo di catalogo per il ripristino.
+  const dishesPrice =
+    admin && booking.menu
+      ? { value: booking.menu_price, catalog: booking.menu.catalog_price_per_person ?? booking.menu.price_per_person }
+      : undefined;
 
   // Riepilogo sempre visibile della tendina "Dettagli e menù".
   const detailsSummary = (
@@ -250,7 +262,7 @@ export default async function BookingDetailPage({
             )}
           </SummaryItem>
         )}
-        {menuPrice && <SummaryItem label="Costo">{`${menuPrice} a persona`}</SummaryItem>}
+        {menuPrice && <SummaryItem label="Costo">{menuPrice}</SummaryItem>}
       </span>
     </span>
   );
@@ -286,7 +298,7 @@ export default async function BookingDetailPage({
             )}
           </div>
           {/* Telefono subito sotto il nome: chiamata, WhatsApp e copia senza scendere alla sezione Cliente. */}
-          {!kitchen && phone && <PhoneLink phone={phone} className="-my-1 text-[16px]" />}
+          {showPhone && phone && <PhoneLink phone={phone} className="-my-1 text-[16px]" />}
           <div className="flex flex-wrap items-center gap-3">
             <KindBadge kind={booking.kind} />
             <StatusBadge status={booking.status} />
@@ -337,7 +349,7 @@ export default async function BookingDetailPage({
                   ) : (
                     <p className="font-serif text-2xl text-slate-dark">Menù non selezionato</p>
                   )}
-                  {menuPrice && <p className="text-[15px] tabular-nums text-slate-dark">{menuPrice} a persona</p>}
+                  {menuPrice && <p className="text-[15px] tabular-nums text-slate-dark">{menuPrice}</p>}
                 </div>
               </header>
 
@@ -348,6 +360,7 @@ export default async function BookingDetailPage({
                 canEdit={dishesEditable}
                 catalog={catalog}
                 expectedUpdated={booking.updated_at}
+                price={dishesPrice}
               />
 
               {booking.kids_menu && (
@@ -375,7 +388,7 @@ export default async function BookingDetailPage({
               </h3>
             </div>
             <dl className="flex min-w-0 flex-col gap-4">
-              {!kitchen && phone && (
+              {showPhone && phone && (
                 <InfoRow label="Telefono">
                   {/* -my-3: il link alto 44 px (tocco) resta sulla riga dell'etichetta. */}
                   <PhoneLink phone={phone} whatsapp={false} className="-my-3" />
@@ -406,7 +419,7 @@ export default async function BookingDetailPage({
               )}
             </dl>
             <div className="no-print flex flex-wrap gap-3">
-              {!kitchen && phone && (
+              {showPhone && phone && (
                 <>
                   <a href={telHref(phone)} className={CALL_BUTTON}>
                     <Phone aria-hidden="true" className="size-4" />

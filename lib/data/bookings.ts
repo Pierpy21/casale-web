@@ -7,7 +7,7 @@ import { isRecordId, dayEndPb, dayStartPb, nn, num, toDateOnly, type PbRecord } 
 import { mapChange, mealOf } from "@/lib/pocketbase/mappers";
 import { listAll, listByParents, fetchOne } from "@/lib/pocketbase/queries";
 import { addDaysISO, monthBounds, romeToday } from "@/lib/dates";
-import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, canViewStats, isAdmin } from "@/lib/permissions";
+import { canAssignRoom, canSeeAppointments, canViewActivityLog, canViewEventSheet, canViewStats, isAdmin, isKitchenRole, canSeeClientPhone } from "@/lib/permissions";
 import { mondayOf } from "@/lib/stats-period";
 import {
   BOOKING_KINDS,
@@ -51,34 +51,43 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** Campo di audit del prezzo finale evento: visibile solo all'admin (sala e cucina non devono vederlo). */
 const PRICE_FIELD = "Prezzo finale";
 
-type WithMenus = { menu?: object | null; kids_menu?: object | null };
+type WithMenus = { menu?: object | null; kids_menu?: object | null; menu_price?: number | null };
 
-/** Se il menù porta `price_per_person` lo azzera a 0 (le liste portano solo il nome del menù bambini). */
+/**
+ * Se il menù porta `price_per_person` lo azzera a 0 (le liste portano solo il nome del menù bambini);
+ * azzera anche `catalog_price_per_person` (dettaglio prenotazione).
+ */
 function zeroPrice<M extends object>(m: M): M {
-  return "price_per_person" in m ? { ...m, price_per_person: 0 } : m;
+  if (!("price_per_person" in m)) return m;
+  const zeroed = { ...m, price_per_person: 0 };
+  return "catalog_price_per_person" in zeroed ? { ...zeroed, catalog_price_per_person: 0 } : zeroed;
 }
 
 /**
- * Azzera i prezzi dei menù (adulti e bambini) per i ruoli non admin, prima che il dato esca dal server.
- * Il campo resta presente con valore 0 così i tipi non cambiano.
+ * Azzera i prezzi dei menù (adulti e bambini) e il prezzo proprio dell'evento (menu_price) per i ruoli non admin,
+ * prima che il dato esca dal server. Il campo resta presente con valore 0 (o null) così i tipi non cambiano.
  */
-function zeroMenuPrices<T extends WithMenus>(item: T): T {
+export function zeroMenuPrices<T extends WithMenus>(item: T): T {
   return {
     ...item,
     ...(item.menu ? { menu: zeroPrice(item.menu) } : {}),
     ...(item.kids_menu ? { kids_menu: zeroPrice(item.kids_menu) } : {}),
+    ...("menu_price" in item ? { menu_price: null } : {}),
   };
 }
 
 /**
  * La cucina non riceve dati di contatto: telefono ed email del cliente, e il cellulare dell'ospite, azzerati.
+ * L'amministratore cucina riceve i telefoni (cliente e ospite) ma non l'email.
  * Il nome resta (serve in cucina). Il campo resta presente con valore vuoto o null.
  */
 function hideKitchenPhone<T extends { client: { phone: string; email?: string | null } | null; guest_phone: string | null }>(
   item: T,
   me: Profile,
 ): T {
-  if (me.role !== "cucina") return item;
+  if (!isKitchenRole(me)) return item;
+  // L'amministratore cucina vede il telefono (cliente e ospite), non l'email; la cucina semplice nessuno dei due.
+  if (canSeeClientPhone(me)) return { ...item, client: item.client ? { ...item.client, email: null } : null };
   const client = item.client ? { ...item.client, phone: "", email: null } : null;
   return { ...item, client, guest_phone: null };
 }

@@ -6,11 +6,14 @@ import { resetDishesFromMenu, updateBookingDishes } from "@/app/actions/bookings
 import { CourseDishesEditor, type CourseDishRow } from "@/components/catalog/CourseDishesEditor";
 import { inCourseOrder, moveWithinCourse, useFocusNewRow } from "@/components/catalog/CourseSections";
 import { normalizeSearch } from "@/components/catalog/search";
-import { Alert, Button } from "@/components/ui";
+import { parseAmountInput } from "@/components/payments/draft";
+import { Alert, Button, Field, Input } from "@/components/ui";
 import { isBrowserOnline } from "@/lib/offline/network";
 import { isQueued, submitMutation } from "@/lib/offline/submit";
+import { formatEUR } from "@/lib/quote-utils";
 import { type BookingDish, type Course, type Dish } from "@/lib/types";
 import { ConfirmAction } from "./ConfirmAction";
+import { describedBy } from "./booking-form-model";
 
 /** Riga dei piatti dell'evento: copia libera (nessun collegamento al catalogo). */
 interface DishDraft {
@@ -29,11 +32,30 @@ export interface DishPayload {
   description?: string;
 }
 
+/**
+ * Prezzo a persona del menù solo per questo evento (admin). `value` null = prezzo di catalogo;
+ * `catalog` è il prezzo del menù in catalogo (per la scritta e per "Usa prezzo di catalogo").
+ */
+export interface DishesMenuPrice {
+  value: number | null;
+  catalog: number;
+}
+
+/** Testo di un importo con la virgola, es. 38 → "38,00" (come i campi prezzo del form). */
+function priceDraftOf(amount: number): string {
+  return amount.toFixed(2).replace(".", ",");
+}
+
 export interface DishesEditorProps {
   /** Prenotazione da aggiornare sul server. Senza (crea evento): i piatti vanno a `onApply`. */
   bookingId?: string;
-  /** Modalità locale: riceve i piatti al posto del salvataggio sul server. */
-  onApply?: (dishes: DishPayload[]) => void;
+  /**
+   * Modalità locale: riceve i piatti al posto del salvataggio sul server.
+   * `menuPrice` arriva solo se è passato `price`: null = prezzo di catalogo, altrimenti il prezzo scelto.
+   */
+  onApply?: (dishes: DishPayload[], menuPrice?: number | null) => void;
+  /** Prezzo a persona del menù per questo evento: la sezione compare solo se passato (solo admin). */
+  price?: DishesMenuPrice;
   /** Testo del pulsante di conferma (default "Salva piatti"). */
   submitLabel?: string;
   dishes: Pick<BookingDish, "course" | "name" | "description">[];
@@ -64,7 +86,7 @@ export interface DishesEditorProps {
  * Nella finestra "bare" della creazione evento l'altezza è data dalla finestra stessa.
  * Layout inline: niente scorrimento interno (la rotella scorre la pagina), la barra è sticky in fondo.
  */
-export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti", dishes, hasMenu, catalog, onClose, onQueued, expectedUpdated, layout = "modal" }: DishesEditorProps) {
+export function DishesEditor({ bookingId, onApply, price, submitLabel = "Salva piatti", dishes, hasMenu, catalog, onClose, onQueued, expectedUpdated, layout = "modal" }: DishesEditorProps) {
   const inline = layout === "inline";
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -85,6 +107,9 @@ export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti",
     })),
   );
   const [formError, setFormError] = useState<string | null>(null);
+  // Prezzo a persona in testo (virgola o punto); prefilled con il prezzo effettivo (proprio o di catalogo).
+  const [priceDraft, setPriceDraft] = useState(() => (price ? priceDraftOf(price.value ?? price.catalog) : ""));
+  const [priceError, setPriceError] = useState<string | null>(null);
 
   /** Righe da salvare nell'ordine delle portate. Le righe senza nome non vengono salvate. */
   const saveRows = useMemo(
@@ -153,9 +178,22 @@ export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti",
     // In una modale dentro un altro form (crea evento) l'invio non deve risalire al form esterno.
     event.stopPropagation();
     setFormError(null);
+    setPriceError(null);
     if (duplicateKeys.size > 0) {
       setFormError("Alcuni piatti compaiono più di una volta nell’elenco: rimuovi i duplicati prima di salvare.");
       return;
+    }
+
+    // Prezzo: null = prezzo di catalogo (uguale a quello di catalogo), altrimenti il numero scelto (0 compreso).
+    let menuPrice: number | null | undefined;
+    if (price) {
+      const parsed = parseAmountInput(priceDraft);
+      if (parsed === null) {
+        setPriceError("Inserisci un prezzo a persona valido, da 0 €. Esempio: 35,50");
+        setFormError("Controlla il prezzo a persona.");
+        return;
+      }
+      menuPrice = Math.abs(parsed - price.catalog) < 0.005 ? null : parsed;
     }
 
     const payload: DishPayload[] = saveRows.map((item, index) => {
@@ -169,13 +207,16 @@ export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti",
     });
 
     if (onApply || !bookingId) {
-      onApply?.(payload);
+      onApply?.(payload, menuPrice);
       onClose(true);
       return;
     }
 
+    // Con la sezione prezzo si manda { dishes, menu_price } (menu_price anche se null); senza, l'elenco com'era.
+    const body = price ? { dishes: payload, menu_price: menuPrice } : payload;
+
     startTransition(async () => {
-      const result = await submitMutation("bookings.updateBookingDishes", updateBookingDishes, [bookingId, payload], {
+      const result = await submitMutation("bookings.updateBookingDishes", updateBookingDishes, [bookingId, body], {
         label: "Piatti dell’evento",
         entity: { type: "booking", id: bookingId },
         expectedUpdated,
@@ -221,6 +262,54 @@ export function DishesEditor({ bookingId, onApply, submitLabel = "Salva piatti",
             : "min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-cream/40 px-4 py-5 sm:px-6"
         }
       >
+        {price && (
+          <div className="mb-6 flex min-w-0 flex-col gap-3 rounded-btn border border-sand bg-paper p-4">
+            <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark">Prezzo del menù per questo evento</p>
+            <div className="flex min-w-0 flex-wrap items-end gap-3">
+              <Field
+                label="Prezzo a persona"
+                htmlFor="booking-dishes-price"
+                error={priceError ?? undefined}
+                hint={`Prezzo di catalogo: ${formatEUR(price.catalog)}`}
+                className="min-w-0 flex-1 basis-40 sm:max-w-56"
+              >
+                <div className="relative">
+                  <span aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[15px] text-slate-dark">
+                    €
+                  </span>
+                  <Input
+                    id="booking-dishes-price"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="0,00"
+                    disabled={pending}
+                    invalid={!!priceError}
+                    aria-describedby={describedBy("booking-dishes-price", !!priceError, true)}
+                    className="pl-8 tabular-nums"
+                    value={priceDraft}
+                    onChange={(e) => {
+                      setPriceError(null);
+                      setPriceDraft(e.target.value);
+                    }}
+                  />
+                </div>
+              </Field>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={pending}
+                onClick={() => {
+                  setPriceError(null);
+                  setPriceDraft(priceDraftOf(price.catalog));
+                }}
+                className="min-h-11"
+              >
+                Usa prezzo di catalogo
+              </Button>
+            </div>
+          </div>
+        )}
         <fieldset className="min-w-0 border-0 p-0">
           <legend className="sr-only">Piatti per portata</legend>
           <CourseDishesEditor

@@ -3,31 +3,44 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { inventoryPdfFileName, inventoryPdfHref } from "@/components/inventory/inventory-links";
-import { InventoryReportSections, type InventoryReportGrouping } from "@/components/inventory/InventoryReportSections";
-import { MarkSeenButton } from "@/components/inventory/ReportActions";
+import { InventoryReportSections } from "@/components/inventory/InventoryReportSections";
+import { InventoryGroupingToggle, resolveInventoryGrouping } from "@/components/inventory/InventoryGroupingToggle";
+import { DeleteReportButton, MarkSeenButton } from "@/components/inventory/ReportActions";
 import { Badge, ButtonLink, DocumentDownload, buttonClasses } from "@/components/ui";
 import { isUuid } from "@/lib/action-utils";
 import { requireProfile } from "@/lib/auth";
 import { mergeReportLines, reportSuppliers } from "@/lib/inventory-utils";
 import { getInventoryReport, getInventorySuppliers } from "@/lib/data/inventory";
-import { canEditInventoryReport, canManageInventory, canUseInventory } from "@/lib/permissions";
+import {
+  canChooseInventoryGrouping,
+  canDeleteInventoryReport,
+  canEditInventoryReport,
+  canManageInventory,
+  canUseInventory,
+} from "@/lib/permissions";
 
 export const metadata: Metadata = {
   title: "Giacenza · Casale del Notaio",
 };
 
-export default async function InventoryReportPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InventoryReportPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ raggruppa?: string }>;
+}) {
   const profile = await requireProfile();
   if (!canUseInventory(profile)) redirect("/admin/agenda");
 
   const { id } = await params;
   if (!isUuid(id)) notFound();
+  const grouping = resolveInventoryGrouping(profile, (await searchParams).raggruppa);
 
   const [report, suppliers] = await Promise.all([getInventoryReport(id), getInventorySuppliers({ includeInactive: true })]);
   if (!report) notFound();
 
   const admin = canManageInventory(profile);
-  const grouping: InventoryReportGrouping = admin ? "supplier" : "category";
   const rows = mergeReportLines(report.lines);
   // Fornitori del report (ordine del catalogo), solo quelli visibili a chi guarda: la route PDF accetta questi.
   const visibleIds = new Set(suppliers.map((s) => s.id));
@@ -89,9 +102,11 @@ export default async function InventoryReportPage({ params }: { params: Promise<
             </ButtonLink>
           )}
           {admin && <MarkSeenButton reportId={report.id} seen={seen} />}
+          {canDeleteInventoryReport(profile) && <DeleteReportButton reportId={report.id} reportDate={report.report_date} />}
         </div>
       </header>
 
+      {canChooseInventoryGrouping(profile) && <InventoryGroupingToggle grouping={grouping} basePath={`/admin/giacenza/${report.id}`} />}
       <InventoryReportSections report={report} grouping={grouping} suppliers={suppliers} />
     </div>
   );
