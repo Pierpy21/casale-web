@@ -38,6 +38,38 @@ export function filterBookings(bookings: BookingListItem[], filter: AgendaKindFi
   return bookings.filter((b) => b.kind !== "evento");
 }
 
+/** Filtro per pasto nelle liste del giorno (query `pasto`). "Tutti" non filtra. */
+export type AgendaMealFilter = "tutti" | "pranzo" | "cena";
+
+export const AGENDA_MEAL_OPTIONS: Array<{ value: AgendaMealFilter; label: string }> = [
+  { value: "tutti", label: "Tutti" },
+  { value: "pranzo", label: "Pranzo" },
+  { value: "cena", label: "Cena" },
+];
+
+export function parseMealFilter(value: string | undefined): AgendaMealFilter {
+  return value === "pranzo" || value === "cena" ? value : "tutti";
+}
+
+/** Pasto di un appuntamento dal suo orario "HH:MM": prima delle 16 è pranzo, altrimenti cena. Null senza orario. */
+function mealFromTime(time: string | null): "pranzo" | "cena" | null {
+  const match = /^(\d{2}):\d{2}/.exec(time ?? "");
+  if (!match) return null;
+  return Number(match[1]) < 16 ? "pranzo" : "cena";
+}
+
+/** Pasto di una voce: gli appuntamenti dall'orario, il resto da `meal` (null se non c'è né l'uno né l'altro). */
+export function mealOfItem(item: BookingListItem): "pranzo" | "cena" | null {
+  if (item.kind === "appuntamento") return mealFromTime(item.event_time);
+  return item.meal;
+}
+
+/** Voci per pasto. "Tutti" le lascia tutte; senza pasto né orario restano solo in "Tutti". */
+export function filterByMeal(items: BookingListItem[], meal: AgendaMealFilter): BookingListItem[] {
+  if (meal === "tutti") return items;
+  return items.filter((item) => mealOfItem(item) === meal);
+}
+
 /** Conteggio di un giorno: solo gli eventi, con singolare/plurale. Le prenotazioni non si contano. */
 export function dayCountLabel(items: BookingListItem[]): string {
   const events = items.filter((b) => b.kind === "evento").length;
@@ -94,15 +126,18 @@ export function agendaHref({
   date,
   view = "month",
   kind = "tutti",
+  meal = "tutti",
   sala = null,
 }: {
   date: string;
   view?: AgendaView;
   kind?: AgendaKindFilter;
+  meal?: AgendaMealFilter;
   sala?: string | null;
 }): string {
   const params = new URLSearchParams({ date, view });
   if (kind !== "tutti") params.set("tipo", kind);
+  if (meal !== "tutti") params.set("pasto", meal);
   if (sala) params.set("sala", sala);
   return `/admin/agenda?${params.toString()}`;
 }

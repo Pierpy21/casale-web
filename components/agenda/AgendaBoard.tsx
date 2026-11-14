@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PinnedBar, StatusLegend, cn } from "@/components/ui";
 import type { BookingListItem, NextEventBrief, Room } from "@/lib/types";
+import { AgendaMealSwitch } from "./AgendaMealSwitch";
 import { AgendaToolbar } from "./AgendaToolbar";
 import { MobileAgenda } from "./MobileAgenda";
 import { MonthView } from "./MonthView";
@@ -20,6 +21,7 @@ import {
   toDate,
   weekDates,
   type AgendaKindFilter,
+  type AgendaMealFilter,
   type AgendaView,
   type IsoRange,
 } from "./agenda-utils";
@@ -31,6 +33,8 @@ export interface AgendaBoardProps {
   initialView: AgendaView;
   /** Filtro per tipo all'apertura (query `tipo`). */
   initialKind: AgendaKindFilter;
+  /** Filtro per pasto all'apertura (query `pasto`): vale solo per le liste del giorno. */
+  initialMeal: AgendaMealFilter;
   /** Griglia mensile caricata dal server: navigare dentro questo intervallo non richiede rete. */
   loadedRange: IsoRange;
   today: string;
@@ -49,7 +53,7 @@ export interface AgendaBoardProps {
 const AGENDA_BAR = "border-b border-sand px-4 pb-2 pt-1 sm:px-6 desk:px-10 desk:pb-3 desk:pt-3";
 
 /**
- * Stato dell'agenda lato client. Selezione del giorno, vista e filtro per tipo cambiano in locale (istantanei);
+ * Stato dell'agenda lato client. Selezione del giorno, vista e filtri (tipo e pasto) cambiano in locale (istantanei);
  * l'URL si aggiorna con replaceState senza refetch. Solo quando si esce dalla griglia caricata
  * si passa dal server, dentro una transizione (la UI precedente resta visibile, con leggero fade).
  */
@@ -58,6 +62,7 @@ export function AgendaBoard({
   initialDate,
   initialView,
   initialKind,
+  initialMeal,
   loadedRange,
   today,
   isAdmin,
@@ -72,6 +77,8 @@ export function AgendaBoard({
   const [selected, setSelected] = useState(initialDate);
   const [view, setView] = useState<AgendaView>(initialView);
   const [kind, setKind] = useState<AgendaKindFilter>(initialKind);
+  /** Filtro pasto (query `pasto`): si conserva quando si cambia giorno, vista o tipo. */
+  const [meal, setMeal] = useState<AgendaMealFilter>(initialMeal);
   /** Sala aperta nella vista sale (query `sala`): si conserva quando si cambia giorno, vista o tipo. */
   const openRoom = roomsView ? searchParams.get(SALA_PARAM) : null;
 
@@ -85,7 +92,7 @@ export function AgendaBoard({
 
   const navigate = useCallback(
     (target: string, nextView: AgendaView, nextKind: AgendaKindFilter = kind) => {
-      const href = agendaHref({ date: target, view: nextView, kind: nextKind, sala: openRoom });
+      const href = agendaHref({ date: target, view: nextView, kind: nextKind, meal, sala: openRoom });
       if (isRangeInside(monthGridRange(target), loadedRange)) {
         setSelected(target);
         setView(nextView);
@@ -97,10 +104,20 @@ export function AgendaBoard({
         router.push(href, { scroll: false });
       });
     },
-    [kind, loadedRange, openRoom, router],
+    [kind, meal, loadedRange, openRoom, router],
   );
 
   const onKindChange = (next: AgendaKindFilter) => navigate(selected, view, next);
+
+  // Il pasto è solo un filtro locale delle liste del giorno: nessuna richiesta al server, solo URL.
+  const onMealChange = (next: AgendaMealFilter) => {
+    setMeal(next);
+    window.history.replaceState(
+      window.history.state,
+      "",
+      agendaHref({ date: selected, view, kind, meal: next, sala: openRoom }),
+    );
+  };
 
   return (
     <div
@@ -131,6 +148,8 @@ export function AgendaBoard({
           canAssignRooms={canAssignRooms}
           canDeleteBookings={isAdmin}
           kind={kind}
+          meal={meal}
+          onMealChange={onMealChange}
           roomsView={roomsView}
           onNavigate={(iso) => navigate(iso, view)}
           nextEvent={nextEvent}
@@ -152,8 +171,15 @@ export function AgendaBoard({
         </PinnedBar>
 
         <div className="flex min-w-0 flex-col gap-5">
-          {/* Legenda degli stati solo in settimana e giorno: nel mese le celle mostrano solo i coperti. */}
-          {view !== "month" && <StatusLegend />}
+          {/* Legenda degli stati solo in settimana e giorno: nel mese le celle mostrano solo i coperti.
+              Nel giorno la stessa riga ospita il filtro pasto a destra. */}
+          {view === "day" && (
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
+              <StatusLegend className="min-w-0" />
+              <AgendaMealSwitch value={meal} onChange={onMealChange} />
+            </div>
+          )}
+          {view === "week" && <StatusLegend />}
 
           {view === "month" && (
             <MonthView
@@ -175,6 +201,7 @@ export function AgendaBoard({
               roomsView={roomsView}
               selected={selected}
               kind={kind}
+              meal={meal}
               nextEvent={nextEvent}
               onOpenNextEvent={(iso) => navigate(iso, "day")}
             />

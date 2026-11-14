@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { bookingPersonName, bookingTimeSortKey, mealLabel } from "@/components/bookings/format";
 import { EmptyState, cn } from "@/components/ui";
 import type { BookingListItem, NextEventBrief } from "@/lib/types";
-import { capitalize, formatIt, toDate, type AgendaKindFilter } from "./agenda-utils";
+import { capitalize, formatIt, toDate, type AgendaKindFilter, type AgendaMealFilter } from "./agenda-utils";
 
 const BOX = "flex w-72 max-w-full flex-col items-center justify-center gap-2 rounded-xl border border-sand bg-cream/60 px-4 py-3 text-center min-h-[44px]";
 
@@ -72,15 +72,30 @@ export function nextEventFrom(bookings: BookingListItem[], selected: string, aft
  */
 export function EmptyDay({
   kind,
+  meal = "tutti",
+  hasBookings = false,
   nextEvent,
   selected,
   onOpen,
 }: {
   kind: AgendaKindFilter;
+  /** Filtro pasto attivo: con servizi nel giorno ma nessuno in questo pasto, il messaggio lo dice. */
+  meal?: AgendaMealFilter;
+  /** Il giorno ha prenotazioni (prima del filtro pasto). */
+  hasBookings?: boolean;
   nextEvent: NextEventBrief | null;
   selected: string;
   onOpen: (iso: string) => void;
 }) {
+  if (meal !== "tutti" && hasBookings) {
+    return (
+      <EmptyState
+        variant="plain"
+        title={`Nessun servizio a ${meal} in questo giorno.`}
+        description="Scegli Tutti per vedere l'intera giornata."
+      />
+    );
+  }
   if (kind === "prenotazioni") {
     return <EmptyState variant="plain" title="Niente da vedere qui" description="Cambia il filtro per vedere anche gli eventi." />;
   }
