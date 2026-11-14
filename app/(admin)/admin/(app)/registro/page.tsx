@@ -30,7 +30,8 @@ export default async function RegistroPage({ searchParams }: { searchParams: Sea
   const [entries, rooms, menus] = await Promise.all([
     getActivityLog(ACTIVITY_LIMIT),
     getRooms({ includeInactive: true }),
-    getMenus({ includeInactive: true }),
+    // Il registro può citare menù compositi (getMenus li esclude di default): il loro nome deve risolversi.
+    getMenus({ includeInactive: true, includeCustom: true }),
   ]);
 
   const lookup: NameLookup = {

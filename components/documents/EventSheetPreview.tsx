@@ -1,7 +1,7 @@
 import type { EventFieldView, EventSheetView } from "@/lib/documents/events-view";
 import { SheetFrame } from "./SheetPreview";
 import styles from "./SheetPreview.module.css";
-import { SHEET_PREVIEW_FOOTER, SHEET_PREVIEW_ISSUER } from "./sheet-issuer";
+import { SHEET_PREVIEW_FOOTER } from "./sheet-issuer";
 
 export interface EventSheetPreviewProps {
   /** Vista formattata del foglio eventi (la stessa del PDF e del DOCX). */
@@ -10,13 +10,14 @@ export interface EventSheetPreviewProps {
   pxPerMm?: number;
 }
 
-/** Righe di testo di una voce (una per riga, senza margini). */
-function Lines({ lines }: { lines: string[] }) {
+/** Righe di testo di una voce (una per riga, senza margini). `tag` in rosso accanto alla prima riga. */
+function Lines({ lines, tag }: { lines: string[]; tag?: string }) {
   return (
     <>
       {lines.map((line, i) => (
         <p key={i} className={styles.lineText}>
           {line}
+          {i === 0 && tag ? <span className={styles.tag}>{tag}</span> : null}
         </p>
       ))}
     </>
@@ -28,7 +29,7 @@ function FieldRow({ field }: { field: EventFieldView }) {
     <div className={styles.field}>
       <p className={styles.fieldLabel}>{field.label}</p>
       <div className={styles.fieldValue}>
-        <Lines lines={field.lines} />
+        <Lines lines={field.lines} tag={field.tag} />
       </div>
     </div>
   );
@@ -44,7 +45,6 @@ export function EventSheetPreview({ view, pxPerMm }: EventSheetPreviewProps) {
       title={view.title}
       subtitle={view.dateLong}
       meta={view.countLabel}
-      issuer={SHEET_PREVIEW_ISSUER}
       footer={SHEET_PREVIEW_FOOTER}
       ariaLabel="Anteprima foglio eventi"
       pxPerMm={pxPerMm}

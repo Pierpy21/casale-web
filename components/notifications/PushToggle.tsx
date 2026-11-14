@@ -1,6 +1,6 @@
 "use client";
 
-import { BellRing, Check, Smartphone } from "lucide-react";
+import { BellRing, Check, Smartphone, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { deletePushSubscription, savePushSubscription } from "@/app/actions/notifications";
 import { useOnline } from "@/components/offline/useOnline";
@@ -14,8 +14,10 @@ const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_KEY_PATTERN = /^[A-Za-z0-9_-]{80,100}$/;
 const VAPID_VALID = !!VAPID_PUBLIC_KEY && VAPID_KEY_PATTERN.test(VAPID_PUBLIC_KEY);
 
-const UNCONFIGURED_MESSAGE = "Le notifiche non sono ancora configurate sul server. Avvisa l’amministratore.";
 const SW_READY_TIMEOUT_MS = 8000;
+
+/** Avviso di installazione su iPhone chiuso dall'utente (localStorage). */
+const IOS_HINT_DISMISS_KEY = "agenda-push-ios-hint-dismissed";
 
 /** Errore di supporto: il service worker non diventa attivo entro il tempo massimo. */
 const SW_TIMEOUT_NAME = "ServiceWorkerTimeout";
@@ -142,6 +144,25 @@ export function PushToggle() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const online = useOnline();
+  // Avviso "installa l'app" (iPhone in Safari): chiuso con la X, non ricompare su questo dispositivo.
+  const [iosHintHidden, setIosHintHidden] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(IOS_HINT_DISMISS_KEY) === "1") setIosHintHidden(true);
+    } catch {
+      // localStorage non disponibile (navigazione privata): l'avviso resta visibile.
+    }
+  }, []);
+
+  const hideIosHint = () => {
+    setIosHintHidden(true);
+    try {
+      window.localStorage.setItem(IOS_HINT_DISMISS_KEY, "1");
+    } catch {
+      // Senza localStorage l'avviso si chiude solo fino al prossimo caricamento.
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -258,13 +279,22 @@ export function PushToggle() {
     return <p className="text-[13px] leading-relaxed text-slate-dark">Le notifiche push non sono disponibili su questo browser.</p>;
   }
 
-  if (state === "unconfigured") {
-    return <p className="text-[13px] leading-relaxed text-slate-dark">{UNCONFIGURED_MESSAGE}</p>;
-  }
+  // Push non configurato in questo ambiente (es. sviluppo senza chiave VAPID): nessun avviso, solo notifiche in-app.
+  if (state === "unconfigured") return null;
 
   if (state === "ios-install") {
+    if (iosHintHidden) return null;
     return (
-      <div className="flex min-w-0 flex-col gap-2 rounded-btn bg-cream/70 px-4 py-3">
+      <div className="relative flex min-w-0 flex-col gap-2 rounded-btn bg-cream/70 py-3 pl-4 pr-11">
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Chiudi"
+          onClick={hideIosHint}
+          className="absolute right-0 top-0 size-11 p-0!"
+        >
+          <X aria-hidden="true" className="size-4" />
+        </Button>
         <p className="break-words text-[14px] font-medium text-ink">Installa l’app per ricevere le notifiche</p>
         <p className="break-words text-[13px] leading-relaxed text-slate-dark">
           Tocca Condividi e poi «Aggiungi alla schermata Home». Apri l’app dalla nuova icona e attiva le notifiche da qui.

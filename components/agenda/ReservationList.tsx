@@ -27,6 +27,8 @@ export interface ReservationListProps {
   canAssign: boolean;
   /** Permesso di eliminare (admin, come `deleteBooking`): senza, la riga non mostra la X. */
   canDeleteBookings: boolean;
+  /** Mostra il "Foglio prenotazioni" nell'intestazione (serve `canAssign`). Falso dove il foglio sta già a livello di giorno. */
+  showSheetButton?: boolean;
 }
 
 /** Assegnazione mostrata subito dopo il tap; vale solo finché la sala salvata è quella di partenza. */
@@ -57,7 +59,7 @@ function byMealThenName(a: BookingListItem, b: BookingListItem): number {
  * Tap sulla sala = assegnazione istantanea; tavolo salvato su blur o Invio. Entrambi ottimistici, con rollback e messaggio.
  * La X elimina la prenotazione dopo conferma: riga tolta subito, ripristinata se il salvataggio fallisce.
  */
-export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBookings }: ReservationListProps) {
+export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBookings, showSheetButton = true }: ReservationListProps) {
   const router = useRouter();
   const [overrides, setOverrides] = useState<Record<string, RoomOverride>>({});
   const [tableOverrides, setTableOverrides] = useState<Record<string, TableOverride>>({});
@@ -249,7 +251,7 @@ export function ReservationList({ bookings, rooms, date, canAssign, canDeleteBoo
           <span className="text-[13px] text-slate-dark tabular-nums">
             {sorted.length} {sorted.length === 1 ? "prenotazione" : "prenotazioni"}
           </span>
-          {canAssign && <ReservationSheetButton date={date} />}
+          {canAssign && showSheetButton && <ReservationSheetButton date={date} />}
         </div>
       </div>
 

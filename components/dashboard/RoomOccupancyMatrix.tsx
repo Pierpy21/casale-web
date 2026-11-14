@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { bookingPersonName, totalCovers } from "@/components/bookings/format";
+import { CustomizedTag } from "@/components/menu/MenuBadge";
 import { useMenuColor } from "@/components/menu/MenuColorsProvider";
 import { EmptyState, StatusDot } from "@/components/ui";
 import { STATUS_LABELS, type BookingListItem, type Room } from "@/lib/types";
@@ -89,7 +90,7 @@ function OccupancyCell({ booking, capacity }: { booking: BookingListItem; capaci
   return (
     <Link
       href={`/admin/prenotazioni/${booking.id}`}
-      title={`${menuName} · ${bookingPersonName(booking)}: ${covers} coperti su capienza ${capacity} · ${STATUS_LABELS[booking.status]}`}
+      title={`${menuName}${booking.dishes_customized ? " (piatti modificati)" : ""} · ${bookingPersonName(booking)}: ${covers} coperti su capienza ${capacity} · ${STATUS_LABELS[booking.status]}`}
       style={{ backgroundColor: color.solid, color: color.onSolid }}
       className="flex min-h-20 flex-col justify-center gap-1.5 rounded-[2px] px-3 py-2.5 transition-[filter] duration-200 hover:brightness-95"
     >
@@ -97,6 +98,7 @@ function OccupancyCell({ booking, capacity }: { booking: BookingListItem; capaci
         {booking.kind !== "normale" && <StatusDot status={booking.status} size="sm" onDark className="mt-1.5" />}
         <span className="line-clamp-2 min-w-0 font-serif text-[15px] font-semibold leading-snug break-words">{menuName}</span>
       </span>
+      {booking.dishes_customized && <CustomizedTag className="self-start" />}
       <span className="text-[12px] font-semibold tabular-nums">
         {covers}/{capacity} coperti
       </span>

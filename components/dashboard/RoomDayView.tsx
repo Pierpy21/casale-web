@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { bookingPersonName, formatCovers, totalCovers } from "@/components/bookings/format";
-import { MenuBadge } from "@/components/menu/MenuBadge";
+import { CustomizedTag, MenuBadge } from "@/components/menu/MenuBadge";
 import { useMenuColor } from "@/components/menu/MenuColorsProvider";
 import { Badge, EmptyState, StatusDot } from "@/components/ui";
 import { STATUS_LABELS, type BookingListItem, type Room } from "@/lib/types";
@@ -71,7 +71,7 @@ export function RoomDayView({ rooms, selectedDay, bookings }: RoomDayViewProps) 
               <li key={booking.id}>
                 <Link
                   href={`/admin/prenotazioni/${booking.id}`}
-                  aria-label={`${booking.menu?.name ?? "Menù da definire"}, ${bookingPersonName(booking)}, stato ${STATUS_LABELS[booking.status]}`}
+                  aria-label={`${booking.menu?.name ?? "Menù da definire"}${booking.dishes_customized ? ", piatti modificati" : ""}, ${bookingPersonName(booking)}, stato ${STATUS_LABELS[booking.status]}`}
                   className="flex flex-col gap-1.5 rounded-btn border border-dashed border-slate/50 bg-paper px-4 py-3 hover:bg-cream"
                 >
                   <span className="flex items-start gap-2">
@@ -80,6 +80,7 @@ export function RoomDayView({ rooms, selectedDay, bookings }: RoomDayViewProps) 
                       menuId={booking.menu?.id ?? null}
                       name={booking.menu?.name ?? "Menù da definire"}
                       size="md"
+                      customized={booking.dishes_customized}
                     />
                   </span>
                   <span className="break-words text-[13px] text-slate-dark">
@@ -104,7 +105,7 @@ function BookingBlock({ booking, capacity }: { booking: BookingListItem; capacit
   return (
     <Link
       href={`/admin/prenotazioni/${booking.id}`}
-      aria-label={`${menuName ?? "Menù da definire"}, ${title}, ${covers} coperti su capienza ${capacity}, stato ${STATUS_LABELS[booking.status]}`}
+      aria-label={`${menuName ?? "Menù da definire"}${booking.dishes_customized ? ", piatti modificati" : ""}, ${title}, ${covers} coperti su capienza ${capacity}, stato ${STATUS_LABELS[booking.status]}`}
       style={{ backgroundColor: color.solid, color: color.onSolid }}
       className="flex flex-col gap-2 px-4 py-4 transition-[filter] duration-200 hover:brightness-95"
     >
@@ -116,6 +117,7 @@ function BookingBlock({ booking, capacity }: { booking: BookingListItem; capacit
           <span className="min-w-0 font-serif text-xl italic leading-tight">Menù da definire</span>
         )}
       </span>
+      {booking.dishes_customized && <CustomizedTag className="self-start" />}
       <span className="text-[13px] font-semibold tabular-nums">
         {covers}/{capacity} coperti · {formatCovers(booking)}
       </span>

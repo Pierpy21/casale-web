@@ -55,6 +55,8 @@ export async function saveMenu(db: PocketBase, id: string | null, req: MenuSaveR
   if (id) {
     current = await fetchOne(db, "menus", id);
     if (!current) throw new UserFacingError("Menù non trovato");
+    // Il menù composto è dell'evento: non si modifica dal catalogo.
+    if (current.custom) throw new UserFacingError("Il menù composto di un evento non si modifica dal catalogo.");
   }
 
   const currentPhotos: string[] = Array.isArray(current?.photos) ? (current!.photos as string[]) : [];

@@ -1,11 +1,8 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import {
   AlignmentType,
   BorderStyle,
   Document,
   Footer,
-  ImageRun,
   PageNumber,
   Packer,
   Paragraph,
@@ -15,9 +12,10 @@ import {
   TextRun,
   VerticalAlign,
   WidthType,
-  type ITableBordersOptions,
 } from "docx";
 import {
+  EMPTY_SHEET_TEXT,
+  SHEET_FOOTER,
   buildReservationSheetView,
   type ReservationPdfRow,
   type ReservationRoomSection,
@@ -26,7 +24,8 @@ import {
 import type { ReservationSheet } from "@/lib/types";
 
 // Foglio prenotazioni del giorno in DOCX: stessa impostazione del preventivo DOCX (lib/documents/quote-docx.ts).
-// Come il PDF, una pagina per gruppo di sale (vedi ROOM_PAGES): ogni pagina è una sezione Word.
+// Come il PDF, nessuna intestazione del Casale e una pagina per gruppo di sale (vedi ROOM_PAGES), solo con prenotazioni:
+// ogni pagina è una sezione Word.
 
 const COLOR = {
   ink: "1C2B2D",
@@ -48,27 +47,10 @@ const CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN; // 10306
 const COL_WIDTHS = [4106, 1100, 2100, 1200, 1800];
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
-const NO_BORDERS: ITableBordersOptions = {
-  top: NO_BORDER,
-  bottom: NO_BORDER,
-  left: NO_BORDER,
-  right: NO_BORDER,
-  insideHorizontal: NO_BORDER,
-  insideVertical: NO_BORDER,
-};
 const THIN_LINE = { style: BorderStyle.SINGLE, size: 4, color: COLOR.line } as const;
 const INK_LINE = { style: BorderStyle.SINGLE, size: 8, color: COLOR.ink } as const;
 
 type Align = (typeof AlignmentType)[keyof typeof AlignmentType];
-
-let logoCache: Promise<Buffer> | null = null;
-
-function loadLogo(): Promise<Buffer> {
-  if (!logoCache) {
-    logoCache = readFile(path.join(process.cwd(), "public", "logo-dark.png"));
-  }
-  return logoCache;
-}
 
 function text(
   value: string,
@@ -95,7 +77,7 @@ function text(
 }
 
 function para(
-  children: TextRun[] | ImageRun[],
+  children: TextRun[],
   opts: { align?: Align; before?: number; after?: number; keepNext?: boolean } = {},
 ): Paragraph {
   return new Paragraph({
@@ -157,7 +139,7 @@ function linesTable(rows: ReservationPdfRow[]): Table {
   });
 }
 
-/** Una sala: nome e conteggio, poi la tabella o "Nessuna prenotazione". */
+/** Una sala: nome e conteggio, poi la tabella. */
 function roomBlock(section: ReservationRoomSection): Array<Paragraph | Table> {
   return [
     para(
@@ -167,88 +149,21 @@ function roomBlock(section: ReservationRoomSection): Array<Paragraph | Table> {
       ],
       { after: 80, keepNext: true },
     ),
-    section.rows.length === 0
-      ? para([text("Nessuna prenotazione", { size: 9.5, italics: true, color: COLOR.slate, font: FONT.serif })], {
-          after: 60,
-        })
-      : linesTable(section.rows),
+    linesTable(section.rows),
   ];
 }
 
 /** Renderizza il foglio prenotazioni del giorno in un file DOCX (Buffer). */
 export async function renderReservationsDocx(sheet: ReservationSheet): Promise<Buffer> {
-  const logo = await loadLogo();
-  return renderSheetView(buildReservationSheetView(sheet), logo);
+  return renderSheetView(buildReservationSheetView(sheet));
 }
 
-async function renderSheetView(view: ReservationSheetView, logo: Buffer): Promise<Buffer> {
-  // Intestazione: dati del Casale a sinistra, logo a destra (come il preventivo).
-  const headerLeftWidth = 6306;
-  const headerRightWidth = CONTENT_WIDTH - headerLeftWidth;
-  const header = new Table({
-    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
-    columnWidths: [headerLeftWidth, headerRightWidth],
-    borders: NO_BORDERS,
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            width: { size: headerLeftWidth, type: WidthType.DXA },
-            borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
-            children: [
-              para([text("Casale del Notaio", { size: 20, font: FONT.serif })], { after: 60 }),
-              para(
-                [text("Del gusto il Teatro.", { size: 9.5, italics: true, color: COLOR.petrol, font: FONT.serif })],
-                { after: 120 },
-              ),
-              para([text("Via Nicolosi 67, 95032 Belpasso (CT)", { size: 8.5, color: COLOR.slate })], { after: 10 }),
-              para([text("+39 340 109 0100 · info@casaledelnotaio.it", { size: 8.5, color: COLOR.slate })], {
-                after: 0,
-              }),
-            ],
-          }),
-          new TableCell({
-            width: { size: headerRightWidth, type: WidthType.DXA },
-            borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
-            children: [
-              para(
-                [
-                  new ImageRun({
-                    type: "png",
-                    data: logo,
-                    transformation: { width: 200, height: 67 },
-                    altText: {
-                      name: "Logo Casale del Notaio",
-                      title: "Casale del Notaio",
-                      description: "Logo del Casale del Notaio",
-                    },
-                  }),
-                ],
-                { align: AlignmentType.RIGHT, after: 0 },
-              ),
-            ],
-          }),
-        ],
-      }),
-    ],
-  });
-
-  // Titolo, data e totale (solo prima pagina)
-  const titleBlock = [
-    para([text(view.title, { size: 22, font: FONT.serif })], { before: 280, after: 60 }),
+async function renderSheetView(view: ReservationSheetView): Promise<Buffer> {
+  // Prima pagina: titolo, data e totale (senza intestazione del Casale).
+  const firstPageHead = [
+    para([text(view.title, { size: 22, font: FONT.serif })], { after: 60 }),
     para([text(view.dateLong, { size: 13, italics: true, color: COLOR.petrol, font: FONT.serif })], { after: 60 }),
     para([text(view.countLabel, { size: 9, color: COLOR.slate })], { after: 240 }),
-  ];
-
-  const firstPageHead = [
-    header,
-    para([], { after: 120 }),
-    new Paragraph({
-      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: COLOR.line, space: 1 } },
-      children: [],
-      spacing: { after: 120 },
-    }),
-    ...titleBlock,
   ];
 
   // Pagine successive: titolo e data su una riga.
@@ -275,7 +190,7 @@ async function renderSheetView(view: ReservationSheetView, logo: Buffer): Promis
       children: [
         para(
           [
-            text("Casale del Notaio · Via Nicolosi 67, Belpasso (CT)   |   Pagina ", { size: 7.5, color: COLOR.slate }),
+            text(`${SHEET_FOOTER}   |   Pagina `, { size: 7.5, color: COLOR.slate }),
             new TextRun({ children: [PageNumber.CURRENT], size: 15, color: COLOR.slate, font: FONT.sans }),
             text(" di ", { size: 7.5, color: COLOR.slate }),
             new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 15, color: COLOR.slate, font: FONT.sans }),
@@ -303,7 +218,9 @@ async function renderSheetView(view: ReservationSheetView, logo: Buffer): Promis
       footers: { default: footer() },
       children: [
         ...(pageIndex === 0 ? firstPageHead : compactHead),
-        ...page.sections.flatMap((section, i) => [...(i > 0 ? [divider()] : []), ...roomBlock(section)]),
+        ...(page.sections.length === 0
+          ? [para([text(EMPTY_SHEET_TEXT, { size: 9.5, italics: true, color: COLOR.slate, font: FONT.serif })], { after: 60 })]
+          : page.sections.flatMap((section, i) => [...(i > 0 ? [divider()] : []), ...roomBlock(section)])),
       ],
     })),
   });

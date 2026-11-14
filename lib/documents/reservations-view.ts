@@ -25,7 +25,10 @@ export interface ReservationRoomSection {
   rows: ReservationPdfRow[];
 }
 
-/** Una pagina del PDF: una o più sale, separate da una linea. */
+/**
+ * Una pagina del PDF: una o più sale con prenotazioni, separate da una linea.
+ * Le sale senza prenotazioni non compaiono; la pagina senza sale è solo nel caso di giornata vuota (vedi buildReservationSheetView).
+ */
 export interface ReservationSheetPage {
   sections: ReservationRoomSection[];
 }
@@ -36,12 +39,12 @@ export interface ReservationSheetView {
   dateLong: string;
   countLabel: string;
   rows: ReservationPdfRow[];
-  /** Divisione per sale del PDF (vedi ROOM_PAGES), più una pagina per le altre sale/senza sala se servono. */
+  /** Divisione per sale del PDF (vedi ROOM_PAGES), solo con prenotazioni; almeno una pagina sempre presente. */
   pages: ReservationSheetPage[];
 }
 
 /**
- * Pagine fisse del PDF per sala, sempre stampate anche se vuote:
+ * Pagine fisse del PDF per sala, stampate solo se hanno prenotazioni:
  * 1) Sala 1, 2 e 3 · 2) Sala Grande · 3) Palmento · 4) Terrazza e Pozzo.
  */
 export const ROOM_PAGES: readonly (readonly string[])[] = [
@@ -53,13 +56,11 @@ export const ROOM_PAGES: readonly (readonly string[])[] = [
 
 const NO_ROOM = "Senza sala";
 
-/** Intestazione e piè di pagina del foglio: stessi testi del PDF e dell'anteprima HTML. */
-export const SHEET_ISSUER = {
-  name: "Casale del Notaio",
-  tagline: "Del gusto il Teatro.",
-  lines: ["Via Nicolosi 67, 95032 Belpasso (CT)", "+39 340 109 0100 · info@casaledelnotaio.it"],
-  footer: "Casale del Notaio · Via Nicolosi 67, Belpasso (CT)",
-} as const;
+/** Messaggio della pagina unica quando il giorno non ha prenotazioni (titolo e data restano in alto). */
+export const EMPTY_SHEET_TEXT = "Nessuna prenotazione per questa giornata";
+
+/** Piè di pagina del foglio: stesso testo del PDF, del DOCX e dell'anteprima HTML. */
+export const SHEET_FOOTER = "Casale del Notaio · Via Nicolosi 67, Belpasso (CT)";
 
 const normalizeRoom = (s: string): string => s.toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -93,7 +94,11 @@ export function buildReservationSheetView(sheet: ReservationSheet): ReservationS
   };
 }
 
-/** Divide le prenotazioni (già ordinate) nelle pagine per sala; l'ordine delle righe resta quello del foglio. */
+/**
+ * Divide le prenotazioni (già ordinate) nelle pagine per sala; l'ordine delle righe resta quello del foglio.
+ * Sale senza prenotazioni, pagine senza sale e pagine vuote non vengono emesse. Se il giorno è vuoto,
+ * resta una sola pagina senza sezioni (i renderer mostrano EMPTY_SHEET_TEXT).
+ */
 function roomPages(
   rows: ReservationSheet["rows"],
   toView: (row: ReservationSheet["rows"][number]) => ReservationPdfRow,
@@ -103,12 +108,19 @@ function roomPages(
     countLabel: countLabelOf(roomRows),
     rows: roomRows.map(toView),
   });
+  // Solo le sezioni con prenotazioni, nell'ordine dei gruppi.
+  const sectionsOf = (groups: [string, ReservationSheet["rows"]][]): ReservationRoomSection[] =>
+    groups.filter(([, roomRows]) => roomRows.length > 0).map(([room, roomRows]) => section(room, roomRows));
+
   const known = new Set(ROOM_PAGES.flat().map(normalizeRoom));
   const pages: ReservationSheetPage[] = ROOM_PAGES.map((rooms) => ({
-    sections: rooms.map((room) =>
-      section(room, rows.filter((r) => r.room !== null && normalizeRoom(r.room) === normalizeRoom(room))),
+    sections: sectionsOf(
+      rooms.map((room): [string, ReservationSheet["rows"]] => [
+        room,
+        rows.filter((r) => r.room !== null && normalizeRoom(r.room) === normalizeRoom(room)),
+      ]),
     ),
-  }));
+  })).filter((page) => page.sections.length > 0);
 
   // Sale non previste e prenotazioni senza sala: una pagina in più, solo se ce ne sono.
   const others = new Map<string, ReservationSheet["rows"]>();
@@ -117,8 +129,11 @@ function roomPages(
     const key = r.room?.trim() || NO_ROOM;
     others.set(key, [...(others.get(key) ?? []), r]);
   }
-  if (others.size > 0) {
-    pages.push({ sections: [...others].map(([room, roomRows]) => section(room, roomRows)) });
+  const otherSections = sectionsOf([...others]);
+  if (otherSections.length > 0) {
+    pages.push({ sections: otherSections });
   }
-  return pages;
+
+  // Giornata senza prenotazioni: un'unica pagina vuota, così il documento non ha zero pagine.
+  return pages.length > 0 ? pages : [{ sections: [] }];
 }

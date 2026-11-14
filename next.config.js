@@ -35,6 +35,8 @@ function pocketbaseImagePatterns() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Solo sviluppo: consente di aprire `next dev` dal telefono sulla rete locale o dall'hotspot del telefono.
+  allowedDevOrigins: ['192.168.*.*', '172.20.10.*'],
   // Pacchetti con binari/Node-only: non vanno bundlati nel server.
   serverExternalPackages: ['@react-pdf/renderer', 'web-push'],
   // pdfkit (usato da @react-pdf) carica i font standard (Helvetica…) con un percorso calcolato a runtime:

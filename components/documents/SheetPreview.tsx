@@ -1,4 +1,3 @@
-import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/components/ui/cn";
 import styles from "./SheetPreview.module.css";
@@ -19,15 +18,7 @@ export interface SheetPreviewTotal {
   strong?: boolean;
 }
 
-/** Intestazione del documento: nome, slogan, righe di contatto e logo facoltativo. */
-export interface SheetIssuer {
-  name: string;
-  tagline?: string;
-  lines: readonly string[];
-  logoSrc?: string;
-}
-
-/** Parti comuni a tutti i fogli: foglio A4, intestazione, titolo e piè di pagina. */
+/** Parti comuni a tutti i fogli: foglio A4, titolo e piè di pagina (nessuna intestazione del Casale). */
 export interface SheetFrameProps {
   /** Titolo grande del foglio, es. "Foglio prenotazioni". */
   title: string;
@@ -35,7 +26,6 @@ export interface SheetFrameProps {
   subtitle?: string;
   /** Riga piccola a destra del titolo, es. il conteggio. */
   meta?: string;
-  issuer: SheetIssuer;
   /** Testo del piè di pagina in fondo al foglio. */
   footer?: string;
   /** Nome accessibile dell'anteprima. */
@@ -45,7 +35,7 @@ export interface SheetFrameProps {
    * Con un valore il foglio ha la sua larghezza reale e chi lo contiene scorre.
    */
   pxPerMm?: number;
-  /** Pagine dopo la prima: niente intestazione del Casale, solo titolo e sottotitolo su una riga (come nel PDF). */
+  /** Pagine dopo la prima: solo titolo e sottotitolo su una riga, senza il blocco del titolo (come nel PDF). */
   compact?: boolean;
   children: ReactNode;
 }
@@ -76,14 +66,13 @@ function frameStyle(pxPerMm: number | undefined): CSSProperties | undefined {
 }
 
 /**
- * Foglio A4 (210 × 297 mm) con intestazione, titolo e piè di pagina; il contenuto (tabella, schede) va nei children.
+ * Foglio A4 (210 × 297 mm) con titolo e piè di pagina; il contenuto (tabella, schede) va nei children.
  * Stesse misure e tipografia dei PDF react-pdf (pt → mm). Di default il foglio si scala sulla larghezza disponibile.
  */
 export function SheetFrame({
   title,
   subtitle,
   meta,
-  issuer,
   footer,
   ariaLabel,
   pxPerMm,
@@ -99,31 +88,13 @@ export function SheetFrame({
             {subtitle ? <p className={styles.compactSubtitle}>{subtitle}</p> : null}
           </div>
         ) : (
-          <>
-            <header className={styles.header}>
-              <div className={styles.issuer}>
-                <p className={styles.issuerName}>{issuer.name}</p>
-                {issuer.tagline ? <p className={styles.issuerTagline}>{issuer.tagline}</p> : null}
-                {issuer.lines.map((line) => (
-                  <p key={line} className={styles.issuerText}>
-                    {line}
-                  </p>
-                ))}
-              </div>
-              {issuer.logoSrc ? (
-                <Image src={issuer.logoSrc} alt="" width={150} height={50} unoptimized className={styles.logo} />
-              ) : null}
-            </header>
-            <div className={styles.rule} aria-hidden="true" />
-
-            <div className={styles.titleRow}>
-              <div className={styles.titleBlock}>
-                <h3 className={styles.docTitle}>{title}</h3>
-                {subtitle ? <p className={styles.docSubtitle}>{subtitle}</p> : null}
-              </div>
-              {meta ? <p className={styles.metaText}>{meta}</p> : null}
+          <div className={styles.titleRow}>
+            <div className={styles.titleBlock}>
+              <h3 className={styles.docTitle}>{title}</h3>
+              {subtitle ? <p className={styles.docSubtitle}>{subtitle}</p> : null}
             </div>
-          </>
+            {meta ? <p className={styles.metaText}>{meta}</p> : null}
+          </div>
         )}
 
         {children}

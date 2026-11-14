@@ -1,20 +1,12 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import {
-  Document,
-  Image,
-  Page,
-  StyleSheet,
-  Text,
-  View,
-  renderToBuffer,
-} from "@react-pdf/renderer";
+import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { groupOrderRowsBySupplier, inventoryPdfFileName, mergeReportLines, type InventoryOrderRow } from "@/lib/inventory-utils";
 import type { InventoryReport, InventorySupplier } from "@/lib/types";
+import { SHEET_FOOTER } from "@/lib/documents/reservations-view";
 
 // Report di giacenza in PDF: stessa impostazione tipografica del preventivo (lib/documents/quote-pdf.tsx).
+// Nessuna intestazione del Casale: la prima pagina apre con il titolo del report e la data.
 // Un blocco per fornitore (solo quelli con prodotti); ogni prodotto appare una volta, con giacenza e da ordinare.
 // Con un fornitore (lista d'ordine) il PDF contiene solo il suo blocco. Il nome del fornitore è quello dello snapshot del report.
 
@@ -45,13 +37,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLOR.paper,
     lineHeight: 1.35,
   },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  headerLeft: { flexGrow: 1, paddingRight: 16 },
-  issuerName: { fontFamily: FONT.serif, fontSize: 20, lineHeight: 1.2, color: COLOR.ink, marginBottom: 6 },
-  issuerTagline: { fontFamily: FONT.serifItalic, fontSize: 9.5, lineHeight: 1.3, color: COLOR.petrol, marginBottom: 8 },
-  issuerText: { fontSize: 8.5, color: COLOR.slate, marginBottom: 1 },
-  logo: { width: 150, height: 50 },
-  rule: { height: 0.75, backgroundColor: COLOR.line, marginTop: 14, marginBottom: 14 },
   eyebrow: {
     fontFamily: FONT.sansBold,
     fontSize: 8,
@@ -76,7 +61,9 @@ const styles = StyleSheet.create({
   bodyText: { fontSize: 9.5, color: COLOR.ink },
   footer: {
     position: "absolute",
-    bottom: 22,
+    // top e non bottom: con lineHeight sulla pagina, react-pdf 4.9 non disegna un footer fisso ancorato in basso
+    // che contiene il numero di pagina. A4 = 841,89 pt: il bordo inferiore resta a circa 22 pt dal fondo.
+    top: 803,
     left: 40,
     right: 40,
     flexDirection: "row",
@@ -163,15 +150,6 @@ export function buildInventoryPdfModel(report: InventoryReport, opts: InventoryP
   };
 }
 
-let logoCache: Promise<Buffer> | null = null;
-
-function loadLogo(): Promise<Buffer> {
-  if (!logoCache) {
-    logoCache = readFile(path.join(process.cwd(), "public", "logo-dark.png"));
-  }
-  return logoCache;
-}
-
 function SupplierTable({ rows }: { rows: InventoryPdfRow[] }) {
   return (
     <View>
@@ -193,22 +171,10 @@ function SupplierTable({ rows }: { rows: InventoryPdfRow[] }) {
   );
 }
 
-function InventoryDocument({ model, logo }: { model: InventoryPdfModel; logo: Buffer }) {
+function InventoryDocument({ model }: { model: InventoryPdfModel }) {
   return (
     <Document title={`${model.title} ${model.reportDate}`} author="Casale del Notaio" creator="Casale del Notaio">
       <Page size="A4" style={styles.page}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.issuerName}>Casale del Notaio</Text>
-            <Text style={styles.issuerTagline}>Del gusto il Teatro.</Text>
-            <Text style={styles.issuerText}>Via Nicolosi 67, 95032 Belpasso (CT)</Text>
-            <Text style={styles.issuerText}>+39 340 109 0100 · info@casaledelnotaio.it</Text>
-          </View>
-          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image non supporta la prop alt */}
-          <Image src={logo} style={styles.logo} />
-        </View>
-        <View style={styles.rule} />
-
         <View style={styles.titleRow}>
           <View>
             <Text style={styles.eyebrow}>{model.title}</Text>
@@ -239,7 +205,7 @@ function InventoryDocument({ model, logo }: { model: InventoryPdfModel; logo: Bu
         ) : null}
 
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>Casale del Notaio · Via Nicolosi 67, Belpasso (CT)</Text>
+          <Text style={styles.footerText}>{SHEET_FOOTER}</Text>
           <Text
             style={styles.footerText}
             render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}
@@ -252,6 +218,5 @@ function InventoryDocument({ model, logo }: { model: InventoryPdfModel; logo: Bu
 
 /** Renderizza il report di giacenza in un PDF A4 (Buffer). */
 export async function renderInventoryPdf(model: InventoryPdfModel): Promise<Buffer> {
-  const logo = await loadLogo();
-  return renderToBuffer(<InventoryDocument model={model} logo={logo} />);
+  return renderToBuffer(<InventoryDocument model={model} />);
 }

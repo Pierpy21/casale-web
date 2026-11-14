@@ -30,7 +30,7 @@ import {
   type Room,
   type RoomBookingSlot,
 } from "@/lib/types";
-import { formatEUR } from "@/lib/quote-utils";
+import { formatEUR, round2, type QuoteMenuRef } from "@/lib/quote-utils";
 import { CountStepper } from "./CountStepper";
 import { bookingPersonName } from "./format";
 import {
@@ -70,8 +70,17 @@ import {
   type ClientLink,
 } from "./form-primitives";
 import { DishesEditor, type DishPayload } from "./DishesEditor";
+import { CourseList } from "./MenuPreview";
 import { QuotePanel } from "./QuotePanel";
-import { EMPTY_QUOTE_DRAFT, autoQuoteLines, buildQuotePayload, quoteTotals, type QuoteDraft, type QuotePayload } from "./quote-draft";
+import {
+  EMPTY_QUOTE_DRAFT,
+  autoQuoteLines,
+  buildQuotePayload,
+  parseAmount,
+  quoteTotals,
+  type QuoteDraft,
+  type QuotePayload,
+} from "./quote-draft";
 
 export interface EventFormProps {
   mode: "create" | "edit";
@@ -109,6 +118,15 @@ interface EventValues {
   setup_notes: string;
   notes: string;
   allergies: AllergyRow[];
+}
+
+/** Nome predefinito del menù composto quando il nome è vuoto (come il server). */
+const COMPOSED_MENU_NAME = "Menù Composto";
+
+/** Menù composto in composizione (solo creazione, admin): nome e prezzo come testo del form. I piatti stanno in customDishes. */
+interface ComposedMenuDraft {
+  name: string;
+  price: string;
 }
 
 function initialValues(booking: BookingDetail | undefined, initialDate: string): EventValues {
@@ -185,6 +203,9 @@ export function EventForm({
   // Solo creazione: piatti personalizzati per questo evento (null = copia del menù scelto). Il catalogo non cambia.
   const [customDishes, setCustomDishes] = useState<DishPayload[] | null>(null);
   const [dishesEditorOpen, setDishesEditorOpen] = useState(false);
+  // Solo creazione, admin: menù composto per questo evento (null = non scelto). I piatti stanno in customDishes.
+  const composedAllowed = !isEdit && isAdmin;
+  const [composed, setComposed] = useState<ComposedMenuDraft | null>(null);
   // Solo creazione, admin: acconto facoltativo, registrato subito dopo l'evento. Chiuso di default.
   const [depositOpen, setDepositOpen] = useState(false);
   const [deposit, setDeposit] = useState<PaymentDraft>(() => emptyPaymentDraft());
@@ -232,16 +253,24 @@ export function EventForm({
 
   const eventType = resolveEventType(values.eventType);
   const covers = values.adults + values.kids_menus;
-  const adultMenus = menus.filter((m) => !m.is_kids && (m.active || m.id === values.menu_id));
+  // Il menù del evento in modifica (anche composto, che non è nell'elenco dei menù) resta sempre tra le scelte.
+  const adultMenus = menus.filter((m) => !m.is_kids && (m.active || m.id === values.menu_id || m.id === booking?.menu_id));
   const kidsMenuOptions = menus.filter((m) => m.is_kids && (m.active || m.id === values.kids_menu_id));
   const roomOptions = rooms.filter((r) => r.active || r.id === values.room_id);
   const selectedMenu = menus.find((m) => m.id === values.menu_id) ?? null;
   const selectedKidsMenu = menus.find((m) => m.id === values.kids_menu_id) ?? null;
+  // Menù composto: il preventivo usa nome e prezzo inseriti (senza prezzo valido non c'è riga automatica).
+  const composedPrice = composed ? parseAmount(composed.price) : Number.NaN;
+  const quoteMenu: QuoteMenuRef | null = composed
+    ? Number.isFinite(composedPrice) && composedPrice >= 0
+      ? { name: composed.name.trim() || COMPOSED_MENU_NAME, price_per_person: composedPrice }
+      : null
+    : selectedMenu;
   const autoLines = autoQuoteLines(
     {
       adults: values.adults,
       kids_menus: values.kids_menus,
-      menu: selectedMenu,
+      menu: quoteMenu,
       kids_menu: selectedKidsMenu,
     },
     quote.priceOverrides,
@@ -266,10 +295,31 @@ export function EventForm({
   const soleKidsMenuId = activeKidsMenus.length === 1 ? activeKidsMenus[0].id : null;
 
   // Cambiare menù riparte dai piatti del nuovo menù: le personalizzazioni erano sul menù precedente.
+  // Anche il prezzo modificato a mano sulla riga del menù adulti era del menù precedente: si toglie.
+  const resetAdultPrice = () =>
+    setQuote((q) => {
+      const priceOverrides = { ...q.priceOverrides };
+      delete priceOverrides["auto-adults"];
+      return { ...q, priceOverrides };
+    });
   const selectMenu = (menuId: string | null) => {
-    if (menuId === values.menu_id) return;
+    if (menuId === values.menu_id && composed === null) return;
     change({ menu_id: menuId });
+    setComposed(null);
     setCustomDishes(null);
+    resetAdultPrice();
+  };
+  // Menù composto: nessun menù dell'elenco. Nome, prezzo e piatti si inseriscono sotto la scelta, partendo da zero.
+  const selectComposed = () => {
+    if (composed !== null) return;
+    change({ menu_id: null });
+    setComposed({ name: "", price: "" });
+    setCustomDishes(null);
+    resetAdultPrice();
+  };
+  const changeComposed = (changes: Partial<ComposedMenuDraft>) => {
+    setErrors({});
+    setComposed((c) => (c ? { ...c, ...changes } : c));
   };
   const menuDishes: DishPayload[] = (selectedMenu?.items ?? [])
     .slice()
@@ -317,6 +367,13 @@ export function EventForm({
     if (!values.event_date) setValues((v) => ({ ...v, event_date: eventDate }));
     Object.assign(local, validateAllergies(values.allergies));
 
+    // Menù composto (solo creazione): prezzo a persona obbligatorio e almeno un piatto.
+    if (composed) {
+      if (!composed.price.trim() || !Number.isFinite(composedPrice)) add("custom_menu.price_per_person", "Inserisci il prezzo a persona");
+      else if (composedPrice < 0) add("custom_menu.price_per_person", "Il prezzo non può essere negativo");
+      if (!customDishes || customDishes.length === 0) add("dishes", "Componi il menù: aggiungi almeno un piatto");
+    }
+
     let quotePayload: QuotePayload | null = null;
     if (!isEdit && createQuote) {
       const built = buildQuotePayload(quote, quoteLines);
@@ -358,7 +415,14 @@ export function EventForm({
       status: values.status,
       notes: values.notes.trim() || null,
       allergies: allergyPayload(values.allergies),
-      ...(isEdit ? {} : { create_quote: createQuote, quote: createQuote ? quotePayload : null }),
+      ...(isEdit
+        ? {}
+        : {
+            create_quote: createQuote,
+            quote: createQuote ? quotePayload : null,
+            // Menù composto: al posto di menu_id; i piatti vanno come secondo argomento di createBooking.
+            custom_menu: composed ? { name: composed.name.trim(), price_per_person: round2(composedPrice) } : null,
+          }),
     };
 
     const applyError = (result: { error: string; fieldErrors?: Errors }) => {
@@ -567,7 +631,12 @@ export function EventForm({
             <div data-invalid={errors.menu_id ? "true" : undefined} className="flex flex-col gap-3">
               <GroupLabel>Menù adulti</GroupLabel>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <ChoiceCard name="menu_id" title="Nessun menù" checked={values.menu_id === null} onSelect={() => selectMenu(null)}>
+                <ChoiceCard
+                  name="menu_id"
+                  title="Nessun menù"
+                  checked={values.menu_id === null && composed === null}
+                  onSelect={() => selectMenu(null)}
+                >
                   <span className="text-[14px] text-slate-dark">Il menù si può scegliere anche più avanti</span>
                 </ChoiceCard>
                 {adultMenus.map((menu) => (
@@ -584,7 +653,80 @@ export function EventForm({
                     onReset={() => setCustomDishes(null)}
                   />
                 ))}
+                {composedAllowed && (
+                  <ChoiceCard name="menu_id" title="Menù composto" checked={composed !== null} onSelect={selectComposed}>
+                    <span className="text-[14px] text-slate-dark">Solo per questo evento: non entra nel catalogo</span>
+                  </ChoiceCard>
+                )}
               </div>
+
+              {composed && (
+                <div className="flex flex-col gap-5 rounded-btn border border-petrol/40 bg-cream/40 p-4">
+                  <GroupLabel>Composizione del menù</GroupLabel>
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    <Field
+                      label="Nome del menù"
+                      htmlFor="composed-menu-name"
+                      error={first(errors["custom_menu.name"])}
+                      hint="Facoltativo · se vuoto: Menù Composto"
+                    >
+                      <Input
+                        id="composed-menu-name"
+                        autoComplete="off"
+                        maxLength={80}
+                        disabled={pending}
+                        invalid={!!first(errors["custom_menu.name"])}
+                        aria-describedby={describedBy("composed-menu-name", !!first(errors["custom_menu.name"]), true)}
+                        value={composed.name}
+                        onChange={(e) => changeComposed({ name: e.target.value })}
+                        placeholder={COMPOSED_MENU_NAME}
+                      />
+                    </Field>
+                    <Field
+                      label="Prezzo a persona (€)"
+                      htmlFor="composed-menu-price"
+                      required
+                      error={first(errors["custom_menu.price_per_person"])}
+                    >
+                      <Input
+                        id="composed-menu-price"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min={0}
+                        required
+                        disabled={pending}
+                        invalid={!!first(errors["custom_menu.price_per_person"])}
+                        aria-describedby={describedBy("composed-menu-price", !!first(errors["custom_menu.price_per_person"]), false)}
+                        value={composed.price}
+                        onChange={(e) => changeComposed({ price: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+
+                  <div data-invalid={errors.dishes ? "true" : undefined} className="flex flex-col gap-3">
+                    <div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-11"
+                        disabled={pending}
+                        onClick={() => setDishesEditorOpen(true)}
+                      >
+                        Componi i piatti
+                      </Button>
+                    </div>
+                    {customPreview.length > 0 ? (
+                      <CourseList items={customPreview} className="text-[13px]" />
+                    ) : (
+                      <p className="text-[14px] text-slate-dark">Nessun piatto ancora: aggiungi le portate con «Componi i piatti».</p>
+                    )}
+                    {first(errors.dishes) && <p className="text-[13px] text-danger">{first(errors.dishes)}</p>}
+                  </div>
+                  {first(errors.custom_menu) && <p className="text-[13px] text-danger">{first(errors.custom_menu)}</p>}
+                </div>
+              )}
+
               {!hasActiveAdultMenus && <CatalogHint>Nessun menù adulti attivo: l’evento si può salvare anche senza menù.</CatalogHint>}
               {first(errors.menu_id) && <p className="text-[13px] text-danger">{first(errors.menu_id)}</p>}
             </div>
@@ -620,7 +762,13 @@ export function EventForm({
             {/* Portale nel body: l'editor è un form e non può stare dentro il form dell'evento. */}
             {dishesEditorOpen &&
               createPortal(
-                <Modal open onClose={() => setDishesEditorOpen(false)} title="Piatti dell’evento" size="xl" bare>
+                <Modal
+                  open
+                  onClose={() => setDishesEditorOpen(false)}
+                  title={composed ? "Piatti del menù composto" : "Piatti dell’evento"}
+                  size="xl"
+                  bare
+                >
                   <DishesEditor
                     dishes={customDishes ?? menuDishes}
                     hasMenu={false}

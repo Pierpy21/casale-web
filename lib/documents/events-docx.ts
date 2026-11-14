@@ -1,11 +1,8 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import {
   AlignmentType,
   BorderStyle,
   Document,
   Footer,
-  ImageRun,
   PageNumber,
   Packer,
   Paragraph,
@@ -15,12 +12,13 @@ import {
   TextRun,
   VerticalAlign,
   WidthType,
-  type ITableBordersOptions,
 } from "docx";
 import { buildEventSheetView, type EventBlockView, type EventFieldView, type EventSheetView } from "@/lib/documents/events-view";
+import { SHEET_FOOTER } from "@/lib/documents/reservations-view";
 import type { EventSheet } from "@/lib/types";
 
 // Foglio eventi del giorno in DOCX: stessa impostazione del foglio prenotazioni (reservations-docx.ts).
+// Nessuna intestazione del Casale: si apre con il titolo del foglio e la data.
 // Per ogni banchetto: titolo (pasto, nome, coperti) e una tabella etichetta | valore.
 
 const COLOR = {
@@ -29,6 +27,7 @@ const COLOR = {
   slate: "5A6668",
   bronze: "8B6B4A",
   line: "D5D5B7",
+  danger: "9B3B32",
 } as const;
 
 const FONT = { sans: "Arial", serif: "Times New Roman" } as const;
@@ -44,26 +43,9 @@ const LABEL_WIDTH = 2400;
 const VALUE_WIDTH = CONTENT_WIDTH - LABEL_WIDTH;
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
-const NO_BORDERS: ITableBordersOptions = {
-  top: NO_BORDER,
-  bottom: NO_BORDER,
-  left: NO_BORDER,
-  right: NO_BORDER,
-  insideHorizontal: NO_BORDER,
-  insideVertical: NO_BORDER,
-};
 const THIN_LINE = { style: BorderStyle.SINGLE, size: 4, color: COLOR.line } as const;
 
 type Align = (typeof AlignmentType)[keyof typeof AlignmentType];
-
-let logoCache: Promise<Buffer> | null = null;
-
-function loadLogo(): Promise<Buffer> {
-  if (!logoCache) {
-    logoCache = readFile(path.join(process.cwd(), "public", "logo-dark.png"));
-  }
-  return logoCache;
-}
 
 function text(
   value: string,
@@ -82,7 +64,7 @@ function text(
 }
 
 function para(
-  children: TextRun[] | ImageRun[],
+  children: TextRun[],
   opts: { align?: Align; before?: number; after?: number; keepNext?: boolean } = {},
 ): Paragraph {
   return new Paragraph({
@@ -93,10 +75,16 @@ function para(
   });
 }
 
-/** Riga di valori (più righe nella stessa cella: una per paragrafo). */
-function valueParagraphs(lines: string[], size = 9.5): Paragraph[] {
+/** Riga di valori (più righe nella stessa cella: una per paragrafo). `tag` in rosso dopo la prima riga. */
+function valueParagraphs(lines: string[], size = 9.5, tag?: string): Paragraph[] {
   return lines.map((line, i) =>
-    para([text(line, { size })], { after: i === lines.length - 1 ? 0 : 40 }),
+    para(
+      [
+        text(line, { size }),
+        ...(i === 0 && tag ? [text(`   ${tag}`, { size: 7.5, bold: true, color: COLOR.danger, spacing: 6 })] : []),
+      ],
+      { after: i === lines.length - 1 ? 0 : 40 },
+    ),
   );
 }
 
@@ -120,7 +108,7 @@ function summaryTable(fields: EventFieldView[]): Table {
               borders: { top: NO_BORDER, left: NO_BORDER, right: NO_BORDER, bottom: THIN_LINE },
               margins: { top: 60, bottom: 60, left: 80, right: 80 },
               verticalAlign: VerticalAlign.CENTER,
-              children: valueParagraphs(field.lines),
+              children: valueParagraphs(field.lines, 9.5, field.tag),
             }),
           ],
         }),
@@ -144,56 +132,13 @@ function blockHeading(block: EventBlockView): Paragraph {
 
 /** Renderizza il foglio eventi del giorno in un file DOCX (Buffer). */
 export async function renderEventsDocx(sheet: EventSheet): Promise<Buffer> {
-  const logo = await loadLogo();
-  return renderEventSheetView(buildEventSheetView(sheet), logo);
+  return renderEventSheetView(buildEventSheetView(sheet));
 }
 
-async function renderEventSheetView(view: EventSheetView, logo: Buffer): Promise<Buffer> {
-  // Intestazione: dati del Casale a sinistra, logo a destra (come il foglio prenotazioni).
-  const headerLeftWidth = 6306;
-  const headerRightWidth = CONTENT_WIDTH - headerLeftWidth;
-  const header = new Table({
-    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
-    columnWidths: [headerLeftWidth, headerRightWidth],
-    borders: NO_BORDERS,
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            width: { size: headerLeftWidth, type: WidthType.DXA },
-            borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
-            children: [
-              para([text("Casale del Notaio", { size: 20, font: FONT.serif })], { after: 60 }),
-              para([text("Del gusto il Teatro.", { size: 9.5, italics: true, color: COLOR.petrol, font: FONT.serif })], { after: 120 }),
-              para([text("Via Nicolosi 67, 95032 Belpasso (CT)", { size: 8.5, color: COLOR.slate })], { after: 10 }),
-              para([text("+39 340 109 0100 · info@casaledelnotaio.it", { size: 8.5, color: COLOR.slate })], { after: 0 }),
-            ],
-          }),
-          new TableCell({
-            width: { size: headerRightWidth, type: WidthType.DXA },
-            borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER },
-            children: [
-              para(
-                [
-                  new ImageRun({
-                    type: "png",
-                    data: logo,
-                    transformation: { width: 200, height: 67 },
-                    altText: { name: "Logo Casale del Notaio", title: "Casale del Notaio", description: "Logo del Casale del Notaio" },
-                  }),
-                ],
-                { align: AlignmentType.RIGHT, after: 0 },
-              ),
-            ],
-          }),
-        ],
-      }),
-    ],
-  });
-
-  // Titolo, data e conteggio
+async function renderEventSheetView(view: EventSheetView): Promise<Buffer> {
+  // Titolo, data e conteggio (in cima al foglio, senza intestazione del Casale)
   const titleBlock = [
-    para([text(view.title, { size: 22, font: FONT.serif })], { before: 280, after: 60 }),
+    para([text(view.title, { size: 22, font: FONT.serif })], { after: 60 }),
     para([text(view.dateLong, { size: 13, italics: true, color: COLOR.petrol, font: FONT.serif })], { after: 60 }),
     para([text(view.countLabel, { size: 9, color: COLOR.slate })], { after: 240 }),
   ];
@@ -204,7 +149,7 @@ async function renderEventSheetView(view: EventSheetView, logo: Buffer): Promise
     children: [
       para(
         [
-          text("Casale del Notaio · Via Nicolosi 67, Belpasso (CT)   |   Pagina ", { size: 7.5, color: COLOR.slate }),
+          text(`${SHEET_FOOTER}   |   Pagina `, { size: 7.5, color: COLOR.slate }),
           new TextRun({ children: [PageNumber.CURRENT], size: 15, color: COLOR.slate, font: FONT.sans }),
           text(" di ", { size: 7.5, color: COLOR.slate }),
           new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 15, color: COLOR.slate, font: FONT.sans }),
@@ -239,17 +184,7 @@ async function renderEventSheetView(view: EventSheetView, logo: Buffer): Promise
           },
         },
         footers: { default: footer },
-        children: [
-          header,
-          para([], { after: 120 }),
-          new Paragraph({
-            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: COLOR.line, space: 1 } },
-            children: [],
-            spacing: { after: 120 },
-          }),
-          ...titleBlock,
-          ...body,
-        ],
+        children: [...titleBlock, ...body],
       },
     ],
   });

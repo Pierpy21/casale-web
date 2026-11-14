@@ -39,6 +39,7 @@ export function BookingDishes({ bookingId, dishes, hasMenu, canEdit, catalog, ex
     return (
       <DishesEditor
         key={shown.map((d) => `${d.id}:${d.course}:${d.name}:${d.sort}:${d.description ?? ""}`).join("|")}
+        layout="inline"
         bookingId={bookingId}
         dishes={shown}
         hasMenu={hasMenu}

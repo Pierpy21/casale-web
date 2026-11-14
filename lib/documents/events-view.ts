@@ -12,7 +12,12 @@ const DASH = "—";
 export interface EventFieldView {
   label: string;
   lines: string[];
+  /** Marcatura rossa accanto alla prima riga (es. "MODIFICATO" sul menù con piatti personalizzati). */
+  tag?: string;
 }
+
+/** Marcatura del menù quando i piatti dell'evento sono diversi dal menù (come il tag "Modificato" a schermo). */
+export const MENU_CUSTOMIZED_TAG = "MODIFICATO";
 
 /** Scheda di un banchetto già formattata. `heading` = nome del cliente. */
 export interface EventBlockView {
@@ -85,7 +90,11 @@ function blockOf(row: EventSheetRow): EventBlockView {
       { label: "Cliente", lines: [orDash(row.client_name)] },
       { label: "Sala", lines: [orDash(row.room)] },
       { label: "Coperti", lines: [`${covers} · ${coversNotation(row.adults, row.kids_menus)}`] },
-      { label: "Menù", lines: [orDash(row.menu)] },
+      {
+        label: "Menù",
+        lines: [orDash(row.menu)],
+        ...(row.menu && row.menu_customized ? { tag: MENU_CUSTOMIZED_TAG } : {}),
+      },
       {
         label: "Menù bambini",
         lines: [hasKidsMenu ? `${kidsMenuRowLabel(row.kids_menu)} ×${row.kids_menus}` : DASH],

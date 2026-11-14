@@ -20,7 +20,7 @@
   min-height: calc(297 * var(--mm));
   margin: 0;
   /* Margini come nel PDF: 40 pt laterali, 32 pt in alto, 50 pt in basso (spazio per il piè di pagina). */
-  padding: calc(11.3 * var(--mm)) calc(14.1 * var(--mm)) calc(17.6 * var(--mm));
+  padding: calc(11.3 * var(--mm)) calc(14.1 * var(--mm)) calc(16.23 * var(--mm)); /* 46 pt in basso, come nel PDF */
   background: #ffffff;
   color: #1c2b2d;
   font-family: Helvetica, Arial, sans-serif;
@@ -45,7 +45,7 @@
 }
 
 .issuer {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   padding-right: calc(5.6 * var(--mm));
 }
@@ -105,7 +105,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: calc(4 * var(--mm));
-  margin-bottom: calc(3.53 * var(--mm));
+  margin-bottom: calc(4.94 * var(--mm)); /* 14 pt, come nel PDF */
 }
 
 .docTitle {
@@ -113,7 +113,7 @@
   font-family: "Times New Roman", Times, serif;
   font-weight: 400;
   font-size: calc(7.06 * var(--mm)); /* 20 pt */
-  line-height: 1.2;
+  line-height: 1.35; /* come nel PDF, dove l'interlinea di pagina è 1,35 */
   color: #1c2b2d;
 }
 
@@ -153,17 +153,6 @@
   padding-right: calc(4.2 * var(--mm));
 }
 
-.menuHeading {
-  display: flex;
-  align-items: baseline;
-  gap: calc(3.53 * var(--mm));
-  margin-bottom: calc(1.76 * var(--mm));
-}
-
-.menuEyebrow {
-  margin-bottom: 0;
-}
-
 .allergyList {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -180,10 +169,13 @@
   color: #1c2b2d;
 }
 
+/* Righe chiave/valore con respiro verticale di 3 pt; il filetto separa solo le righe successive alla prima. */
 .kvRow {
   display: flex;
-  margin: 0 0 calc(0.7 * var(--mm));
+  margin: 0;
+  padding: calc(1.06 * var(--mm)) 0;
 }
+
 
 .kvLabel {
   flex: 0 0 calc(27.5 * var(--mm)); /* 78 pt */
@@ -193,7 +185,7 @@
 }
 
 .kvValue {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   margin: 0;
   font-size: calc(3.53 * var(--mm));
@@ -201,26 +193,35 @@
 }
 
 .section {
-  margin: 0 0 calc(3.53 * var(--mm));
+  margin: 0 0 calc(2.12 * var(--mm)); /* 6 pt */
 }
 
-.sectionTitle {
-  margin: 0;
+/* Separatore sottile sopra una sezione (o un blocco) che non ha già un filetto a chiudere quella precedente. */
+
+/* Nome del menù (o etichetta "Menù" / "Menù bambini" se manca): serif, stesso bronzo delle portate. */
+.menuTitle {
+  margin: 0 0 calc(1.76 * var(--mm)); /* 5 pt */
   font-family: "Times New Roman", Times, serif;
   font-weight: 400;
-  font-size: calc(4.59 * var(--mm)); /* 13 pt */
-  line-height: 1.2;
-  color: #1c2b2d;
+  font-size: calc(5.29 * var(--mm)); /* 15 pt */
+  line-height: 1.35;
+  color: #8b6b4a;
 }
 
+/* Ogni portata è una riga di tabella: filetto sotto, con 3 pt sopra e sotto. */
 .courseRow {
   display: flex;
-  margin-bottom: calc(1.06 * var(--mm));
+  padding: calc(1.06 * var(--mm)) 0; /* 3 pt */
+  border-bottom: calc(0.18 * var(--mm)) solid #d5d5b7; /* 0,5 pt */
   break-inside: avoid;
 }
 
+/* Etichetta a larghezza fissa 66 pt, uguale al PDF: non cresce né si restringe per riga,
+   così i piatti di ogni portata partono sempre dallo stesso x. */
 .courseLabel {
-  flex: 0 0 calc(23.3 * var(--mm)); /* 66 pt */
+  flex: none;
+  width: calc(23.3 * var(--mm)); /* 66 pt */
+  min-width: 0;
   margin: 0;
   padding-top: calc(0.35 * var(--mm));
   font-weight: 700;
@@ -231,7 +232,7 @@
 }
 
 .courseDishes {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -249,7 +250,7 @@
 }
 
 .th {
-  padding: calc(1.76 * var(--mm)) 0;
+  padding: calc(1.06 * var(--mm)) 0; /* 3 pt, come nel PDF */
   border-bottom: calc(0.32 * var(--mm)) solid #1c2b2d;
   font-weight: 700;
   font-size: calc(2.82 * var(--mm));
@@ -261,7 +262,7 @@
 }
 
 .td {
-  padding: calc(1.41 * var(--mm)) 0;
+  padding: calc(1.06 * var(--mm)) 0; /* 3 pt, come nel PDF */
   border-bottom: calc(0.18 * var(--mm)) solid #d5d5b7;
   text-align: left;
   vertical-align: top;
@@ -400,4 +401,39 @@
   margin: 0;
   font-size: calc(2.65 * var(--mm)); /* 7,5 pt */
   color: #5a6668;
+}
+
+/* A destra del piè di pagina: numerazione, poi il marchio "Powered by C.PINSAI" (come nel PDF). */
+.footerRight {
+  display: flex;
+  align-items: center;
+  gap: calc(4.94 * var(--mm)); /* 14 pt */
+}
+
+.poweredBy {
+  display: flex;
+  align-items: center;
+  gap: calc(1.41 * var(--mm)); /* 4 pt */
+}
+
+.poweredByLabel {
+  margin: 0;
+  font-size: calc(2.29 * var(--mm)); /* 6,5 pt */
+  letter-spacing: calc(0.32 * var(--mm)); /* 0,9 pt */
+  text-transform: uppercase;
+  color: #5a6668;
+}
+
+.brandName {
+  margin: 0;
+  font-family: Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: calc(3.18 * var(--mm)); /* 9 pt */
+  letter-spacing: calc(0.18 * var(--mm)); /* 0,5 pt */
+  color: #1c2b2d;
+}
+
+/* Punto del marchio, come nel PDF. */
+.brandDot {
+  color: #e5488a;
 }

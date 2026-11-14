@@ -13,9 +13,13 @@ export interface NavLink {
   mobileBar?: boolean;
   /** Contatore mostrato accanto alla voce: "queue" = modifiche offline in coda (lato client). */
   badge?: "queue";
+  /** Ordine nella barra mobile (crescente). Risolto da getNavLinks: di default è la posizione in LINKS. */
+  mobileOrder: number;
 }
 
-interface NavDefinition extends NavLink {
+interface NavDefinition extends Omit<NavLink, "mobileOrder"> {
+  /** Chiave di ordine solo per la barra mobile; senza valore resta la posizione in LINKS (desktop invariato). */
+  mobileOrder?: number;
   visible: (p: Profile) => boolean;
 }
 
@@ -28,9 +32,10 @@ export const SYNC_HREF = "/admin/sincronizzazione";
 const LINKS: NavDefinition[] = [
   { href: CREATE_EVENT_HREF, label: "Crea evento", icon: "event", prominent: true, mobileBar: false, visible: isAdmin },
   { href: "/admin/agenda", label: "Agenda", icon: "agenda", visible: (p) => p.active },
-  { href: "/admin/sala", label: "Mappa sala", icon: "floor", visible: canViewFloorPlan },
+  // Su telefono Statistiche prende lo slot di Mappa sala (e Mappa sala finisce nel menù Altro); desktop invariato.
+  { href: "/admin/sala", label: "Mappa sala", icon: "floor", mobileOrder: 4, visible: canViewFloorPlan },
   { href: "/admin/dashboard", label: "Dashboard", icon: "dashboard", visible: isAdmin },
-  { href: "/admin/statistiche", label: "Statistiche", icon: "stats", visible: canViewStats },
+  { href: "/admin/statistiche", label: "Statistiche", icon: "stats", mobileOrder: 2, visible: canViewStats },
   { href: "/admin/clienti", label: "Clienti", icon: "clients", visible: isAdmin },
   { href: "/admin/operatori", label: "Operatori", icon: "operators", visible: isAdmin },
   { href: "/admin/catalogo", label: "Menù & Sale", icon: "catalog", visible: isAdmin },
@@ -41,12 +46,19 @@ const LINKS: NavDefinition[] = [
 
 /** Voci di navigazione filtrate per ruolo. */
 export function getNavLinks(profile: Profile): NavLink[] {
-  return LINKS.filter((link) => link.visible(profile)).map(({ href, label, icon, prominent, mobileBar, badge }) => ({
-    href,
-    label,
-    icon,
-    prominent,
-    mobileBar,
-    badge,
-  }));
+  return LINKS.flatMap((link, index) =>
+    link.visible(profile)
+      ? [
+          {
+            href: link.href,
+            label: link.label,
+            icon: link.icon,
+            prominent: link.prominent,
+            mobileBar: link.mobileBar,
+            badge: link.badge,
+            mobileOrder: link.mobileOrder ?? index,
+          },
+        ]
+      : [],
+  );
 }

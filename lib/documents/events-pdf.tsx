@@ -1,18 +1,10 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import {
-  Document,
-  Image,
-  Page,
-  StyleSheet,
-  Text,
-  View,
-  renderToBuffer,
-} from "@react-pdf/renderer";
+import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import type { EventSheet } from "@/lib/types";
 import { buildEventSheetView, type EventBlockView, type EventFieldView, type EventSheetView } from "@/lib/documents/events-view";
+import { SHEET_FOOTER } from "@/lib/documents/reservations-view";
 
 // Foglio eventi del giorno in PDF: stessa impostazione tipografica del foglio prenotazioni (reservations-pdf.tsx).
+// Nessuna intestazione del Casale: la prima pagina apre con il titolo del foglio e la data.
 // Per ogni banchetto una scheda: intestazione (pasto, nome) e voci etichetta/valore. I valori mancanti diventano "—".
 
 const COLOR = {
@@ -22,6 +14,7 @@ const COLOR = {
   bronze: "#8B6B4A",
   line: "#D5D5B7",
   paper: "#FFFFFF",
+  danger: "#9B3B32",
 } as const;
 
 const FONT = {
@@ -42,13 +35,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLOR.paper,
     lineHeight: 1.35,
   },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  headerLeft: { flexGrow: 1, paddingRight: 16 },
-  issuerName: { fontFamily: FONT.serif, fontSize: 20, lineHeight: 1.2, color: COLOR.ink, marginBottom: 6 },
-  issuerTagline: { fontFamily: FONT.serifItalic, fontSize: 9.5, lineHeight: 1.3, color: COLOR.petrol, marginBottom: 8 },
-  issuerText: { fontSize: 8.5, color: COLOR.slate, marginBottom: 1 },
-  logo: { width: 150, height: 50 },
-  rule: { height: 0.75, backgroundColor: COLOR.line, marginTop: 14, marginBottom: 14 },
   titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18 },
   docTitle: { fontFamily: FONT.serif, fontSize: 22, lineHeight: 1.25, color: COLOR.ink, marginBottom: 4 },
   docSubtitle: { fontFamily: FONT.serifItalic, fontSize: 13, lineHeight: 1.3, color: COLOR.petrol },
@@ -75,10 +61,14 @@ const styles = StyleSheet.create({
   field: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: COLOR.line, paddingVertical: 4 },
   fieldLabel: { width: 110, fontSize: 8, color: COLOR.bronze, fontFamily: FONT.sansBold, textTransform: "uppercase", letterSpacing: 0.6, paddingTop: 1.5 },
   fieldValue: { flexGrow: 1, fontSize: 9.5 },
+  // Tag rosso accanto al valore (es. menù modificato): testo annidato nella riga, niente render prop.
+  tag: { fontFamily: FONT.sansBold, fontSize: 7.5, color: COLOR.danger, letterSpacing: 0.6 },
   empty: { fontSize: 9.5, color: COLOR.slate, fontFamily: FONT.serifItalic, marginTop: 8 },
   footer: {
     position: "absolute",
-    bottom: 22,
+    // top e non bottom: con lineHeight sulla pagina, react-pdf 4.9 non disegna un footer fisso ancorato in basso
+    // che contiene il numero di pagina. A4 = 841,89 pt: il bordo inferiore resta a circa 22 pt dal fondo.
+    top: 803,
     left: 40,
     right: 40,
     flexDirection: "row",
@@ -90,22 +80,16 @@ const styles = StyleSheet.create({
   footerText: { fontSize: 7.5, color: COLOR.slate },
 });
 
-let logoCache: Promise<Buffer> | null = null;
-
-function loadLogo(): Promise<Buffer> {
-  if (!logoCache) {
-    logoCache = readFile(path.join(process.cwd(), "public", "logo-dark.png"));
-  }
-  return logoCache;
-}
-
 function FieldRow({ field }: { field: EventFieldView }) {
   return (
     <View style={styles.field} wrap={false}>
       <Text style={styles.fieldLabel}>{field.label}</Text>
       <View style={styles.fieldValue}>
         {field.lines.map((line, i) => (
-          <Text key={i}>{line}</Text>
+          <Text key={i}>
+            {line}
+            {i === 0 && field.tag ? <Text style={styles.tag}>{`   ${field.tag}`}</Text> : null}
+          </Text>
         ))}
       </View>
     </View>
@@ -127,22 +111,10 @@ function EventBlock({ block }: { block: EventBlockView }) {
   );
 }
 
-function EventsDocument({ view, logo }: { view: EventSheetView; logo: Buffer }) {
+function EventsDocument({ view }: { view: EventSheetView }) {
   return (
     <Document title={`${view.title} ${view.dateLong}`} author="Casale del Notaio" creator="Casale del Notaio">
       <Page size="A4" style={styles.page}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.issuerName}>Casale del Notaio</Text>
-            <Text style={styles.issuerTagline}>Del gusto il Teatro.</Text>
-            <Text style={styles.issuerText}>Via Nicolosi 67, 95032 Belpasso (CT)</Text>
-            <Text style={styles.issuerText}>+39 340 109 0100 · info@casaledelnotaio.it</Text>
-          </View>
-          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image non supporta la prop alt */}
-          <Image src={logo} style={styles.logo} />
-        </View>
-        <View style={styles.rule} />
-
         <View style={styles.titleRow}>
           <View>
             <Text style={styles.docTitle}>{view.title}</Text>
@@ -174,7 +146,7 @@ function EventsDocument({ view, logo }: { view: EventSheetView; logo: Buffer }) 
         )}
 
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>Casale del Notaio · Via Nicolosi 67, Belpasso (CT)</Text>
+          <Text style={styles.footerText}>{SHEET_FOOTER}</Text>
           <Text
             style={styles.footerText}
             render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}
@@ -187,6 +159,5 @@ function EventsDocument({ view, logo }: { view: EventSheetView; logo: Buffer }) 
 
 /** Renderizza il foglio eventi del giorno in un PDF A4 (Buffer). */
 export async function renderEventsPdf(sheet: EventSheet): Promise<Buffer> {
-  const logo = await loadLogo();
-  return renderToBuffer(<EventsDocument view={buildEventSheetView(sheet)} logo={logo} />);
+  return renderToBuffer(<EventsDocument view={buildEventSheetView(sheet)} />);
 }

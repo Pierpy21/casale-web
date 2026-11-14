@@ -42,17 +42,16 @@ function CourseColumn({ courses }: { courses: QuoteDocumentCourse[] }) {
   );
 }
 
-/** Menù su due colonne bilanciate, come nel PDF. */
+/**
+ * Menù su due colonne bilanciate, come nel PDF.
+ * Il titolo è il nome del menù; se manca (o coincide con l'etichetta di sezione) resta l'etichetta.
+ */
 function MenuBlock({ title, menu }: { title: string; menu: QuoteDocumentMenu }) {
   const [left, right] = splitCoursesInColumns(menu.courses);
+  const heading = menu.name && menu.name.trim().toLowerCase() !== title.trim().toLowerCase() ? menu.name : title;
   return (
     <section className={styles.section}>
-      <div className={styles.menuHeading}>
-        <p className={`${styles.eyebrow} ${styles.menuEyebrow}`}>{title}</p>
-        {menu.name && menu.name.trim().toLowerCase() !== title.trim().toLowerCase() ? (
-          <p className={styles.sectionTitle}>{menu.name}</p>
-        ) : null}
-      </div>
+      <p className={styles.menuTitle}>{heading}</p>
       <div className={styles.twoCols}>
         <CourseColumn courses={left} />
         <CourseColumn courses={right} />
@@ -109,6 +108,7 @@ export function QuotePreview({ model }: QuotePreviewProps) {
         <section className={styles.section} aria-label="Cliente">
           <p className={styles.eyebrow}>Cliente</p>
           <dl className={styles.grid}>
+            {/* Filetto tra una riga di coppie e la successiva (non sopra la prima riga) */}
             {clientFields(client).map(([label, value]) => (
               <div key={label} className={styles.gridCell}>
                 <KeyValue label={label} value={value} />
@@ -117,10 +117,15 @@ export function QuotePreview({ model }: QuotePreviewProps) {
           </dl>
         </section>
 
+        {/* Menù: il filetto sopra il menù bambini c'è solo se manca il menù adulti, perché le portate chiudono già con un filetto */}
         {menu ? <MenuBlock title="Menù" menu={menu} /> : null}
         {kidsMenu ? <MenuBlock title="Menù bambini" menu={kidsMenu} /> : null}
 
-        <section className={styles.section} aria-label="Allergie e intolleranze">
+        {/* Allergie e intolleranze: filetto sopra solo se nessun menù ha già chiuso la sezione precedente */}
+        <section
+          className={styles.section}
+          aria-label="Allergie e intolleranze"
+        >
           <p className={styles.eyebrow}>Allergie e intolleranze</p>
           {allergies.length > 0 ? (
             <ul className={styles.allergyList}>
@@ -229,11 +234,20 @@ export function QuotePreview({ model }: QuotePreviewProps) {
           </div>
         </section>
 
+        {/* Piè di pagina come nel PDF: a destra numerazione, poi "Powered by C.PINSAI" */}
         <footer className={styles.footer}>
           <p className={styles.footerText}>
             {issuer.name} · {issuer.addressLines.join(", ")} · {issuer.phone}
           </p>
-          <p className={styles.footerText}>Pagina 1 di 1</p>
+          <div className={styles.footerRight}>
+            <p className={styles.footerText}>Pagina 1 di 1</p>
+            <div className={styles.poweredBy}>
+              <p className={styles.poweredByLabel}>Powered by</p>
+              <p className={styles.brandName}>
+                C<span className={styles.brandDot}>.</span>PINSAI
+              </p>
+            </div>
+          </div>
         </footer>
       </article>
     </div>

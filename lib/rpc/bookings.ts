@@ -35,6 +35,13 @@ export interface DishLike {
   description?: string | null;
 }
 
+/** Menù composto per un nuovo evento: il menù (non per bambini, attivo, custom) e i suoi piatti, nella stessa batch. */
+export interface CustomMenuDraft {
+  name: string;
+  price_per_person: number;
+  dishes: DishLike[];
+}
+
 type Batch = ReturnType<PocketBase["createBatch"]>;
 
 /** Riga di booking_changes nella batch. Senza bookingId (eliminazione) la riga resta come storico. */
@@ -66,10 +73,67 @@ async function loadBooking(db: PocketBase, id: string): Promise<PbRecord> {
   return record;
 }
 
-async function assertMenuKind(db: PocketBase, menuId: string | null, kids: boolean, message: string): Promise<void> {
-  if (!menuId) return;
+/** Controlla che il menù sia del tipo richiesto (adulti o bambini). Ritorna il record, o null se la prenotazione non ha menù. */
+async function assertMenuKind(db: PocketBase, menuId: string | null, kids: boolean, message: string): Promise<PbRecord | null> {
+  if (!menuId) return null;
   const menu = await fetchOne(db, "menus", menuId);
   if (!menu || Boolean(menu.is_kids) !== kids) throw new UserFacingError(message);
+  return menu;
+}
+
+/** Il menù è composto per un solo evento (menus.custom). */
+async function isCustomMenu(db: PocketBase, menuId: string | null): Promise<boolean> {
+  if (!menuId) return false;
+  const menu = await fetchOne(db, "menus", menuId);
+  return Boolean(menu?.custom);
+}
+
+/**
+ * Firma dei piatti per il confronto con il menù, raggruppata per portata.
+ * Per ogni portata: i nomi (trim, spazi interni compressi, righe vuote escluse) nell'ordine di sort
+ * (a parità, ordine alfabetico del nome), uniti con \u0000 in una chiave "portata|nome1\u0000nome2…".
+ * L'ordine globale di sort non conta: menù e prenotazione salvano i sort in modo diverso.
+ * Le chiavi delle portate sono ordinate, così il risultato non dipende dall'ordine di arrivo.
+ * Funzione pura. La stessa logica è nella migrazione 1793000026 (backfill) e 1793000027 (ricalcolo), da tenere allineata.
+ */
+export function dishSignature(dishes: { course: string; name: string; sort: number }[]): string[] {
+  const byCourse = new Map<string, { sort: number; name: string }[]>();
+  for (const d of dishes) {
+    const name = String(d.name ?? "").replace(/\s+/g, " ").trim();
+    if (!name) continue;
+    const list = byCourse.get(d.course) ?? [];
+    list.push({ sort: Number(d.sort) || 0, name });
+    byCourse.set(d.course, list);
+  }
+  return [...byCourse.entries()]
+    .map(([course, list]) => {
+      const names = list
+        .sort((a, b) => a.sort - b.sort || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+        .map((x) => x.name);
+      return `${course}|${names.join("\u0000")}`;
+    })
+    .sort();
+}
+
+/** True se i due elenchi di piatti non coincidono (portata, nome e ordine dei piatti in ogni portata). Funzione pura. */
+export function dishesDiffer(
+  a: { course: string; name: string; sort: number }[],
+  b: { course: string; name: string; sort: number }[],
+): boolean {
+  const sa = dishSignature(a);
+  const sb = dishSignature(b);
+  return sa.length !== sb.length || sa.some((key, i) => key !== sb[i]);
+}
+
+/**
+ * Valore di dishes_customized per dei piatti appena scritti: false senza menù o con menù composto;
+ * altrimenti true solo se i piatti differiscono dalle voci del menù.
+ */
+async function dishesCustomizedFor(db: PocketBase, menuId: string | null, dishes: DishLike[]): Promise<boolean> {
+  if (!menuId) return false;
+  const menu = await fetchOne(db, "menus", menuId);
+  if (!menu || Boolean(menu.custom)) return false;
+  return dishesDiffer(dishes, await menuDishes(db, menuId));
 }
 
 /** Piatti del menù come copia per la prenotazione (menu_dishes_json in SQL). */
@@ -120,6 +184,48 @@ function queueDishes(batch: Batch, actor: Actor, bookingId: string, oldRows: PbR
       new: nullIfEmpty(newSummary),
     });
   }
+}
+
+/**
+ * Menù composto nuovo: record del menù (custom, attivo, non per bambini, senza prezzo di catalogo) e le sue voci.
+ * Le voci non sono collegate al catalogo piatti (dish vuoto): il menù dell'evento è uno snapshot, e una modifica
+ * del catalogo non deve cambiarne il contenuto.
+ */
+function queueCustomMenu(batch: Batch, menuId: string, draft: CustomMenuDraft): void {
+  batch.collection("menus").create({
+    id: menuId,
+    name: draft.name,
+    season: "",
+    price_per_person: draft.price_per_person,
+    is_kids: false,
+    active: true,
+    custom: true,
+    sort: 0,
+  });
+  for (const d of draft.dishes) {
+    batch.collection("menu_items").create({
+      id: generateRecordId(),
+      menu: menuId,
+      course: d.course,
+      name: d.name,
+      sort: d.sort,
+      description: d.description ?? "",
+      dish: "",
+    });
+  }
+}
+
+/**
+ * Elimina il menù composto della prenotazione quando non lo usa più nessun'altra prenotazione (cambio di menù o
+ * eliminazione dell'evento). Menù del catalogo: nessuna scrittura. Va chiamata prima dell'invio della batch.
+ */
+async function queueCustomMenuRemoval(db: PocketBase, batch: Batch, menuId: string | null, bookingId: string): Promise<void> {
+  if (!menuId || !(await isCustomMenu(db, menuId))) return;
+  const others = await countWhere(db, "bookings", db.filter("menu = {:m} && id != {:b}", { m: menuId, b: bookingId }));
+  if (others > 0) return;
+  const items = await listAll(db, "menu_items", db.filter("menu = {:m}", { m: menuId }), { fields: "id" });
+  for (const item of items) batch.collection("menu_items").delete(item.id);
+  batch.collection("menus").delete(menuId);
 }
 
 /**
@@ -216,19 +322,26 @@ function bookingRecordFields(
   };
 }
 
-/** Crea (id null) o modifica una prenotazione con allergie, piatti e audit in un'unica batch. Ritorna l'id. */
+/**
+ * Crea (id null) o modifica una prenotazione con allergie, piatti e audit in un'unica batch. Ritorna l'id.
+ * `customMenu` (solo creazione di un evento): crea anche il menù composto e lo collega, nella stessa batch.
+ * Piatti: il menù composto porta i suoi; altrimenti `input.dishes` se presenti; altrimenti la copia del menù
+ * alla creazione o quando il menù cambia. `dishes_customized` si ricalcola dal contenuto (vedi dishesCustomizedFor).
+ */
 export async function upsertBooking(
   db: PocketBase,
   input: BookingInputType,
   id: string | null,
   actor: Actor,
+  customMenu: CustomMenuDraft | null = null,
 ): Promise<string> {
   // Menù solo per gli eventi: per normali e appuntamenti vengono scartati.
   const isEvent = input.kind === "evento";
-  const menuId = isEvent ? input.menu_id ?? null : null;
+  if (customMenu && (id || !isEvent)) throw new UserFacingError("Il menù composto si crea solo con un nuovo evento.");
+  // Id del menù composto nuovo: nasce qui, così la prenotazione può referenziarlo nella stessa batch.
+  const newCustomMenuId = customMenu ? generateRecordId() : null;
+  const menuId = newCustomMenuId ?? (isEvent ? input.menu_id ?? null : null);
   const kidsMenuId = isEvent ? input.kids_menu_id ?? null : null;
-  await assertMenuKind(db, menuId, false, "Il menù selezionato non è un menù adulti");
-  await assertMenuKind(db, kidsMenuId, true, "Il menù bambini selezionato non è un menù bambini");
 
   const bookingId = id ?? generateRecordId();
   let before: PbRecord | null = null;
@@ -238,6 +351,12 @@ export async function upsertBooking(
     before = await loadBooking(db, id);
     [oldDishes, oldAllergies] = await Promise.all([bookingDishRows(db, id), bookingAllergyRows(db, id)]);
   }
+  const menu = newCustomMenuId ? null : await assertMenuKind(db, menuId, false, "Il menù selezionato non è un menù adulti");
+  // Un menù composto appartiene a un solo evento: non si può scegliere quello di un'altra prenotazione.
+  if (menu && Boolean(menu.custom) && menuId !== nn(before?.menu)) {
+    throw new UserFacingError("Il menù selezionato è il menù composto di un altro evento.");
+  }
+  await assertMenuKind(db, kidsMenuId, true, "Il menù bambini selezionato non è un menù bambini");
 
   // Stato: per gli eventi viene ricalcolato dagli acconti; le normali sono sempre confermate (vedi validazione).
   const paidCount = id ? await countPayments(db, id) : 0;
@@ -256,7 +375,28 @@ export async function upsertBooking(
   // Cliente nuovo: il record cliente viene messo nella stessa batch, prima della prenotazione.
   // Prenotazione normale: nessun cliente di rubrica (l'ospite sta sulla prenotazione).
   const clientId = input.kind === "normale" ? null : await planClient(db, input, batch);
-  const fields = bookingRecordFields(input, actor, clientId, menuId, kidsMenuId, status);
+  // Menù composto: prima della prenotazione che lo referenzia (la batch esegue in ordine).
+  if (customMenu && newCustomMenuId) queueCustomMenu(batch, newCustomMenuId, customMenu);
+
+  // Piatti da scrivere (null = non cambiano) e il loro flag "modificato" (null = il flag non cambia).
+  let dishes: DishLike[] | null = null;
+  let dishesCustomized: boolean | null = null;
+  if (customMenu) {
+    dishes = customMenu.dishes;
+    dishesCustomized = false;
+  } else if (isEvent && input.dishes) {
+    dishes = input.dishes;
+    dishesCustomized = await dishesCustomizedFor(db, menuId, input.dishes);
+  } else if (isEvent && menuId && (!id || menuId !== nn(before?.menu))) {
+    // Copia del menù: i piatti tornano uguali al menù.
+    dishes = await menuDishes(db, menuId);
+    dishesCustomized = false;
+  }
+
+  const fields = {
+    ...bookingRecordFields(input, actor, clientId, menuId, kidsMenuId, status),
+    ...(dishesCustomized === null ? {} : { dishes_customized: dishesCustomized }),
+  };
   // Evento spostato in un'altra sala (o diventato evento): i numeri dei tavoli non valgono più, si tolgono.
   if (input.kind === "evento" && (!before || String(before.room ?? "") !== String(fields.room ?? "") || String(before.kind) !== "evento")) {
     Object.assign(fields, { table_number: 0, extra_tables: [] });
@@ -336,14 +476,9 @@ export async function upsertBooking(
     });
   }
 
-  // Piatti: se forniti li sostituisce; altrimenti li copia dal menù alla creazione o quando il menù cambia.
-  let dishes: DishLike[] | null = null;
-  if (isEvent && input.dishes) {
-    dishes = input.dishes;
-  } else if (isEvent && menuId && (!id || menuId !== nn(before?.menu))) {
-    dishes = await menuDishes(db, menuId);
-  }
   if (dishes) queueDishes(batch, actor, bookingId, oldDishes, dishes);
+  // Menù cambiato: il menù composto precedente si elimina se nessun'altra prenotazione lo usa.
+  if (before && nn(before.menu) !== menuId) await queueCustomMenuRemoval(db, batch, nn(before.menu), bookingId);
 
   await batch.send();
   return bookingId;
@@ -523,17 +658,21 @@ export async function saveBookingAllergies(
   return true;
 }
 
-/** Sostituisce i piatti della prenotazione (admin o chef) con audit. */
+/**
+ * Sostituisce i piatti della prenotazione con audit. `dishes_customized` si ricalcola dal contenuto: true solo se i
+ * piatti differiscono dalle voci del menù; sempre false senza menù o con menù composto.
+ */
 export async function saveBookingDishes(db: PocketBase, id: string, dishes: DishLike[], actor: Actor): Promise<void> {
-  await loadBooking(db, id);
+  const booking = await loadBooking(db, id);
   const oldRows = await bookingDishRows(db, id);
+  const customized = await dishesCustomizedFor(db, nn(booking.menu), dishes);
   const batch = db.createBatch();
   queueDishes(batch, actor, id, oldRows, dishes);
-  batch.collection("bookings").update(id, { updated_by: actor.id });
+  batch.collection("bookings").update(id, { updated_by: actor.id, dishes_customized: customized });
   await batch.send();
 }
 
-/** Ripristina i piatti dal menù principale della prenotazione. */
+/** Ripristina i piatti dal menù principale della prenotazione (uguali al menù: il flag torna falso). */
 export async function resetBookingDishesFromMenu(db: PocketBase, id: string, actor: Actor): Promise<void> {
   const booking = await loadBooking(db, id);
   const menuId = nn(booking.menu);
@@ -573,6 +712,8 @@ export async function deleteBookingRecord(db: PocketBase, id: string, actor: Act
   for (const q of quotes) batch.collection("quotes").delete(q.id);
   for (const p of payments) batch.collection("payments").delete(p.id);
   batch.collection("bookings").delete(id);
+  // Menù composto dell'evento: va via con l'evento (se nessun'altra prenotazione lo usa).
+  await queueCustomMenuRemoval(db, batch, nn(booking.menu), id);
   try {
     await batch.send();
   } catch (err) {
