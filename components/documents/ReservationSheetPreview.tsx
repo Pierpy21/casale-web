@@ -1,5 +1,5 @@
-import { SheetFrame, SheetTable, type SheetIssuer, type SheetPreviewColumn } from "./SheetPreview";
-import type { ReservationSheetView } from "@/lib/documents/reservations-view";
+import { SheetFrame, SheetTable, type SheetPreviewColumn } from "./SheetPreview";
+import { EMPTY_SHEET_TEXT, type ReservationSheetView } from "@/lib/documents/reservations-view";
 import styles from "./ReservationSheetPreview.module.css";
 
 /** Colonne di ogni sala come nel PDF (larghezze in pt; il nome prende lo spazio residuo). La sala è nel titolo. */
@@ -13,16 +13,15 @@ const COLUMNS: SheetPreviewColumn[] = [
 
 export interface ReservationSheetPreviewProps {
   view: ReservationSheetView;
-  issuer: SheetIssuer;
   footer: string;
   pxPerMm?: number;
 }
 
 /**
- * Anteprima del foglio prenotazioni come nel PDF: un foglio A4 per pagina (Sala 1-2-3, Sala Grande, Palmento,
- * Terrazza e Pozzo, più le altre sale se servono), con le sale della stessa pagina separate da una linea.
+ * Anteprima del foglio prenotazioni come nel PDF: un foglio A4 per pagina (solo le sale con prenotazioni: Sala 1-2-3,
+ * Sala Grande, Palmento, Terrazza e Pozzo, più le altre sale se servono), con le sale della stessa pagina separate da una linea.
  */
-export function ReservationSheetPreview({ view, issuer, footer, pxPerMm }: ReservationSheetPreviewProps) {
+export function ReservationSheetPreview({ view, footer, pxPerMm }: ReservationSheetPreviewProps) {
   return (
     <div className={styles.pages}>
       {view.pages.map((page, pageIndex) => (
@@ -32,11 +31,11 @@ export function ReservationSheetPreview({ view, issuer, footer, pxPerMm }: Reser
           title={view.title}
           subtitle={view.dateLong}
           meta={view.countLabel}
-          issuer={issuer}
           footer={footer}
           pxPerMm={pxPerMm}
           compact={pageIndex > 0}
         >
+          {page.sections.length === 0 ? <p className={styles.empty}>{EMPTY_SHEET_TEXT}</p> : null}
           {page.sections.map((section, i) => (
             <section key={section.room} aria-label={section.room}>
               {i > 0 ? <div className={styles.divider} aria-hidden="true" /> : null}
@@ -48,7 +47,6 @@ export function ReservationSheetPreview({ view, issuer, footer, pxPerMm }: Reser
                 columns={COLUMNS}
                 caption={`Prenotazioni ${section.room}`}
                 rows={section.rows.map((row) => [row.name, row.table, row.covers, row.meal, row.phone])}
-                emptyText="Nessuna prenotazione"
               />
             </section>
           ))}

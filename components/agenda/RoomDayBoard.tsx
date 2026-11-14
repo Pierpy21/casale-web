@@ -9,6 +9,7 @@ import { cn } from "@/components/ui";
 import type { BookingListItem, Room } from "@/lib/types";
 import { SALA_PARAM, SALA_WITHOUT } from "./agenda-utils";
 import { ReservationList } from "./ReservationList";
+import { ReservationSheetButton } from "./ReservationSheetButton";
 
 export interface RoomDayBoardProps {
   /** Eventi, prenotazioni e appuntamenti del giorno, già filtrati per tipo (gli annullati si escludono qui). */
@@ -199,8 +200,16 @@ export function RoomDayBoard({ items, rooms, selected, canAssignRooms, canDelete
     return <p className="text-[14px] text-slate">Nessuna prenotazione attiva in questo giorno.</p>;
   }
 
+  // Il foglio prenotazioni copre tutta la giornata (tutte le sale): sta qui, sopra la griglia o le pillole, non dentro una sala.
+  const showSheetButton = canAssignRooms && groups.some((group) => group.reservations.length > 0);
+
   return (
     <div ref={rootRef} className="flex min-w-0 scroll-mt-40 flex-col gap-5">
+      {showSheetButton && (
+        <div className="flex justify-end">
+          <ReservationSheetButton date={selected} />
+        </div>
+      )}
       {open ? (
         <>
           <RoomChips groups={groups} activeKey={open.key} onShowAll={() => openRoom(null)} onSelect={openRoom} />
@@ -374,7 +383,14 @@ function RoomDetail({
             </section>
           )}
           {reservations.length > 0 && (
-            <ReservationList bookings={reservations} rooms={rooms} date={date} canAssign={canAssignRooms} canDeleteBookings={canDeleteBookings} />
+            <ReservationList
+              bookings={reservations}
+              rooms={rooms}
+              date={date}
+              canAssign={canAssignRooms}
+              canDeleteBookings={canDeleteBookings}
+              showSheetButton={false}
+            />
           )}
         </>
       )}

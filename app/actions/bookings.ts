@@ -25,6 +25,7 @@ import {
   saveBookingDishes,
   updateBookingCovers as writeCovers,
   upsertBooking,
+  type CustomMenuDraft,
 } from "@/lib/rpc/bookings";
 import { eventStatusFor } from "@/lib/booking-status";
 import type { ActionResult, BookingAllergyDraft, BookingDayMark, BookingKind, BookingStatus } from "@/lib/types";
@@ -148,6 +149,7 @@ type CreatedBooking = { id: string; quote_id: string | null; warnings: string[] 
  * (new_client, con cellulare obbligatorio; riusato se il telefono esiste gia'). Prenotazione normale: ospite
  * (guest_name, guest_phone) sulla prenotazione, nessun cliente di rubrica.
  * `dishes` (solo eventi, facoltativo): piatti personalizzati nel form di creazione, salvati al posto della copia del menù prima del preventivo.
+ * `input.custom_menu` (solo admin, solo eventi, con `dishes` non vuoto): menù composto per questo evento, creato nella stessa scrittura.
  */
 export async function createBooking(
   input: unknown,
@@ -174,27 +176,47 @@ export async function createBooking(
       if (!parsedDishes.success) return invalidInput(parsedDishes.error);
       customDishes = parsedDishes.data;
     }
+    // Menù composto: solo admin, e con almeno un piatto (senza piatti non c'è menù da comporre).
+    const composed = parsed.data.custom_menu;
+    if (composed) {
+      if (!canEditDishes(auth.profile)) return fail("Solo l'amministratore può comporre il menù dell'evento.");
+      if (!customDishes || customDishes.length === 0) {
+        return { ok: false, error: "Componi il menù: aggiungi almeno un piatto.", fieldErrors: { dishes: ["Aggiungi almeno un piatto"] } };
+      }
+    }
     // La rubrica clienti e' riservata all'admin: la sala indica sempre il cliente come nuovo cliente.
     if (!isAdmin(auth.profile) && parsed.data.client_id) {
       return fail("Inserisci il cliente come nuovo cliente (nome, cognome, telefono).");
     }
 
+    // Menù composto: menù, piatti e prenotazione nella stessa scrittura (tutto o niente).
+    const customMenu: CustomMenuDraft | null =
+      composed && customDishes
+        ? {
+            name: composed.name,
+            price_per_person: composed.price_per_person,
+            dishes: customDishes.map((d, index) => ({ ...d, sort: index })),
+          }
+        : null;
+
     // Prezzo proprio del menù: solo admin e solo eventi. Per gli altri (anche l'amministratore cucina) resta 0 = catalogo.
+    // Con il menù composto il prezzo è già quello del menù dell'evento: nessun prezzo proprio.
     const menuPriceInput = {
       ...parsed.data,
-      menu_price: isAdmin(auth.profile) && parsed.data.kind === "evento" ? parsed.data.menu_price : undefined,
+      menu_price: isAdmin(auth.profile) && parsed.data.kind === "evento" && !customMenu ? parsed.data.menu_price : undefined,
     };
 
     let id: string;
     try {
-      id = await upsertBooking(auth.db, menuPriceInput, null, { id: auth.profile.id, full_name: auth.profile.full_name });
+      id = await upsertBooking(auth.db, menuPriceInput, null, { id: auth.profile.id, full_name: auth.profile.full_name }, customMenu);
     } catch (err) {
       return dbFail(err);
     }
 
     const warnings: string[] = [];
     // Piatti personalizzati al posto della copia del menu'. Come per il preventivo: un errore e' un avviso.
-    if (customDishes) {
+    // Con il menù composto i piatti sono già stati salvati insieme alla prenotazione.
+    if (customDishes && !customMenu) {
       try {
         await saveBookingDishes(
           auth.db,
@@ -245,6 +267,8 @@ export async function updateBooking(id: string, input: unknown, opts?: MutationO
     if (!previous) return fail("Prenotazione non trovata.");
     const parsed = BookingInput.safeParse(await withLegacyGuest(auth.db, input, previous));
     if (!parsed.success) return invalidInput(parsed.error);
+    // Il menù composto si crea solo con il nuovo evento: in modifica resta quello salvato (menu_id).
+    if (parsed.data.custom_menu) return fail("Il menù composto si crea solo con un nuovo evento.");
 
     const conflict = await checkConflict(auth.db, opts, previous);
     if (conflict) return conflict;

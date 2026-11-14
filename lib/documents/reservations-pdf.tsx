@@ -1,17 +1,8 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import {
-  Document,
-  Image,
-  Page,
-  StyleSheet,
-  Text,
-  View,
-  renderToBuffer,
-} from "@react-pdf/renderer";
+import { Document, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import type { ReservationSheet } from "@/lib/types";
 import {
-  SHEET_ISSUER,
+  EMPTY_SHEET_TEXT,
+  SHEET_FOOTER,
   buildReservationSheetView,
   type ReservationPdfRow,
   type ReservationRoomSection,
@@ -19,8 +10,9 @@ import {
 } from "@/lib/documents/reservations-view";
 
 // Foglio prenotazioni del giorno in PDF: stessa impostazione tipografica del preventivo e del report di giacenza.
-// Una pagina per gruppo di sale (vedi ROOM_PAGES): Sala 1-2-3 separate da una linea, Sala Grande, Palmento,
-// Terrazza e Pozzo. Per ogni sala una tabella: Nome | Tavolo | Coperti | Pasto | Cellulare. I valori mancanti diventano "—".
+// Nessuna intestazione del Casale: la prima pagina apre con il titolo del foglio e la data.
+// Una pagina per gruppo di sale (vedi ROOM_PAGES), solo con prenotazioni: Sala 1-2-3 separate da una linea, Sala Grande,
+// Palmento, Terrazza e Pozzo. Per ogni sala una tabella: Nome | Tavolo | Coperti | Pasto | Cellulare. I valori mancanti diventano "—".
 
 const COLOR = {
   ink: "#1C2B2D",
@@ -49,13 +41,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLOR.paper,
     lineHeight: 1.35,
   },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  headerLeft: { flexGrow: 1, paddingRight: 16 },
-  issuerName: { fontFamily: FONT.serif, fontSize: 20, lineHeight: 1.2, color: COLOR.ink, marginBottom: 6 },
-  issuerTagline: { fontFamily: FONT.serifItalic, fontSize: 9.5, lineHeight: 1.3, color: COLOR.petrol, marginBottom: 8 },
-  issuerText: { fontSize: 8.5, color: COLOR.slate, marginBottom: 1 },
-  logo: { width: 150, height: 50 },
-  rule: { height: 0.75, backgroundColor: COLOR.line, marginTop: 14, marginBottom: 14 },
   titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 18 },
   docTitle: { fontFamily: FONT.serif, fontSize: 22, lineHeight: 1.25, color: COLOR.ink, marginBottom: 4 },
   docSubtitle: { fontFamily: FONT.serifItalic, fontSize: 13, lineHeight: 1.3, color: COLOR.petrol },
@@ -80,7 +65,9 @@ const styles = StyleSheet.create({
   roomDivider: { height: 0.9, backgroundColor: COLOR.ink, marginTop: 14, marginBottom: 14 },
   footer: {
     position: "absolute",
-    bottom: 22,
+    // top e non bottom: con lineHeight sulla pagina, react-pdf 4.9 non disegna un footer fisso ancorato in basso
+    // che contiene il numero di pagina. A4 = 841,89 pt: il bordo inferiore resta a circa 22 pt dal fondo.
+    top: 803,
     left: 40,
     right: 40,
     flexDirection: "row",
@@ -91,15 +78,6 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 7.5, color: COLOR.slate },
 });
-
-let logoCache: Promise<Buffer> | null = null;
-
-function loadLogo(): Promise<Buffer> {
-  if (!logoCache) {
-    logoCache = readFile(path.join(process.cwd(), "public", "logo-dark.png"));
-  }
-  return logoCache;
-}
 
 function ReservationsTable({ rows }: { rows: ReservationPdfRow[] }) {
   return (
@@ -131,11 +109,7 @@ function RoomSection({ section }: { section: ReservationRoomSection }) {
         <Text style={styles.roomName}>{section.room}</Text>
         <Text style={styles.roomCount}>{section.countLabel}</Text>
       </View>
-      {section.rows.length === 0 ? (
-        <Text style={styles.empty}>Nessuna prenotazione</Text>
-      ) : (
-        <ReservationsTable rows={section.rows} />
-      )}
+      <ReservationsTable rows={section.rows} />
     </View>
   );
 }
@@ -143,7 +117,7 @@ function RoomSection({ section }: { section: ReservationRoomSection }) {
 function Footer() {
   return (
     <View style={styles.footer} fixed>
-      <Text style={styles.footerText}>{SHEET_ISSUER.footer}</Text>
+      <Text style={styles.footerText}>{SHEET_FOOTER}</Text>
       <Text
         style={styles.footerText}
         render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}
@@ -152,38 +126,22 @@ function Footer() {
   );
 }
 
-function ReservationsDocument({ view, logo }: { view: ReservationSheetView; logo: Buffer }) {
+function ReservationsDocument({ view }: { view: ReservationSheetView }) {
   return (
     <Document title={`${view.title} ${view.dateLong}`} author="Casale del Notaio" creator="Casale del Notaio">
       {view.pages.map((page, pageIndex) => (
         <Page key={pageIndex} size="A4" style={styles.page}>
           {pageIndex === 0 ? (
-            <>
-              <View style={styles.headerRow}>
-                <View style={styles.headerLeft}>
-                  <Text style={styles.issuerName}>{SHEET_ISSUER.name}</Text>
-                  <Text style={styles.issuerTagline}>{SHEET_ISSUER.tagline}</Text>
-                  {SHEET_ISSUER.lines.map((line) => (
-                    <Text key={line} style={styles.issuerText}>
-                      {line}
-                    </Text>
-                  ))}
-                </View>
-                {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image non supporta la prop alt */}
-                <Image src={logo} style={styles.logo} />
+            // Prima pagina: titolo, data e conteggio (anche se la prima sala del gruppo è saltata).
+            <View style={styles.titleRow}>
+              <View>
+                <Text style={styles.docTitle}>{view.title}</Text>
+                <Text style={styles.docSubtitle}>{view.dateLong}</Text>
               </View>
-              <View style={styles.rule} />
-
-              <View style={styles.titleRow}>
-                <View>
-                  <Text style={styles.docTitle}>{view.title}</Text>
-                  <Text style={styles.docSubtitle}>{view.dateLong}</Text>
-                </View>
-                <View>
-                  <Text style={styles.metaText}>{view.countLabel}</Text>
-                </View>
+              <View>
+                <Text style={styles.metaText}>{view.countLabel}</Text>
               </View>
-            </>
+            </View>
           ) : (
             // Pagine successive: intestazione compatta con titolo e data.
             <View style={styles.pageHead}>
@@ -192,6 +150,7 @@ function ReservationsDocument({ view, logo }: { view: ReservationSheetView; logo
             </View>
           )}
 
+          {page.sections.length === 0 ? <Text style={styles.empty}>{EMPTY_SHEET_TEXT}</Text> : null}
           {page.sections.map((section, i) => (
             <View key={section.room}>
               {i > 0 ? <View style={styles.roomDivider} /> : null}
@@ -208,6 +167,5 @@ function ReservationsDocument({ view, logo }: { view: ReservationSheetView; logo
 
 /** Renderizza il foglio prenotazioni del giorno in un PDF A4 (Buffer). */
 export async function renderReservationsPdf(sheet: ReservationSheet): Promise<Buffer> {
-  const logo = await loadLogo();
-  return renderToBuffer(<ReservationsDocument view={buildReservationSheetView(sheet)} logo={logo} />);
+  return renderToBuffer(<ReservationsDocument view={buildReservationSheetView(sheet)} />);
 }

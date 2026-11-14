@@ -10,6 +10,7 @@ import {
   monthGridRange,
   parseDateParam,
   parseKindFilter,
+  parseMealFilter,
   parseView,
   todayISO,
 } from "@/components/agenda/agenda-utils";
@@ -18,13 +19,14 @@ export const metadata: Metadata = {
   title: "Agenda · Casale del Notaio",
 };
 
-type SearchParams = Promise<{ date?: string; view?: string; tipo?: string }>;
+type SearchParams = Promise<{ date?: string; view?: string; tipo?: string; pasto?: string }>;
 
 export default async function AgendaPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const profile = await requireProfile();
   const today = todayISO();
   const kind = parseKindFilter(params.tipo);
+  const meal = parseMealFilter(params.pasto);
 
   // Cucina: calendario con schede dei banchetti (uguali a sala e admin), note cucina in tendina.
   if (isKitchenRole(profile)) {
@@ -65,11 +67,12 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
 
   return (
     <AgendaBoard
-      key={`${selected}|${view}|${kind}`}
+      key={`${selected}|${view}|${kind}|${meal}`}
       bookings={bookings}
       initialDate={selected}
       initialView={view}
       initialKind={kind}
+      initialMeal={meal}
       loadedRange={loadedRange}
       today={today}
       isAdmin={admin}

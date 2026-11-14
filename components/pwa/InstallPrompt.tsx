@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { X } from "lucide-react";
 import { isDeskLayout } from "@/components/shell/shell-mode";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui";
@@ -118,6 +119,15 @@ export function InstallPrompt() {
         shown ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
       )}
     >
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label="Chiudi"
+        onClick={dismiss}
+        className="absolute right-1 top-1 size-11 p-0!"
+      >
+        <X aria-hidden="true" className="size-4" />
+      </Button>
       <div className="flex items-start gap-4">
         <div className="shrink-0 overflow-hidden rounded-[2px] bg-ink">
           <Image
@@ -129,7 +139,7 @@ export function InstallPrompt() {
             className="size-12"
           />
         </div>
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-1 pr-8">
           <h2 id={titleId} className="font-serif text-xl leading-tight">
             Installa l&rsquo;Agenda sul telefono
           </h2>

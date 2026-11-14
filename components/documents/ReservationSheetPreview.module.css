@@ -31,6 +31,15 @@
   color: #5a6668;
 }
 
+/* Giornata senza prenotazioni: messaggio sotto il titolo (come nel PDF). */
+.empty {
+  margin: calc(2.82 * var(--mm)) 0 0;
+  font-family: "Times New Roman", Times, serif;
+  font-style: italic;
+  font-size: calc(3.35 * var(--mm)); /* 9,5 pt */
+  color: #5a6668;
+}
+
 /* Linea tra le sale della stessa pagina (0,9 pt, margini 14 pt). */
 .divider {
   height: calc(0.32 * var(--mm));

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { capitalize, formatIt, toDate } from "@/components/agenda/agenda-utils";
 import { bookingPersonName, bookingWhen, formatCovers, totalCovers } from "@/components/bookings/format";
+import { CustomizedTag } from "@/components/menu/MenuBadge";
 import { Badge, EmptyState, PageHeader, type BadgeTone } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { requireAdmin } from "@/lib/auth";
@@ -87,7 +88,12 @@ export default async function DaConfermarePage() {
                           <span className="tabular-nums">
                             {totalCovers(booking)} coperti · {formatCovers(booking)}
                           </span>
-                          {menuName && <span className="break-words text-slate-dark">{menuName}</span>}
+                          {menuName && (
+                            <span className="flex flex-wrap items-center gap-2 sm:justify-end">
+                              <span className="break-words text-slate-dark">{menuName}</span>
+                              {booking.dishes_customized && <CustomizedTag />}
+                            </span>
+                          )}
                         </div>
                       </Link>
                     </li>

@@ -18,10 +18,19 @@ export async function getRooms(opts?: { includeInactive?: boolean }): Promise<Ro
   return records.map(mapRoom).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name, "it"));
 }
 
-export async function getMenus(opts?: { includeInactive?: boolean }): Promise<Menu[]> {
+/**
+ * Menù per le scelte e per il catalogo. I menù compositi (creati per un solo evento) non ci sono mai: il menù
+ * di una prenotazione composta si legge con la prenotazione stessa (getBooking, campo `menu`).
+ */
+export async function getMenus(opts?: { includeInactive?: boolean; includeCustom?: boolean }): Promise<Menu[]> {
   if (!(await getCurrentProfile())) return [];
   const db = await getAdminPb();
-  const filter = opts?.includeInactive ? "" : db.filter("active = {:a}", { a: true });
+  const filter = [
+    opts?.includeInactive ? "" : db.filter("active = {:a}", { a: true }),
+    opts?.includeCustom ? "" : "custom != true",
+  ]
+    .filter(Boolean)
+    .join(" && ");
   const records = await listAll(db, "menus", filter, { sort: "sort,name" });
   const byId = await menusWithItems(db, records);
   return records.map((r) => byId.get(r.id)).filter((m): m is Menu => Boolean(m));
@@ -40,15 +49,18 @@ export async function getDishes(opts?: { includeInactive?: boolean }): Promise<D
   const links = await listByParents(db, "menu_items", "dish", records.map((r) => r.id), { fields: "id,dish,menu" });
   const menuIds = [...new Set(links.map((l) => String(l.menu ?? "")).filter(Boolean))];
   const menuNames = new Map<string, string>();
-  for (const m of await listByParents(db, "menus", "id", menuIds, { fields: "id,name" })) {
-    menuNames.set(m.id, String(m.name ?? ""));
+  // I menù compositi non compaiono tra quelli che usano un piatto (sono dell'evento, non del catalogo).
+  const composedIds = new Set<string>();
+  for (const m of await listByParents(db, "menus", "id", menuIds, { fields: "id,name,custom" })) {
+    if (m.custom) composedIds.add(m.id);
+    else menuNames.set(m.id, String(m.name ?? ""));
   }
 
   const usedBy = new Map<string, Map<string, { id: string; name: string }>>();
   for (const link of links) {
     const dishId = String(link.dish ?? "");
     const menuId = String(link.menu ?? "");
-    if (!dishId || !menuId) continue;
+    if (!dishId || !menuId || composedIds.has(menuId)) continue;
     const bucket = usedBy.get(dishId) ?? new Map<string, { id: string; name: string }>();
     if (!bucket.has(menuId)) bucket.set(menuId, { id: menuId, name: menuNames.get(menuId) ?? "" });
     usedBy.set(dishId, bucket);
@@ -66,12 +78,13 @@ export async function getDishes(opts?: { includeInactive?: boolean }): Promise<D
 /**
  * Colore di ogni menù (adulti per prezzo crescente, bambini fissi). Letto con l'account di servizio per
  * qualunque ruolo attivo: i prezzi servono solo a ordinare, non escono dal server. Include anche i menù
- * inattivi, così le prenotazioni passate mantengono il loro colore.
+ * inattivi, così le prenotazioni passate mantengono il loro colore. Esclusi i menù compositi: un menù per
+ * evento sposterebbe la scala dei menù adulti (chi non ha colore usa il colore di ripiego).
  */
 export async function getMenuColors(): Promise<Record<string, MenuColor>> {
   if (!(await getCurrentProfile())) return {};
   const db = await getAdminPb();
-  const records = await listAll(db, "menus", "", { fields: "id,name,price_per_person,is_kids" });
+  const records = await listAll(db, "menus", "custom != true", { fields: "id,name,price_per_person,is_kids" });
   return buildMenuColors(
     records.map((r: PbRecord) => ({
       id: r.id,

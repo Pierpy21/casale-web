@@ -74,7 +74,7 @@ export default async function AppLayout({
             </a>
 
             <Sidebar profile={profile} links={links} />
-            <MobileHeader />
+            <MobileHeader profile={profile} />
 
             <main
               id="contenuto"

@@ -68,6 +68,12 @@ export interface DishesEditorProps {
   onQueued?: (dishes: DishPayload[]) => void;
   /** `updated_at` della prenotazione letto con la pagina (controllo di conflitto offline). */
   expectedUpdated?: string;
+  /**
+   * "modal" (default): editor dentro una modale, il contenuto scorre nell'area centrale.
+   * "inline": editor nella pagina, nessuna area di scorrimento interna: la pagina scorre tutta
+   * e la barra dei pulsanti resta in fondo sticky.
+   */
+  layout?: "modal" | "inline";
 }
 
 /**
@@ -76,10 +82,12 @@ export interface DishesEditorProps {
  * Il componente va montato con `key` legata alla versione dei piatti salvati: dopo un salvataggio
  * o un ripristino si riparte dai dati del server.
  *
- * Layout: il contenuto scorre nell'area centrale, la barra con Annulla / Applica resta in fondo.
+ * Layout modale: il contenuto scorre nell'area centrale, la barra con Annulla / Applica resta in fondo.
  * Nella finestra "bare" della creazione evento l'altezza è data dalla finestra stessa.
+ * Layout inline: niente scorrimento interno (la rotella scorre la pagina), la barra è sticky in fondo.
  */
-export function DishesEditor({ bookingId, onApply, price, submitLabel = "Salva piatti", dishes, hasMenu, catalog, onClose, onQueued, expectedUpdated }: DishesEditorProps) {
+export function DishesEditor({ bookingId, onApply, price, submitLabel = "Salva piatti", dishes, hasMenu, catalog, onClose, onQueued, expectedUpdated, layout = "modal" }: DishesEditorProps) {
+  const inline = layout === "inline";
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const nextKey = useRef(0);
@@ -241,8 +249,19 @@ export function DishesEditor({ bookingId, onApply, price, submitLabel = "Salva p
   }));
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="Piatti dell’evento" className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-cream/40 px-4 py-5 sm:px-6">
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      aria-label="Piatti dell’evento"
+      className={inline ? "flex min-w-0 flex-col" : "flex min-h-0 min-w-0 flex-1 flex-col"}
+    >
+      <div
+        className={
+          inline
+            ? "min-w-0 bg-cream/40 px-4 py-5 sm:px-6"
+            : "min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-cream/40 px-4 py-5 sm:px-6"
+        }
+      >
         {price && (
           <div className="mb-6 flex min-w-0 flex-col gap-3 rounded-btn border border-sand bg-paper p-4">
             <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-slate-dark">Prezzo del menù per questo evento</p>
@@ -310,7 +329,15 @@ export function DishesEditor({ bookingId, onApply, price, submitLabel = "Salva p
         </fieldset>
       </div>
 
-      <div className="shrink-0 border-t border-sand bg-paper px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-10px_24px_-18px_rgba(28,43,45,0.45)] sm:px-6 sm:pb-4">
+      {/* Inline la barra è sticky sopra la nav mobile (3.75rem, come InventoryReportForm); su desktop va in fondo alla viewport. */}
+      <div
+        className={
+          (inline
+            ? "sticky bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-20 desk:bottom-0"
+            : "shrink-0") +
+          " border-t border-sand bg-paper px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 shadow-[0_-10px_24px_-18px_rgba(28,43,45,0.45)] sm:px-6 sm:pb-4"
+        }
+      >
         {formError && (
           <div className="mb-3">
             <Alert tone="danger">{formError}</Alert>

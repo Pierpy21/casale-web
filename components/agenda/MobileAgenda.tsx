@@ -7,7 +7,8 @@ import { EmptyDay } from "./NextEventHint";
 import { ReservationList } from "./ReservationList";
 import { RoomDayBoard } from "./RoomDayBoard";
 import { SwipeDay } from "./SwipeDay";
-import { capitalize, dayCountLabel, formatIt, shiftPeriod, toDate, type AgendaKindFilter } from "./agenda-utils";
+import { AgendaMealSwitch } from "./AgendaMealSwitch";
+import { capitalize, dayCountLabel, filterByMeal, formatIt, shiftPeriod, toDate, type AgendaKindFilter, type AgendaMealFilter } from "./agenda-utils";
 
 export interface MobileAgendaProps {
   selected: string;
@@ -23,6 +24,9 @@ export interface MobileAgendaProps {
   canDeleteBookings: boolean;
   /** Filtro per tipo corrente (la scelta sta nella barra sopra, in AgendaBoard). */
   kind: AgendaKindFilter;
+  /** Filtro pasto del giorno (Tutti / Pranzo / Cena), scelto sulla riga della legenda. */
+  meal: AgendaMealFilter;
+  onMealChange: (meal: AgendaMealFilter) => void;
   /** Vista per sale (ruolo sala): il giorno mostra le sale invece della lista. */
   roomsView?: boolean;
   onNavigate: (iso: string) => void;
@@ -31,7 +35,7 @@ export interface MobileAgendaProps {
   onOpenNextEvent: (iso: string) => void;
 }
 
-/** Agenda mobile (< desk): calendario mensile in alto, lista del giorno sotto. Periodo e filtro stanno nella barra fissa (AgendaBoard). */
+/** Agenda mobile (< desk): calendario mensile in alto, lista del giorno sotto. Periodo e filtro tipo stanno nella barra fissa (AgendaBoard). */
 export function MobileAgenda({
   selected,
   today,
@@ -41,13 +45,16 @@ export function MobileAgenda({
   canAssignRooms,
   canDeleteBookings,
   kind,
+  meal,
+  onMealChange,
   roomsView = false,
   onNavigate,
   nextEvent = null,
   onOpenNextEvent,
 }: MobileAgendaProps) {
   const selectedDate = toDate(selected);
-  const items = byDate.get(selected) ?? [];
+  const dayItems = byDate.get(selected) ?? [];
+  const items = filterByMeal(dayItems, meal);
   const cards = items.filter((b) => b.kind !== "normale");
   const reservations = items.filter((b) => b.kind === "normale");
   const dayLabel = capitalize(formatIt(selectedDate, "EEEE d MMMM"));
@@ -73,15 +80,18 @@ export function MobileAgenda({
 
         <DaySummary bookings={items} />
 
-        {/* Legenda degli stati sopra le schede del giorno (non sopra il calendario del mese). */}
-        <StatusLegend />
+        {/* Legenda degli stati e filtro pasto sopra le schede del giorno (non sopra il calendario del mese). */}
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <StatusLegend className="min-w-0" />
+          <AgendaMealSwitch value={meal} onChange={onMealChange} />
+        </div>
 
         <SwipeDay
           onPrev={() => onNavigate(shiftPeriod(selected, "day", -1))}
           onNext={() => onNavigate(shiftPeriod(selected, "day", 1))}
         >
           {items.length === 0 ? (
-            <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={onOpenNextEvent} />
+            <EmptyDay kind={kind} meal={meal} hasBookings={dayItems.length > 0} nextEvent={nextEvent} selected={selected} onOpen={onOpenNextEvent} />
           ) : roomsView ? (
             <RoomDayBoard items={items} rooms={rooms} selected={selected} canAssignRooms={canAssignRooms} canDeleteBookings={canDeleteBookings} />
           ) : (

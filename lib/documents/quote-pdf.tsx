@@ -26,6 +26,8 @@ const COLOR = {
   line: "#D5D5B7",
   paper: "#FFFFFF",
   zebra: "#F7F7F4",
+  // Punto del marchio C.PINSAI (come nel piè di pagina del sito).
+  pink: "#E5488A",
 } as const;
 
 const FONT = {
@@ -48,7 +50,8 @@ const styles = StyleSheet.create({
     lineHeight: 1.35,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  headerLeft: { flexGrow: 1, paddingRight: 16 },
+  // flexBasis 0: il blocco sinistro non deve mai restringere il blocco evento (250 pt), come nell'anteprima.
+  headerLeft: { flexGrow: 1, flexBasis: 0, paddingRight: 16 },
   // Logo in alto a sinistra, al posto del nome del Casale.
   logo: { width: 135, height: 45, marginBottom: 4 },
   issuerTagline: { fontFamily: FONT.serifItalic, fontSize: 9.5, lineHeight: 1.3, color: COLOR.petrol, marginBottom: 4 },
@@ -73,17 +76,28 @@ const styles = StyleSheet.create({
   col: { flexGrow: 1, flexBasis: 0 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   gridCell: { width: "50%", paddingRight: 12 },
-  kvRow: { flexDirection: "row", marginBottom: 2 },
+  // Righe chiave/valore con respiro verticale di 3 pt; il filetto separa solo le righe successive alla prima.
+  kvRow: { flexDirection: "row", paddingVertical: 3 },
+  // Etichette a larghezza fissa (78 pt, 44 pt nel blocco evento). React-PDF forza flexShrink 0 a 1,
+  // quindi il valore non deve mai superare lo spazio: per questo il valore parte da flexBasis 0.
   kvLabel: { width: 78, fontSize: 8.5, color: COLOR.slate },
   kvLabelCompact: { width: 44 },
-  kvValue: { flexGrow: 1, flexShrink: 1, fontSize: 10, color: COLOR.ink },
-  section: { marginBottom: 8 },
-  sectionTitle: { fontFamily: FONT.serif, fontSize: 13, color: COLOR.ink },
-  menuHeading: { flexDirection: "row", alignItems: "baseline", gap: 10, marginBottom: 5 },
-  menuEyebrow: { marginBottom: 0 },
-  courseRow: { flexDirection: "row", marginBottom: 3 },
-  courseLabel: { width: 66, fontFamily: FONT.sansBold, fontSize: 8, color: COLOR.bronze, textTransform: "uppercase", letterSpacing: 0.8, paddingTop: 1 },
-  courseDishes: { flexGrow: 1, flexShrink: 1 },
+  kvValue: { flexGrow: 1, flexShrink: 1, flexBasis: 0, fontSize: 10, color: COLOR.ink },
+  section: { marginBottom: 6 },
+  // Separatore sottile sopra una sezione (o un blocco) che non ha già un filetto a chiudere quella precedente.
+  // Nome del menù (o etichetta "Menù" / "Menù bambini" se manca): serif, stesso bronzo delle portate.
+  menuTitle: { fontFamily: FONT.serif, fontSize: 15, color: COLOR.bronze, marginBottom: 5 },
+  // Ogni portata è una riga di tabella: filetto sotto, con 3 pt sopra e sotto.
+  courseRow: {
+    flexDirection: "row",
+    paddingVertical: 3,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLOR.line,
+  },
+  // Larghezza fissa 66 pt (come .courseLabel nel CSS): la voce più lunga (CONTORNO, ~53 pt) ci sta.
+  // Piatti con flexBasis 0: la colonna dei piatti non può far restringere l'etichetta riga per riga.
+  courseLabel: { width: 66, flexGrow: 0, fontFamily: FONT.sansBold, fontSize: 8, color: COLOR.bronze, textTransform: "uppercase", letterSpacing: 0.8, paddingTop: 1 },
+  courseDishes: { flexGrow: 1, flexShrink: 1, flexBasis: 0 },
   dish: { fontSize: 9.5, lineHeight: 1.25, color: COLOR.ink, marginBottom: 1 },
   tableHead: {
     flexDirection: "row",
@@ -98,7 +112,8 @@ const styles = StyleSheet.create({
     borderBottomColor: COLOR.line,
     paddingVertical: 3,
   },
-  cellDescription: { flexGrow: 4, paddingRight: 8, fontSize: 9.5 },
+  // flexBasis 0: una descrizione lunga non deve restringere le colonne numeriche di quella riga.
+  cellDescription: { flexGrow: 4, flexBasis: 0, paddingRight: 8, fontSize: 9.5 },
   cellQty: { width: 50, textAlign: "right", fontSize: 9.5 },
   cellUnit: { width: 90, textAlign: "right", fontSize: 9.5 },
   cellAmount: { width: 90, textAlign: "right", fontSize: 9.5 },
@@ -129,16 +144,26 @@ const styles = StyleSheet.create({
   signatureLabel: { fontSize: 8.5, color: COLOR.slate },
   footer: {
     position: "absolute",
-    bottom: 22,
+    // top e non bottom: con lineHeight sulla pagina, react-pdf 4.9 non disegna un footer fisso ancorato in basso
+    // che contiene il numero di pagina. A4 = 841,89 pt: il bordo inferiore resta a circa 22 pt dal fondo.
+    top: 801,
     left: 40,
     right: 40,
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     borderTopWidth: 0.5,
     borderTopColor: COLOR.line,
     paddingTop: 6,
   },
   footerText: { fontSize: 7.5, color: COLOR.slate },
+  // Marchio "Powered by C.PINSAI" nell'angolo in basso a destra (largo circa 98 pt).
+  poweredBy: { flexDirection: "row", alignItems: "center" },
+  // Numero di pagina allineato a destra, 14 pt a sinistra del marchio: 40 margine + 98 marchio + 14 = 152.
+  footerPage: { position: "absolute", top: 808.5, right: 152, fontSize: 7.5, color: COLOR.slate, textAlign: "right" },
+  poweredByLabel: { fontSize: 6.5, color: COLOR.slate, textTransform: "uppercase", letterSpacing: 0.9, marginRight: 4 },
+  brandName: { fontFamily: FONT.sansBold, fontSize: 9, letterSpacing: 0.5, color: COLOR.ink },
+  brandDot: { color: COLOR.pink },
 });
 
 let logoCache: Promise<Buffer> | null = null;
@@ -178,17 +203,16 @@ function CourseColumn({ courses }: { courses: QuoteDocumentCourse[] }) {
   );
 }
 
-/** Menù su due colonne bilanciate, per stare in un unico foglio A4. */
+/**
+ * Menù su due colonne bilanciate, per stare in un unico foglio A4.
+ * Il titolo è il nome del menù; se manca (o coincide con l'etichetta di sezione) resta l'etichetta.
+ */
 function MenuBlock({ title, menu }: { title: string; menu: QuoteDocumentMenu }) {
   const [left, right] = splitCoursesInColumns(menu.courses);
+  const heading = menu.name && menu.name.trim().toLowerCase() !== title.trim().toLowerCase() ? menu.name : title;
   return (
     <View style={styles.section}>
-      <View style={styles.menuHeading}>
-        <Text style={[styles.eyebrow, styles.menuEyebrow]}>{title}</Text>
-        {menu.name && menu.name.trim().toLowerCase() !== title.trim().toLowerCase() ? (
-          <Text style={styles.sectionTitle}>{menu.name}</Text>
-        ) : null}
-      </View>
+      <Text style={styles.menuTitle}>{heading}</Text>
       <View style={styles.twoCols}>
         <CourseColumn courses={left} />
         <CourseColumn courses={right} />
@@ -202,16 +226,25 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
   return (
     <Document title={`${model.title} ${meta.number}`} author={issuer.name} creator={issuer.name}>
       <Page size="A4" style={styles.page}>
-        {/* Footer con numerazione pagine */}
+        {/* Footer con numerazione pagine e marchio C.PINSAI in basso a destra */}
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
             {issuer.name} · {issuer.addressLines.join(", ")} · {issuer.phone}
           </Text>
-          <Text
-            style={styles.footerText}
-            render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}
-          />
+          <View style={styles.poweredBy}>
+            <Text style={styles.poweredByLabel}>Powered by</Text>
+            <Text style={styles.brandName}>
+              C<Text style={styles.brandDot}>.</Text>PINSAI
+            </Text>
+          </View>
         </View>
+        {/* Numero di pagina in un elemento fisso a parte: react-pdf 4.9 non disegna gli altri figli di una riga
+            che contiene un testo con render. Sta subito a sinistra del marchio. */}
+        <Text
+          fixed
+          style={styles.footerPage}
+          render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} di ${totalPages}`}
+        />
         {/* Intestazione: logo e dati Casale a sinistra, dettagli evento in alto a destra */}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
@@ -253,6 +286,7 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
           <Text style={styles.eyebrow}>Cliente</Text>
           {/* Griglia a due colonne: i campi si dispongono a coppie per riga */}
           <View style={styles.grid}>
+            {/* Filetto tra una riga di coppie e la successiva (non sopra la prima riga) */}
             {clientFields(client).map(([label, value]) => (
               <View key={label} style={styles.gridCell}>
                 <KeyValue label={label} value={value} />
@@ -261,12 +295,15 @@ function QuoteDocument({ model, logo }: { model: QuoteDocumentModel; logo: Buffe
           </View>
         </View>
 
-        {/* Menù */}
+        {/* Menù: il filetto sopra il menù bambini c'è solo se manca il menù adulti, perché le portate chiudono già con un filetto */}
         {model.menu ? <MenuBlock title="Menù" menu={model.menu} /> : null}
         {model.kidsMenu ? <MenuBlock title="Menù bambini" menu={model.kidsMenu} /> : null}
 
-        {/* Allergie e intolleranze */}
-        <View style={styles.section} wrap={false}>
+        {/* Allergie e intolleranze: filetto sopra solo se nessun menù ha già chiuso la sezione precedente */}
+        <View
+          style={styles.section}
+          wrap={false}
+        >
           <Text style={styles.eyebrow}>Allergie e intolleranze</Text>
           {model.allergies.length > 0 ? (
             <View style={styles.allergyList}>

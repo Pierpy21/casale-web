@@ -28,6 +28,9 @@ export default async function EditBookingPage({ params }: { params: Promise<{ id
     getRoomBookingSlots(range.from, range.to),
   ]);
 
+  // Menù composto di questo evento: non è tra i menù scelti, ma deve restare selezionabile nel form (altrimenti il salvataggio lo perderebbe).
+  const menuOptions = booking.menu?.custom ? [...menus, booking.menu] : menus;
+
   // Il form dipende dal tipo salvato (evento, prenotazione o appuntamento).
   return (
     <BookingForm
@@ -36,7 +39,7 @@ export default async function EditBookingPage({ params }: { params: Promise<{ id
       booking={booking}
       clients={clients}
       rooms={rooms}
-      menus={menus}
+      menus={menuOptions}
       occupancy={occupancy}
       initialDate={booking.event_date}
     />

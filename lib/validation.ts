@@ -218,6 +218,21 @@ export type DishInputType = z.infer<typeof DishInput>;
 
 export const DishesInput = z.array(DishInput).max(MAX_ITEMS, "Troppi piatti (massimo 60)");
 
+/** Nome predefinito del menù composto quando il nome è vuoto. */
+export const DEFAULT_CUSTOM_MENU_NAME = "Menù Composto";
+
+/**
+ * Menù composto per un nuovo evento (createBooking): nome facoltativo (vuoto → "Menù Composto") e prezzo a persona.
+ * I piatti non stanno qui: arrivano come argomento `dishes` di createBooking (obbligatori con il menù composto).
+ */
+export const CustomMenuInput = z.object({
+  name: z
+    .preprocess(emptyToNull, z.string().max(80, "Nome del menù troppo lungo (max 80 caratteri)").nullable())
+    .transform((n) => n ?? DEFAULT_CUSTOM_MENU_NAME),
+  price_per_person: priceSchema,
+});
+export type CustomMenuInputType = z.infer<typeof CustomMenuInput>;
+
 /**
  * Payload di updateBookingDishes: l'elenco piatti (formato originale, coda offline) oppure
  * `{ dishes, menu_price? }`. `menu_price` presente (anche null) = salva il prezzo del menù dell'evento (null o 0 = catalogo).
@@ -383,12 +398,23 @@ const BookingObject = z
     allergies: z.array(AllergyInput).max(MAX_ITEMS, "Troppe allergie (massimo 60)").default([]),
     /** Se assente e menu_id presente, il backend copia i piatti dal menù (solo eventi). */
     dishes: DishesInput.optional(),
+    /**
+     * Menù composto per questo evento (solo creazione, admin): al posto di menu_id. I piatti sono l'argomento `dishes`
+     * di createBooking. Non si usa in modifica (updateBooking lo rifiuta).
+     */
+    custom_menu: CustomMenuInput.nullish(),
     /** Solo eventi: crea anche il preventivo. Con `quote` assente si usano le righe automatiche dal catalogo. */
     create_quote: z.boolean().default(true),
     quote: z.lazy(() => QuoteDraftInput).nullish(),
   })
   .superRefine((v, ctx) => {
     const issue = (path: string, message: string) => ctx.addIssue({ code: "custom", message, path: [path] });
+
+    // Menù composto: solo per gli eventi, e al posto (non insieme) di un menù dell'elenco.
+    if (v.custom_menu) {
+      if (v.kind !== "evento") issue("custom_menu", "Il menù composto è solo per gli eventi");
+      if (v.menu_id) issue("menu_id", "Scegli un menù dell'elenco oppure componi il menù dell'evento, non entrambi");
+    }
 
     // Di tutti i tipi solo il nome (del cliente o dell'ospite) è obbligatorio: tipo evento, ora e coperti sono facoltativi.
     if (v.kind === "normale") {
@@ -422,6 +448,7 @@ const BookingObject = z
       guest_phone: normal ? (v.guest_phone ?? null) : null,
       // Normali: sempre confermate (annullato escluso). Eventi: stato richiesto o "opzione", ricalcolato dal server.
       status: normal ? normalBookingStatus(v.status ?? "confermato") : (v.status ?? "opzione"),
+      custom_menu: v.custom_menu ?? null,
     };
   });
 

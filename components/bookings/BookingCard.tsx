@@ -53,7 +53,7 @@ export interface BookingCardProps {
 const SETUP_FALLBACK = "#B0B0B0";
 
 /** Menù scelto: nome nel colore del menù, la prima informazione della card. */
-function MenuLabel({ menuId, name }: { menuId: string | null; name: string | null }) {
+function MenuLabel({ menuId, name, customized = false }: { menuId: string | null; name: string | null; customized?: boolean }) {
   if (!name) {
     return (
       <span className="inline-flex max-w-full items-center rounded-[2px] border border-dashed border-slate/60 px-3 py-1.5 font-serif text-[15px] italic text-slate-dark">
@@ -61,7 +61,7 @@ function MenuLabel({ menuId, name }: { menuId: string | null; name: string | nul
       </span>
     );
   }
-  return <MenuBadge menuId={menuId} name={name} size="md" />;
+  return <MenuBadge menuId={menuId} name={name} size="md" customized={customized} />;
 }
 
 /** Colori di allestimento: pallini distanziati e nomi che vanno a capo, senza troncamenti. */
@@ -112,7 +112,7 @@ export function BookingCard({
     return (
       <Link
         href={href}
-        aria-label={`${BOOKING_KIND_LABELS[b.kind]}, ${isEvent ? (menuName ?? "Menù da definire") : title}${whenLine ? `, ${whenLine}` : ""}${b.room ? `, ${b.room.name}` : ""}${covers > 0 ? `, ${formatCovers(b)} coperti` : ""}${allergyCount > 0 ? `, ${allergyCount} allergie` : ""}, stato ${STATUS_LABELS[b.status]}`}
+        aria-label={`${BOOKING_KIND_LABELS[b.kind]}, ${isEvent ? (menuName ?? "Menù da definire") + (b.dishes_customized ? ", piatti modificati" : "") : title}${whenLine ? `, ${whenLine}` : ""}${b.room ? `, ${b.room.name}` : ""}${covers > 0 ? `, ${formatCovers(b)} coperti` : ""}${allergyCount > 0 ? `, ${allergyCount} allergie` : ""}, stato ${STATUS_LABELS[b.status]}`}
         style={{ borderLeftColor: STATUS_COLORS[b.status] }}
         className={cn(
           "flex min-w-0 flex-col gap-1.5 border-l-[3px] bg-cream/70 px-3 py-3 text-ink transition-colors duration-200 hover:bg-sand/60",
@@ -138,7 +138,7 @@ export function BookingCard({
         </span>
         {isEvent ? (
           menuName ? (
-            <MenuBadge menuId={b.menu?.id ?? null} name={menuName} size="sm" className="self-start" />
+            <MenuBadge menuId={b.menu?.id ?? null} name={menuName} size="sm" className="self-start" customized={b.dishes_customized} />
           ) : (
             <span className="font-serif text-[16px] font-semibold italic leading-snug text-slate-dark">Menù da definire</span>
           )
@@ -201,7 +201,7 @@ export function BookingCard({
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             <KindBadge kind={b.kind} />
-            {isEvent && <MenuLabel menuId={b.menu?.id ?? null} name={menuName} />}
+            {isEvent && <MenuLabel menuId={b.menu?.id ?? null} name={menuName} customized={b.dishes_customized} />}
           </div>
           {b.kind !== "normale" && <StatusDot status={b.status} />}
         </div>

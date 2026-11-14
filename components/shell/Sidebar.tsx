@@ -6,6 +6,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { InstallAppButton } from "@/components/pwa/InstallAppButton";
 import { SignOutForm } from "@/components/pwa/SignOutForm";
 import { SidebarNav } from "./NavLinks";
+import { MobileUserMenu } from "./MobileUserMenu";
 import type { NavLink } from "./nav";
 
 /**
@@ -40,7 +41,7 @@ export function Sidebar({ profile, links }: { profile: Profile; links: NavLink[]
         </div>
         <div className="flex items-center justify-between gap-3">
           <p className="min-w-0 truncate font-serif text-lg text-logo-cream sidebar-compact:hidden">{profile.full_name}</p>
-          <NotificationBell variant="sidebar" />
+          <NotificationBell />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 sidebar-compact:hidden">
           <Badge tone="bronze" className="border-sand/40 bg-transparent text-sand">
@@ -58,38 +59,32 @@ export function Sidebar({ profile, links }: { profile: Profile; links: NavLink[]
 }
 
 /**
- * Header mobile (< lg): logo compatto ed uscita.
+ * Header mobile (< lg): logo compatto e menu utente (nome e avatar; l'avatar porta il conteggio delle notifiche
+ * e apre il pannello con notifiche, ruolo, installa ed esci).
  * Fisso e su un layer GPU, non sticky: su iOS un header sticky segue il rimbalzo elastico dello scroll e sembra
  * in ritardo. Altezza fissa (safe area + 4rem) uguale allo spaziatore sotto e agli offset degli elementi sticky.
  */
-export function MobileHeader() {
+export function MobileHeader({ profile }: { profile: Profile }) {
   return (
     <>
-      <MobileHeaderBar />
+      <MobileHeaderBar profile={profile} />
       <div aria-hidden="true" className="no-print h-[calc(env(safe-area-inset-top)+4rem)] desk:hidden" />
     </>
   );
 }
 
-function MobileHeaderBar() {
+function MobileHeaderBar({ profile }: { profile: Profile }) {
   return (
-    <header className="no-print fixed inset-x-0 top-0 z-30 flex h-[calc(env(safe-area-inset-top)+4rem)] transform-gpu items-center justify-between gap-3 bg-ink px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] desk:hidden optouch:px-[max(2rem,calc((100%-56rem)/2+2rem))]">
+    <header className="no-print fixed inset-x-0 top-0 z-50 flex h-[calc(env(safe-area-inset-top)+4rem)] transform-gpu items-center justify-between gap-3 bg-ink px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] desk:hidden optouch:px-[max(2rem,calc((100%-56rem)/2+2rem))]">
       <Image
         src="/logo.svg"
         alt="Il Casale del Notaio"
         width={675}
         height={225}
         unoptimized
-        className="h-8 w-auto"
+        className="h-8 w-auto shrink-0"
       />
-      <div className="flex items-center gap-1">
-        <NotificationBell variant="header" />
-        <SignOutForm action={signOut}>
-          <SubmitButton variant="light" size="sm" pendingLabel="Uscita…">
-            Esci
-          </SubmitButton>
-        </SignOutForm>
-      </div>
+      <MobileUserMenu fullName={profile.full_name} roleLabel={ROLE_LABELS[profile.role]} signOut={signOut} />
     </header>
   );
 }

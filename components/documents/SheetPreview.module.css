@@ -35,57 +35,7 @@
   }
 }
 
-/* Intestazione: dati del Casale a sinistra, logo a destra. */
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: calc(4 * var(--mm));
-}
-
-.issuer {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding-right: calc(5.6 * var(--mm));
-}
-
-.issuerName {
-  margin: 0 0 calc(2.12 * var(--mm));
-  font-family: "Times New Roman", Times, serif;
-  font-weight: 400;
-  font-size: calc(7.06 * var(--mm)); /* 20 pt */
-  line-height: 1.2;
-  color: #1c2b2d;
-}
-
-.issuerTagline {
-  margin: 0 0 calc(2.82 * var(--mm));
-  font-family: "Times New Roman", Times, serif;
-  font-style: italic;
-  font-size: calc(3.35 * var(--mm)); /* 9,5 pt */
-  line-height: 1.3;
-  color: #355a63;
-}
-
-.issuerText {
-  margin: 0 0 calc(0.35 * var(--mm));
-  font-size: calc(3 * var(--mm)); /* 8,5 pt */
-  color: #5a6668;
-}
-
-.logo {
-  display: block;
-  flex: 0 0 auto;
-  width: calc(52.9 * var(--mm)); /* 150 pt */
-  height: auto;
-}
-
-.rule {
-  height: calc(0.26 * var(--mm));
-  margin: calc(4.94 * var(--mm)) 0;
-  background: #d5d5b7;
-}
-
+/* Titolo del foglio (nessuna intestazione del Casale). */
 .titleRow {
   display: flex;
   align-items: flex-end;
@@ -306,6 +256,18 @@
 
 .lineText {
   margin: 0;
+}
+
+/* Tag rosso accanto a un valore (es. menù modificato), come nel PDF. */
+.tag {
+  margin-left: calc(1.41 * var(--mm));
+  font-family: Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: calc(2.65 * var(--mm)); /* 7,5 pt */
+  letter-spacing: calc(0.21 * var(--mm));
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #9b3b32;
 }
 
 .block {

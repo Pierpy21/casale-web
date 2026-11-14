@@ -106,7 +106,8 @@ export default async function BookingDetailPage({
 
   const lookup: NameLookup = {
     rooms: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
-    menus: Object.fromEntries(menus.map((m) => [m.id, m.name])),
+    // Il menù composto di questo evento non è nell'elenco (getMenus lo esclude): si aggiunge per far risolvere il nome nel registro.
+    menus: Object.fromEntries([...menus, ...(booking.menu ? [booking.menu] : [])].map((m) => [m.id, m.name])),
     clients: booking.client_id ? { [booking.client_id]: personName } : {},
   };
 
@@ -254,7 +255,11 @@ export default async function BookingDetailPage({
         </SummaryItem>
         {isEvent && (
           <SummaryItem label="Menù">
-            {booking.menu ? <MenuBadge menuId={booking.menu.id} name={booking.menu.name} /> : "Non scelto"}
+            {booking.menu ? (
+              <MenuBadge menuId={booking.menu.id} name={booking.menu.name} customized={booking.dishes_customized} />
+            ) : (
+              "Non scelto"
+            )}
           </SummaryItem>
         )}
         {menuPrice && <SummaryItem label="Costo">{menuPrice}</SummaryItem>}
@@ -340,7 +345,7 @@ export default async function BookingDetailPage({
                 </h3>
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
                   {booking.menu ? (
-                    <MenuBadge menuId={booking.menu.id} name={booking.menu.name} size="lg" />
+                    <MenuBadge menuId={booking.menu.id} name={booking.menu.name} size="lg" customized={booking.dishes_customized} />
                   ) : (
                     <p className="font-serif text-2xl text-slate-dark">Menù non selezionato</p>
                   )}

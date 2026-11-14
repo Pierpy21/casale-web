@@ -248,6 +248,7 @@ export async function getEventSheet(date: string): Promise<EventSheet | null> {
       adults: b.adults,
       children: b.children,
       menu: b.menu?.name ?? null,
+      menu_customized: b.dishes_customized,
       kids_menu: b.kids_menu?.name ?? null,
       kids_menus: b.kids_menus,
       dishes: groupDishes(b.dishes).map((g) => ({ course: g.course, label: g.label, items: g.items.map((d) => d.name) })),
@@ -541,13 +542,16 @@ function addServings(servings: Map<string, number>, menuId: string | null, n: nu
   servings.set(menuId, (servings.get(menuId) ?? 0) + n);
 }
 
-/** Porzioni per menù, con nome e tipo dal record menù; ordine: adulti prima, poi porzioni decrescenti, poi nome. */
+/**
+ * Porzioni per menù, con nome e tipo dal record menù; ordine: adulti prima, poi porzioni decrescenti, poi nome.
+ * I menù compositi (uno per evento) non entrano nel riepilogo per menù: i loro coperti restano nei totali.
+ */
 function menuConsumptions(servings: Map<string, number>, menuRecords: PbRecord[]): MenuConsumption[] {
   const byId = new Map(menuRecords.map((m) => [m.id, m]));
   return [...servings.entries()]
     .map(([menuId, n]) => {
       const m = byId.get(menuId);
-      return m ? { menu_id: menuId, name: String(m.name ?? ""), is_kids: Boolean(m.is_kids), servings: n } : null;
+      return m && !m.custom ? { menu_id: menuId, name: String(m.name ?? ""), is_kids: Boolean(m.is_kids), servings: n } : null;
     })
     .filter((m): m is MenuConsumption => m !== null && m.servings > 0)
     .sort((a, b) => Number(a.is_kids) - Number(b.is_kids) || b.servings - a.servings || a.name.localeCompare(b.name));
@@ -637,7 +641,7 @@ export async function getCoversStats(opts: { from: string; to: string; kind?: St
   }
 
   const menuIds = [...new Set([...periodServings.keys(), ...[...weekServings.values()].flatMap((m) => [...m.keys()])])];
-  const menuRecords = menuIds.length > 0 ? await listByParents(db, "menus", "id", menuIds, { fields: "id,name,is_kids" }) : [];
+  const menuRecords = menuIds.length > 0 ? await listByParents(db, "menus", "id", menuIds, { fields: "id,name,is_kids,custom" }) : [];
   const menus = menuConsumptions(periodServings, menuRecords);
   for (const [weekKey, ws] of weekServings) {
     const week = weeks.get(weekKey);

@@ -12,7 +12,9 @@ export interface MenuItem { id: string; menu_id: string; course: Course; name: s
 export interface Dish { id: string; name: string; course: Course; description: string | null; active: boolean; sort: number; used_in: { id: string; name: string }[]; updated_at: string; }
 /** Foto del menu: nome file su PocketBase e URL pubblico assoluto. */
 export interface MenuPhoto { file: string; url: string; }
-export interface Menu { id: string; name: string; season: string | null; price_per_person: number; is_kids: boolean; active: boolean; sort: number; items: MenuItem[]; photos: MenuPhoto[]; updated_at: string; }
+export interface Menu { id: string; name: string; season: string | null; price_per_person: number; is_kids: boolean; active: boolean; sort: number; items: MenuItem[]; photos: MenuPhoto[]; updated_at: string;
+  /** Menù composto per un solo evento: non compare tra i menù scelti, nel catalogo, nei colori né sul sito. */
+  custom: boolean; }
 export interface BookingDish { id: string; booking_id: string; course: Course; name: string; sort: number; description?: string | null; }
 export interface BookingAllergy { id: string; booking_id: string; subject_name: string | null; condition: string; notes: string | null; }
 /** Allergia in ingresso per il salvataggio dell'elenco (saveBookingAllergies). `id` presente = riga esistente da aggiornare. */
@@ -43,7 +45,10 @@ export interface Booking {
   menu_id: string | null;
   /** Prezzo a persona del menù solo per questo evento (null = prezzo del menù in catalogo). Solo l'admin lo imposta. */
   menu_price: number | null;
-  kids_menu_id: string | null; setup_colors: string[]; setup_notes: string | null;
+  kids_menu_id: string | null;
+  /** Piatti dell'evento modificati rispetto al suo menù (scelta dell'admin). Sempre false con menù composto o senza menù. */
+  dishes_customized: boolean;
+  setup_colors: string[]; setup_notes: string | null;
   status: BookingStatus; notes: string | null; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string;
 }
 /** Riga del foglio prenotazioni (export PDF/DOCX): prenotazioni normali del giorno. */
@@ -69,6 +74,8 @@ export interface EventSheetRow {
   adults: number;
   children: number;
   menu: string | null;
+  /** Piatti dell'evento modificati rispetto al menù (vedi Booking.dishes_customized). Falso senza menù o con menù composto. */
+  menu_customized: boolean;
   kids_menu: string | null;
   kids_menus: number;
   dishes: EventSheetDishGroup[];

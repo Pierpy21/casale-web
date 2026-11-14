@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { BookingCard } from "@/components/bookings/BookingCard";
 import { cn } from "@/components/ui";
 import type { BookingListItem, NextEventBrief, Room } from "@/lib/types";
-import { dayCountLabel, formatIt, toISO, type AgendaKindFilter } from "./agenda-utils";
+import { dayCountLabel, filterByMeal, formatIt, toISO, type AgendaKindFilter, type AgendaMealFilter } from "./agenda-utils";
 import { DaySummary } from "./DaySummary";
 import { EmptyDay } from "./NextEventHint";
 import { ReservationList } from "./ReservationList";
@@ -68,16 +68,18 @@ export function WeekView({
  * le prenotazioni normali sotto, come lista compatta con la sala assegnabile.
  */
 export function DayView({
-  items,
+  items: dayItems,
   rooms,
   canAssignRooms,
   canDeleteBookings,
   roomsView = false,
   selected,
   kind,
+  meal = "tutti",
   nextEvent = null,
   onOpenNextEvent,
 }: {
+  /** Prenotazioni del giorno già filtrate per tipo; il filtro pasto si applica qui. */
   items: BookingListItem[];
   rooms: Room[];
   canAssignRooms: boolean;
@@ -90,10 +92,22 @@ export function DayView({
   nextEvent?: NextEventBrief | null;
   /** Filtro tipo attivo: con "prenotazioni" il giorno vuoto invita a cambiarlo. */
   kind: AgendaKindFilter;
+  /** Filtro pasto attivo (Tutti / Pranzo / Cena). */
+  meal?: AgendaMealFilter;
   onOpenNextEvent: (iso: string) => void;
 }) {
+  const items = filterByMeal(dayItems, meal);
   if (items.length === 0) {
-    return <EmptyDay kind={kind} nextEvent={nextEvent} selected={selected} onOpen={onOpenNextEvent} />;
+    return (
+      <EmptyDay
+        kind={kind}
+        meal={meal}
+        hasBookings={dayItems.length > 0}
+        nextEvent={nextEvent}
+        selected={selected}
+        onOpen={onOpenNextEvent}
+      />
+    );
   }
   if (roomsView) {
     return (

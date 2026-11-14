@@ -24,13 +24,13 @@ const COURSE_LABEL: Record<Course, string> = {
 
 const CATEGORY_KEYS = Object.values(COURSE_LABEL);
 
-/** Menu attivi e non per bambini, con voci (ordine portata poi sort) e foto pubbliche. */
+/** Menu attivi, non per bambini e non compositi (menù di un solo evento), con voci (ordine portata poi sort) e foto pubbliche. */
 async function loadMenus(): Promise<MenuCategoria[]> {
   const db = await getAdminPb();
   const menus = await listAll(
     db,
     "menus",
-    db.filter("active = {:a} && is_kids = {:k}", { a: true, k: false }),
+    db.filter("active = {:a} && is_kids = {:k} && custom != true", { a: true, k: false }),
   );
   if (menus.length === 0) return [];
 

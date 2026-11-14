@@ -40,19 +40,14 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
 
 const BADGE_MAX = 99;
 
-export interface NotificationBellProps {
-  /** sidebar: bottone scuro in fondo alla sidebar desktop. header: bottone nell'header mobile. */
-  variant?: "sidebar" | "header";
-}
-
-/** Campanella con badge e pannello (sheet dal basso su mobile, colonna accanto alla sidebar su desktop). */
-export function NotificationBell({ variant = "header" }: NotificationBellProps) {
+/**
+ * Conteggio delle notifiche non lette: pallino crema in alto a destra del contenitore (che deve essere `relative`).
+ * Non renderizza nulla se non ci sono notifiche non lette. Animazione breve quando ne arriva una in tempo reale.
+ */
+export function NotificationBadge() {
   const { unreadCount, pulse } = useNotifications();
-  const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState(false);
-  const titleId = useId();
 
-  // Animazione breve del badge quando arriva una notifica in tempo reale.
   useEffect(() => {
     if (pulse === 0) return;
     const start = window.setTimeout(() => setFlash(true), 0);
@@ -63,7 +58,27 @@ export function NotificationBell({ variant = "header" }: NotificationBellProps) 
     };
   }, [pulse]);
 
+  if (unreadCount === 0) return null;
+
   const badge = unreadCount > BADGE_MAX ? `${BADGE_MAX}+` : String(unreadCount);
+
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute -right-0.5 -top-0.5 flex min-w-[1.25rem] items-center justify-center rounded-full bg-logo-cream px-1 text-[11px] font-semibold leading-5 tabular-nums text-ink"
+    >
+      {badge}
+      {flash && <span className="absolute inset-0 animate-ping rounded-full bg-logo-cream/70" />}
+    </span>
+  );
+}
+
+/** Campanella con badge e pannello (colonna accanto alla sidebar su desktop, sheet dal basso sotto il breakpoint). */
+export function NotificationBell() {
+  const { unreadCount } = useNotifications();
+  const [open, setOpen] = useState(false);
+  const titleId = useId();
+
   const label = unreadCount > 0 ? `Notifiche, ${unreadCount} non lette` : "Notifiche";
 
   return (
@@ -80,40 +95,21 @@ export function NotificationBell({ variant = "header" }: NotificationBellProps) 
         )}
       >
         <Bell aria-hidden="true" className="size-5" />
-        {unreadCount > 0 && (
-          <span
-            aria-hidden="true"
-            className="absolute -right-0.5 -top-0.5 flex min-w-[1.25rem] items-center justify-center rounded-full bg-logo-cream px-1 text-[11px] font-semibold leading-5 tabular-nums text-ink"
-          >
-            {badge}
-            {flash && (
-              <span className="absolute inset-0 animate-ping rounded-full bg-logo-cream/70" />
-            )}
-          </span>
-        )}
+        <NotificationBadge />
       </button>
 
-      {open && (
-        <NotificationPanel
-          titleId={titleId}
-          variant={variant}
-          onClose={() => setOpen(false)}
-        />
-      )}
+      {open && <NotificationPanel titleId={titleId} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
 interface NotificationPanelProps {
   titleId: string;
-  variant: "sidebar" | "header";
   onClose: () => void;
 }
 
-function NotificationPanel({ titleId, variant, onClose }: NotificationPanelProps) {
-  const { items, unreadCount, markRead, markAllRead } = useNotifications();
-  const router = useRouter();
-
+/** Pannello della campanella desktop: nel portale del body, sopra la sidebar. Esc e il fondo lo chiudono. */
+function NotificationPanel({ titleId, onClose }: NotificationPanelProps) {
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -121,14 +117,6 @@ function NotificationPanel({ titleId, variant, onClose }: NotificationPanelProps
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  // Il link esplicito (url) ha la precedenza; altrimenti si apre la prenotazione collegata.
-  const openItem = (n: AppNotification) => {
-    markRead(n.id);
-    onClose();
-    const target = n.url || (n.booking_id ? `/admin/prenotazioni/${n.booking_id}` : null);
-    if (target) router.push(target);
-  };
 
   // Portal nel body: il pannello sta sopra la barra di navigazione mobile e l'header sticky.
   return createPortal(
@@ -139,59 +127,90 @@ function NotificationPanel({ titleId, variant, onClose }: NotificationPanelProps
         aria-labelledby={titleId}
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-[2px] border-t border-sand bg-paper pb-[env(safe-area-inset-bottom)] text-ink shadow-2xl shadow-ink/30",
-          "desk:inset-x-auto desk:bottom-6 desk:max-h-[min(70vh,40rem)] desk:w-[24rem] desk:rounded-[2px] desk:border desk:pb-0",
-          variant === "sidebar" ? "desk:left-[17.5rem]" : "desk:left-auto desk:right-6",
+          "desk:inset-x-auto desk:bottom-6 desk:max-h-[min(70vh,40rem)] desk:w-[24rem] desk:rounded-[2px] desk:border desk:pb-0 desk:left-[17.5rem]",
         )}
       >
-        <header className="flex items-center justify-between gap-3 border-b border-sand px-5 py-4">
-          <h2 id={titleId} className="font-serif text-2xl">
-            Attività
-          </h2>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={markAllRead}
-              disabled={unreadCount === 0}
-              className="inline-flex items-center gap-1.5 rounded-[2px] px-2 py-1.5 text-[12px] font-medium uppercase tracking-[0.12em] text-petrol transition-colors hover:bg-cream disabled:cursor-not-allowed disabled:text-disabled disabled:hover:bg-transparent"
-            >
-              <CheckCheck aria-hidden="true" className="size-4" />
-              Segna tutte come lette
-            </button>
-            <button
-              type="button"
-              aria-label="Chiudi"
-              onClick={onClose}
-              className="grid size-9 place-items-center rounded-[2px] text-slate-dark transition-colors hover:bg-cream"
-            >
-              <X aria-hidden="true" className="size-5" />
-            </button>
-          </div>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          {items.length === 0 ? (
-            <div className="p-5">
-              <EmptyState
-                title="Nessuna attività"
-                description="Qui compariranno le nuove prenotazioni, le modifiche e i promemoria degli eventi."
-                icon={<Bell aria-hidden="true" className="size-6" />}
-              />
-            </div>
-          ) : (
-            <ul className="divide-y divide-sand">
-              {items.map((n) => (
-                <NotificationRow key={n.id} notification={n} onOpen={() => openItem(n)} />
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <footer className="border-t border-sand px-5 py-4">
-          <PushToggle />
-        </footer>
+        <NotificationList titleId={titleId} onClose={onClose} className="flex-1" />
       </div>
     </>,
     document.body,
+  );
+}
+
+export interface NotificationListProps {
+  /** Id dell'intestazione: il contenitore lo usa in aria-labelledby. */
+  titleId: string;
+  /** Chiude il contenitore: pulsante Chiudi e tap su una notifica (che poi naviga). */
+  onClose: () => void;
+  /** Classi della radice (es. flex-1 quando sta in un contenitore a colonna con altezza massima). */
+  className?: string;
+}
+
+/**
+ * Corpo del pannello notifiche: intestazione con "Segna tutte come lette", elenco a scorrimento e
+ * attivazione push in fondo. Non gestisce né il posizionamento né Esc: lo fa il contenitore.
+ */
+export function NotificationList({ titleId, onClose, className }: NotificationListProps) {
+  const { items, unreadCount, markRead, markAllRead } = useNotifications();
+  const router = useRouter();
+
+  // Il link esplicito (url) ha la precedenza; altrimenti si apre la prenotazione collegata.
+  const openItem = (n: AppNotification) => {
+    markRead(n.id);
+    onClose();
+    const target = n.url || (n.booking_id ? `/admin/prenotazioni/${n.booking_id}` : null);
+    if (target) router.push(target);
+  };
+
+  return (
+    <div className={cn("flex min-h-0 flex-col", className)}>
+      <header className="flex items-center justify-between gap-3 border-b border-sand px-5 py-4">
+        <h2 id={titleId} className="font-serif text-2xl">
+          Attività
+        </h2>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={markAllRead}
+            disabled={unreadCount === 0}
+            className="inline-flex items-center gap-1.5 rounded-[2px] px-2 py-1.5 text-[12px] font-medium uppercase tracking-[0.12em] text-petrol transition-colors hover:bg-cream disabled:cursor-not-allowed disabled:text-disabled disabled:hover:bg-transparent"
+          >
+            <CheckCheck aria-hidden="true" className="size-4" />
+            Segna tutte come lette
+          </button>
+          <button
+            type="button"
+            aria-label="Chiudi"
+            onClick={onClose}
+            className="grid size-9 place-items-center rounded-[2px] text-slate-dark transition-colors hover:bg-cream"
+          >
+            <X aria-hidden="true" className="size-5" />
+          </button>
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {items.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              title="Nessuna attività"
+              description="Qui compariranno le nuove prenotazioni, le modifiche e i promemoria degli eventi."
+              icon={<Bell aria-hidden="true" className="size-6" />}
+            />
+          </div>
+        ) : (
+          <ul className="divide-y divide-sand">
+            {items.map((n) => (
+              <NotificationRow key={n.id} notification={n} onOpen={() => openItem(n)} />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <footer className="border-t border-sand px-5 py-4 empty:hidden">
+        <PushToggle />
+      </footer>
+    </div>
   );
 }
 

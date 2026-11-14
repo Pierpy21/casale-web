@@ -139,7 +139,10 @@ export function BottomNav({ items }: { items: NavLink[] }) {
   const online = useOnline();
 
   // Su telefono la creazione passa dal pulsante +: le voci con mobileBar=false restano fuori dalla barra.
-  const mobileItems = items.filter((item) => item.mobileBar !== false);
+  // L'ordine mobile (mobileOrder) può differire da quello desktop; la sidebar usa l'ordine di items.
+  const mobileItems = items
+    .filter((item) => item.mobileBar !== false)
+    .sort((a, b) => a.mobileOrder - b.mobileOrder);
   const direct = mobileItems.slice(0, MOBILE_DIRECT_LINKS);
   const overflow = mobileItems.slice(MOBILE_DIRECT_LINKS);
   const overflowActive = overflow.some((item) => isActive(pathname, item.href));
