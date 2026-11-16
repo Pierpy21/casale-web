@@ -1,4 +1,5 @@
 import { Hero } from "./components/Hero";
+import { FestiveMenus } from "./components/FestiveMenus";
 import { SeasonalMenus } from "./components/SeasonalMenus";
 import { CreateYourOwnMenu } from "./components/CreateYourOwnMenu";
 import { ChooseExistingMenu } from "./components/ChooseExistingMenu";
@@ -7,6 +8,8 @@ import { FloorPlan } from "./components/FloorPlan";
 import { Footer } from "./components/Footer";
 import { getMenuCompleto, getTuttiPiatti } from "@/lib/menus";
 import type { MenuCategoria, PiattoDettaglio } from "@/lib/menus-types";
+import { getFestiveSection } from "@/lib/festive";
+import type { FestiveSection } from "@/lib/festive-types";
 import { SetupsGallery } from "./components/SetupsGallery";
 
 // I menù sono in cache con tag "menus": le azioni admin la invalidano subito, questo è solo un ripiego.
@@ -23,15 +26,19 @@ async function loadOrFallback<T>(label: string, load: () => Promise<T>, fallback
 }
 
 export default async function App() {
-  const [dataMenus, tuttiPiatti] = await Promise.all([
+  const [dataMenus, tuttiPiatti, festive] = await Promise.all([
     loadOrFallback<MenuCategoria[]>("i menù", () => getMenuCompleto(), []),
     loadOrFallback<Record<string, PiattoDettaglio[]>>("i piatti", () => getTuttiPiatti(), {}),
+    loadOrFallback<FestiveSection>("i menù festivi", () => getFestiveSection(), { enabled: false, menus: [], photos: [] }),
   ]);
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: "#F7F7F4" }}>
       {/* MARKER-MAKE-KIT-INVOKED */}
       <Hero />
+
+      {/* Buone Feste (menù festivi): non renderizza nulla se spenta o senza menù */}
+      <FestiveMenus section={festive} />
 
       {/* Seasonal Menus */}
       <SeasonalMenus menus={dataMenus} />

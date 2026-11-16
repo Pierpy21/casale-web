@@ -661,6 +661,18 @@ export const MenuInput = z.object({
 });
 export type MenuInputType = z.infer<typeof MenuInput>;
 
+/** Menù festivo (admin): creazione e modifica. Le foto arrivano a parte (FormData), come per i menù. */
+export const FestiveMenuInput = z.object({
+  id: uuidSchema.optional(),
+  title: z.string().trim().min(1, "Nome della festa obbligatorio").max(120),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data non valida"),
+  price: z.number().min(0).max(10000).nullable(),
+  courses: z.array(z.string().trim().min(1).max(300)).max(40),
+  notes: z.string().trim().max(500),
+  active: z.boolean(),
+});
+export type FestiveMenuInputType = z.infer<typeof FestiveMenuInput>;
+
 export const RoomInput = z.object({
   id: uuidSchema.optional(),
   name: z.string().trim().min(1, "Nome sala obbligatorio").max(MAX_TEXT, "Nome sala troppo lungo"),

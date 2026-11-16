@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/auth";
 import { getDishes, getMenus, getRooms } from "@/lib/data/catalog";
+import { getFestiveAdmin } from "@/lib/data/festive";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { DishesPanel } from "@/components/catalog/DishesPanel";
+import { FestiveMenusPanel } from "@/components/catalog/FestiveMenusPanel";
 import { MenusPanel } from "@/components/catalog/MenusPanel";
 import { RoomsPanel } from "@/components/catalog/RoomsPanel";
 
@@ -14,10 +16,11 @@ export const metadata: Metadata = {
 
 type SearchParams = Promise<{ tab?: string }>;
 
-type CatalogTab = "menu" | "piatti" | "sale";
+type CatalogTab = "menu" | "festivi" | "piatti" | "sale";
 
 const TABS: readonly { key: CatalogTab; label: string }[] = [
   { key: "menu", label: "Menù" },
+  { key: "festivi", label: "Menù festivi" },
   { key: "piatti", label: "Piatti" },
   { key: "sale", label: "Sale" },
 ];
@@ -25,7 +28,8 @@ const TABS: readonly { key: CatalogTab; label: string }[] = [
 export default async function CatalogPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
   const { tab } = await searchParams;
-  const current: CatalogTab = tab === "sale" ? "sale" : tab === "piatti" ? "piatti" : "menu";
+  const current: CatalogTab =
+    tab === "sale" ? "sale" : tab === "piatti" ? "piatti" : tab === "festivi" ? "festivi" : "menu";
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,6 +64,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Sear
       </nav>
 
       {current === "menu" && <MenusTab />}
+      {current === "festivi" && <FestiveTab />}
       {current === "piatti" && <DishesTab />}
       {current === "sale" && <RoomsTab />}
     </div>
@@ -72,6 +77,11 @@ async function MenusTab() {
     getDishes({ includeInactive: true }),
   ]);
   return <MenusPanel menus={menus} dishes={dishes} />;
+}
+
+async function FestiveTab() {
+  const { enabled, menus } = await getFestiveAdmin();
+  return <FestiveMenusPanel enabled={enabled} menus={menus} />;
 }
 
 async function DishesTab() {
