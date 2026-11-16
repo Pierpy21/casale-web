@@ -126,6 +126,8 @@ export async function saveMenu(db: PocketBase, id: string | null, req: MenuSaveR
     is_kids: req.menu.is_kids,
     active: req.menu.active,
     sort: req.menu.sort,
+    // Menù festivo: data della festa a mezzogiorno UTC (come gli altri campi date); vuoto = menù normale.
+    festive_date: req.menu.festive_date ? `${req.menu.festive_date} 12:00:00.000Z` : "",
   };
 
   const batch = db.createBatch();

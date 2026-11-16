@@ -21,17 +21,25 @@ export async function getRooms(opts?: { includeInactive?: boolean }): Promise<Ro
 /**
  * Menù per le scelte e per il catalogo. I menù compositi (creati per un solo evento) non ci sono mai: il menù
  * di una prenotazione composta si legge con la prenotazione stessa (getBooking, campo `menu`).
+ * `festive`: "include" (default, tutti), "exclude" (solo menù normali), "only" (solo menù festivi, per data crescente).
  */
-export async function getMenus(opts?: { includeInactive?: boolean; includeCustom?: boolean }): Promise<Menu[]> {
+export async function getMenus(opts?: {
+  includeInactive?: boolean;
+  includeCustom?: boolean;
+  festive?: "include" | "exclude" | "only";
+}): Promise<Menu[]> {
   if (!(await getCurrentProfile())) return [];
   const db = await getAdminPb();
+  const festive = opts?.festive ?? "include";
   const filter = [
     opts?.includeInactive ? "" : db.filter("active = {:a}", { a: true }),
     opts?.includeCustom ? "" : "custom != true",
+    festive === "exclude" ? `festive_date = ""` : festive === "only" ? `festive_date != ""` : "",
   ]
     .filter(Boolean)
     .join(" && ");
-  const records = await listAll(db, "menus", filter, { sort: "sort,name" });
+  const sort = festive === "only" ? "festive_date,name" : "sort,name";
+  const records = await listAll(db, "menus", filter, { sort });
   const byId = await menusWithItems(db, records);
   return records.map((r) => byId.get(r.id)).filter((m): m is Menu => Boolean(m));
 }

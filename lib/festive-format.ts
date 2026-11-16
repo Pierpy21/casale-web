@@ -16,6 +16,8 @@ const MESI = [
   "dicembre",
 ] as const;
 
+const GIORNI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"] as const;
+
 export interface FestiveDay {
   year: number;
   month: number;
@@ -33,32 +35,19 @@ export function parseFestiveDate(iso: string): FestiveDay | null {
   return { year, month, day };
 }
 
-/** "25 Dicembre": giorno e mese con iniziale maiuscola (per la card della landing). */
+/** "25 dicembre" (giorno e mese in minuscolo, come nei menù stampati). Se la data non è valida restituisce la stringa originale. */
 export function formatFestiveDayMonth(iso: string): string {
   const parsed = parseFestiveDate(iso);
   if (!parsed) return iso;
-  const mese = MESI[parsed.month - 1];
-  return `${parsed.day} ${mese.charAt(0).toUpperCase()}${mese.slice(1)}`;
+  return `${parsed.day} ${MESI[parsed.month - 1]}`;
 }
 
-/** "25 dicembre 2026" (per l'elenco admin). */
-export function formatFestiveDateLong(iso: string): string {
+/** "giovedì": giorno della settimana della festa, calcolato in UTC per non dipendere dal fuso. Stringa vuota se la data non è valida. */
+export function formatFestiveWeekday(iso: string): string {
   const parsed = parseFestiveDate(iso);
-  if (!parsed) return iso;
-  return `${parsed.day} ${MESI[parsed.month - 1]} ${parsed.year}`;
-}
-
-/** Data di oggi nel fuso locale, formato "YYYY-MM-DD". */
-export function festiveTodayISO(now: Date = new Date()): string {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-/** Vero se la festa è già passata (data prima di oggi). Il confronto testuale funziona con "YYYY-MM-DD". */
-export function isPastFestiveDate(iso: string, today: string = festiveTodayISO()): boolean {
-  return iso < today;
+  if (!parsed) return "";
+  const weekday = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)).getUTCDay();
+  return GIORNI[weekday];
 }
 
 /** Prezzo in stile sito: "70€", "69,5€". */

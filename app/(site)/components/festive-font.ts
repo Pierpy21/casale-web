@@ -1,8 +1,8 @@
-import { Caveat } from "next/font/google";
+import { Pinyon_Script } from "next/font/google";
 
-/** Corsivo "a mano" della fascia Buone Feste. Usare `festiveFont.className` sul contenitore. */
-export const festiveFont = Caveat({
+/** Corsivo calligrafico della fascia Buone Feste: solo per "Buone Feste" e piccoli accenti. Usare `festiveScript.className`. */
+export const festiveScript = Pinyon_Script({
   subsets: ["latin"],
-  weight: ["400", "600"],
+  weight: "400",
   display: "swap",
 });

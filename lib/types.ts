@@ -14,7 +14,9 @@ export interface Dish { id: string; name: string; course: Course; description: s
 export interface MenuPhoto { file: string; url: string; }
 export interface Menu { id: string; name: string; season: string | null; price_per_person: number; is_kids: boolean; active: boolean; sort: number; items: MenuItem[]; photos: MenuPhoto[]; updated_at: string;
   /** Menù composto per un solo evento: non compare tra i menù scelti, nel catalogo, nei colori né sul sito. */
-  custom: boolean; }
+  custom: boolean;
+  /** Giorno della festa "YYYY-MM-DD": valorizzato = menù festivo (scheda "Menù festivi", fascia "Buone Feste" del sito). */
+  festive_date: string | null; }
 export interface BookingDish { id: string; booking_id: string; course: Course; name: string; sort: number; description?: string | null; }
 export interface BookingAllergy { id: string; booking_id: string; subject_name: string | null; condition: string; notes: string | null; }
 /** Allergia in ingresso per il salvataggio dell'elenco (saveBookingAllergies). `id` presente = riga esistente da aggiornare. */

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/auth";
 import { getDishes, getMenus, getRooms } from "@/lib/data/catalog";
-import { getFestiveAdmin } from "@/lib/data/festive";
+import { getFestiveSectionEnabled } from "@/lib/data/festive";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { cn } from "@/components/ui/cn";
 import { DishesPanel } from "@/components/catalog/DishesPanel";
-import { FestiveMenusPanel } from "@/components/catalog/FestiveMenusPanel";
+import { FestiveSectionToggle } from "@/components/catalog/FestiveSectionToggle";
 import { MenusPanel } from "@/components/catalog/MenusPanel";
 import { RoomsPanel } from "@/components/catalog/RoomsPanel";
 
@@ -73,15 +73,24 @@ export default async function CatalogPage({ searchParams }: { searchParams: Sear
 
 async function MenusTab() {
   const [menus, dishes] = await Promise.all([
-    getMenus({ includeInactive: true }),
+    getMenus({ includeInactive: true, festive: "exclude" }),
     getDishes({ includeInactive: true }),
   ]);
   return <MenusPanel menus={menus} dishes={dishes} />;
 }
 
 async function FestiveTab() {
-  const { enabled, menus } = await getFestiveAdmin();
-  return <FestiveMenusPanel enabled={enabled} menus={menus} />;
+  const [menus, dishes, enabled] = await Promise.all([
+    getMenus({ includeInactive: true, festive: "only" }),
+    getDishes({ includeInactive: true }),
+    getFestiveSectionEnabled(),
+  ]);
+  return (
+    <div className="flex flex-col gap-6">
+      <FestiveSectionToggle enabled={enabled} />
+      <MenusPanel variant="festive" menus={menus} dishes={dishes} />
+    </div>
+  );
 }
 
 async function DishesTab() {
