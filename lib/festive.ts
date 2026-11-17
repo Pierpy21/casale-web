@@ -22,6 +22,9 @@ import {
  */
 export const FESTIVE_TAG = "festive";
 
+/** Foto fisse degli allestimenti natalizi del casale (public/images/feste): sempre in coda a quelle dei menù festivi. */
+const FESTIVE_STOCK_PHOTOS = [1, 2, 3, 4].map((n) => `/images/feste/${n}.webp`);
+
 /** Oggi nel fuso di Roma, formato "YYYY-MM-DD" (il giorno della festa vale fino a fine giornata locale). */
 function todayInRome(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -107,7 +110,7 @@ export const getFestiveSection = unstable_cache(
     return {
       enabled: true,
       menus,
-      photos: menus.flatMap((m) => m.photos),
+      photos: [...menus.flatMap((m) => m.photos), ...FESTIVE_STOCK_PHOTOS],
     };
   },
   ["festive-section-v2"],
