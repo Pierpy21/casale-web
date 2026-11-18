@@ -6,6 +6,7 @@ import { CatalogDishInput, MenuInput, MenuPhotoFile, MENU_PHOTO_MAX_COUNT, RoomI
 import { authorize, dbFail, fail, invalidInput, isRecordId } from "@/lib/action-utils";
 import { isAdmin } from "@/lib/permissions";
 import { MENUS_TAG } from "@/lib/menus";
+import { FESTIVE_TAG } from "@/lib/festive";
 import { checkConflictById, withMutation } from "@/lib/mutations";
 import { fetchOne } from "@/lib/pocketbase/queries";
 import type { MutationOptions } from "@/lib/offline/contract";
@@ -45,6 +46,8 @@ function revalidateCatalog(): void {
   revalidatePath("/admin/prenotazioni/nuova");
   // Sito pubblico: menu letti in cache con tag "menus".
   revalidateTag(MENUS_TAG);
+  // Fascia "Buone Feste" della home (menù festivi con festive_date).
+  revalidateTag(FESTIVE_TAG);
   revalidatePath("/");
 }
 

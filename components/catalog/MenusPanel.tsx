@@ -8,19 +8,49 @@ import { isQueued, submitMutation, updatedAtOf } from "@/lib/offline/submit";
 import { Alert, Badge, Button, cn, Disclosure, EmptyState, Modal, Switch } from "@/components/ui";
 import { formatEUR } from "@/lib/quote-utils";
 import { COURSE_LABELS, COURSE_ORDER, type Dish, type Menu } from "@/lib/types";
-import { MenuEditor } from "./MenuEditor";
+import { MenuEditor, type MenuVariant } from "./MenuEditor";
 import { useOptimisticActive } from "./useOptimisticActive";
 
 export interface MenusPanelProps {
   menus: Menu[];
   /** Catalogo piatti (anche inattivi): l'editor mostra solo quelli attivi. */
   dishes: Dish[];
+  /** "festive" = scheda "Menù festivi": stessa resa, con data della festa. */
+  variant?: MenuVariant;
 }
 
 type Notice = { tone: "success" | "danger"; text: string };
 
+const MONTHS_IT = [
+  "gennaio",
+  "febbraio",
+  "marzo",
+  "aprile",
+  "maggio",
+  "giugno",
+  "luglio",
+  "agosto",
+  "settembre",
+  "ottobre",
+  "novembre",
+  "dicembre",
+] as const;
+
+/** "YYYY-MM-DD" -> "25 dicembre 2026", senza passare per new Date(string). */
+function formatFestiveDay(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return `${day} ${MONTHS_IT[month - 1]} ${year}`;
+}
+
+/** Oggi nel fuso del locale (Europa/Roma) come "YYYY-MM-DD". */
+function romeTodayISO(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
+}
+
 /** Elenco menù con editor (crea/modifica) e interruttore di visibilità. */
-export function MenusPanel({ menus, dishes }: MenusPanelProps) {
+export function MenusPanel({ menus, dishes, variant = "standard" }: MenusPanelProps) {
+  const festive = variant === "festive";
+  const today = festive ? romeTodayISO() : "";
   const router = useRouter();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Menu | null>(null);
@@ -47,13 +77,15 @@ export function MenusPanel({ menus, dishes }: MenusPanelProps) {
     <section aria-labelledby="menu-titolo" className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">Banchetti</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+            {festive ? "Feste" : "Banchetti"}
+          </p>
           <h2 id="menu-titolo" className="text-2xl">
-            Menù ({menus.length})
+            {festive ? "Menù festivi" : "Menù"} ({menus.length})
           </h2>
         </div>
         <Button variant="primary" size="md" onClick={openNew}>
-          Nuovo menù
+          {festive ? "Nuovo menù festivo" : "Nuovo menù"}
         </Button>
       </div>
 
@@ -61,11 +93,15 @@ export function MenusPanel({ menus, dishes }: MenusPanelProps) {
 
       {menus.length === 0 ? (
         <EmptyState
-          title="Nessun menù in catalogo"
-          description="Crea il primo menù: indica il prezzo per persona e i piatti per portata."
+          title={festive ? "Nessun menù festivo" : "Nessun menù in catalogo"}
+          description={
+            festive
+              ? "Crea un menù per una festa, ad esempio il pranzo di Natale del 25 dicembre: piatti per portata, prezzo e foto."
+              : "Crea il primo menù: indica il prezzo per persona e i piatti per portata."
+          }
           action={
             <Button variant="outline" size="md" onClick={openNew}>
-              Crea menù
+              {festive ? "Crea menù festivo" : "Crea menù"}
             </Button>
           }
         />
@@ -75,6 +111,8 @@ export function MenusPanel({ menus, dishes }: MenusPanelProps) {
             <MenuCard
               key={menu.id}
               menu={menu}
+              festive={festive}
+              today={today}
               onEdit={() => openEdit(menu)}
               onError={(text) => setNotice({ tone: "danger", text })}
             />
@@ -85,7 +123,15 @@ export function MenusPanel({ menus, dishes }: MenusPanelProps) {
       <Modal
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
-        title={editing ? "Modifica menù" : "Nuovo menù"}
+        title={
+          festive
+            ? editing
+              ? "Modifica menù festivo"
+              : "Nuovo menù festivo"
+            : editing
+              ? "Modifica menù"
+              : "Nuovo menù"
+        }
         size="xl"
         bare
       >
@@ -93,6 +139,7 @@ export function MenusPanel({ menus, dishes }: MenusPanelProps) {
           <MenuEditor
             menu={editing}
             dishes={dishes}
+            variant={variant}
             onSaved={handleSaved}
             onCancel={() => setEditorOpen(false)}
           />
@@ -104,16 +151,23 @@ export function MenusPanel({ menus, dishes }: MenusPanelProps) {
 
 function MenuCard({
   menu,
+  festive,
+  today,
   onEdit,
   onError,
 }: {
   menu: Menu;
+  festive: boolean;
+  /** "YYYY-MM-DD" di oggi (fuso Europa/Roma), usato solo nei menù festivi. */
+  today: string;
   onEdit: () => void;
   onError: (text: string) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const { active, setActive, resetActive } = useOptimisticActive(menu.active);
+  const festiveDay = festive && menu.festive_date ? menu.festive_date : null;
+  const past = festiveDay !== null && festiveDay < today;
 
   const groups = COURSE_ORDER.map((course) => ({
     course,
@@ -181,7 +235,16 @@ function MenuCard({
               />
             )}
             <div className="flex min-w-0 flex-col gap-1">
-              {menu.season && (
+              {festiveDay && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">
+                    {formatFestiveDay(festiveDay)}
+                    {menu.season && ` · ${menu.season}`}
+                  </p>
+                  {past && <Badge tone="neutral">Passata</Badge>}
+                </div>
+              )}
+              {!festiveDay && menu.season && (
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-bronze">{menu.season}</p>
               )}
               <h3 className="font-serif text-2xl leading-tight">{menu.name}</h3>

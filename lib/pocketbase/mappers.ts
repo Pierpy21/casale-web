@@ -149,6 +149,7 @@ export function mapMenu(r: PbRecord, items: MenuItem[], baseUrl: string): Menu {
     is_kids: Boolean(r.is_kids),
     active: Boolean(r.active),
     custom: Boolean(r.custom),
+    festive_date: r.festive_date ? String(r.festive_date).slice(0, 10) : null,
     sort: num(r.sort),
     items: sortMenuItems(items),
     photos,

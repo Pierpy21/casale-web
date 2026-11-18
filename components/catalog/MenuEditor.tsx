@@ -28,10 +28,14 @@ interface NewPhoto {
   previewUrl: string;
 }
 
+/** "standard" = menù del catalogo; "festive" = menù festivo (con data della festa). */
+export type MenuVariant = "standard" | "festive";
+
 export interface MenuEditorProps {
   menu: Menu | null;
   /** Catalogo piatti (anche inattivi: si mostrano solo quelli attivi nella scelta). */
   dishes: Dish[];
+  variant?: MenuVariant;
   onSaved: (message: string) => void;
   onCancel: () => void;
 }
@@ -75,7 +79,8 @@ function isBlank(item: DraftItem): boolean {
 }
 
 /** Editor di un menù: dati generali e foto a sinistra (desktop), piatti per portata a destra. */
-export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps) {
+export function MenuEditor({ menu, dishes, variant = "standard", onSaved, onCancel }: MenuEditorProps) {
+  const festive = variant === "festive";
   const [pending, startTransition] = useTransition();
   const nextKey = useRef(0);
   const newKey = () => {
@@ -109,6 +114,7 @@ export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps)
   );
   const [visible, setVisible] = useState(menu?.active ?? true);
   const [isKids, setIsKids] = useState(menu?.is_kids ?? false);
+  const [festiveDate, setFestiveDate] = useState(menu?.festive_date ?? "");
   const existingPhotos = menu?.photos ?? [];
   const [removedPhotos, setRemovedPhotos] = useState<string[]>([]);
   const [newPhotos, setNewPhotos] = useState<NewPhoto[]>([]);
@@ -240,15 +246,22 @@ export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps)
       setFormError("Alcuni piatti compaiono più di una volta nel menù: rimuovi i duplicati prima di salvare.");
       return;
     }
+    if (festive && !festiveDate) {
+      setFormError(null);
+      setErrors({ festive_date: "Indica la data della festa" });
+      return;
+    }
     const form = new FormData(event.currentTarget);
     const input = {
       id: menu?.id,
       name: String(form.get("name") ?? ""),
       season: String(form.get("season") ?? ""),
       price_per_person: String(form.get("price_per_person") ?? ""),
-      is_kids: isKids,
+      // Nei menù festivi il menù bambini non è disponibile: resta false.
+      is_kids: festive ? false : isKids,
       active: visible,
       sort: String(form.get("sort") ?? "0"),
+      festive_date: festive ? festiveDate : (menu?.festive_date ?? null),
       items: saveRows.map((item, index) => ({
         course: item.course,
         name: rowName(item, dishById).trim(),
@@ -358,12 +371,29 @@ export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps)
                 </Field>
               </div>
 
-              <Field label="Stagione" htmlFor={fieldId("season")} error={errors.season}>
+              {festive && (
+                <Field label="Data della festa" htmlFor={fieldId("festive-date")} required error={errors.festive_date}>
+                  <Input
+                    id={fieldId("festive-date")}
+                    name="festive_date"
+                    type="date"
+                    value={festiveDate}
+                    onChange={(event) => {
+                      setFestiveDate(event.target.value);
+                      if (errors.festive_date) setErrors((prev) => ({ ...prev, festive_date: "" }));
+                    }}
+                    required
+                    invalid={!!errors.festive_date}
+                  />
+                </Field>
+              )}
+
+              <Field label={festive ? "Occasione" : "Stagione"} htmlFor={fieldId("season")} error={errors.season}>
                 <Input
                   id={fieldId("season")}
                   name="season"
                   defaultValue={menu?.season ?? ""}
-                  placeholder="Es. Autunno 2026"
+                  placeholder={festive ? "Natale" : "Es. Autunno 2026"}
                   invalid={!!errors.season}
                 />
               </Field>
@@ -388,16 +418,18 @@ export function MenuEditor({ menu, dishes, onSaved, onCancel }: MenuEditorProps)
               </Field>
 
               <div className="flex flex-col gap-3">
-                <ToggleRow
-                  title="Menù bambini"
-                  hint="Tariffa dedicata ai bambini"
-                  label="Menù bambini"
-                  checked={isKids}
-                  onCheckedChange={setIsKids}
-                  onLabel="Sì"
-                  offLabel="No"
-                  disabled={pending}
-                />
+                {!festive && (
+                  <ToggleRow
+                    title="Menù bambini"
+                    hint="Tariffa dedicata ai bambini"
+                    label="Menù bambini"
+                    checked={isKids}
+                    onCheckedChange={setIsKids}
+                    onLabel="Sì"
+                    offLabel="No"
+                    disabled={pending}
+                  />
+                )}
                 <ToggleRow
                   title="Visibilità"
                   hint="Attiva o nascondi il menù"

@@ -658,6 +658,16 @@ export const MenuInput = z.object({
   active: z.boolean().default(true),
   sort: intMin0.default(0),
   items: z.array(MenuItemInput).max(MAX_ITEMS, "Troppe voci (massimo 60)").default([]),
+  /** Giorno della festa "YYYY-MM-DD" (data reale): valorizzato = menù festivo. Null = menù normale. */
+  festive_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data della festa non valida")
+    .refine((s) => {
+      const d = new Date(`${s}T00:00:00Z`);
+      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+    }, "Data della festa non valida")
+    .nullable()
+    .default(null),
 });
 export type MenuInputType = z.infer<typeof MenuInput>;
 

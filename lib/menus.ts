@@ -24,13 +24,16 @@ const COURSE_LABEL: Record<Course, string> = {
 
 const CATEGORY_KEYS = Object.values(COURSE_LABEL);
 
-/** Menu attivi, non per bambini e non compositi (menù di un solo evento), con voci (ordine portata poi sort) e foto pubbliche. */
+/**
+ * Menu attivi, non per bambini, non compositi (menù di un solo evento) e non festivi (la fascia "Buone Feste"
+ * li mostra a parte), con voci (ordine portata poi sort) e foto pubbliche.
+ */
 async function loadMenus(): Promise<MenuCategoria[]> {
   const db = await getAdminPb();
   const menus = await listAll(
     db,
     "menus",
-    db.filter("active = {:a} && is_kids = {:k} && custom != true", { a: true, k: false }),
+    db.filter("active = {:a} && is_kids = {:k} && custom != true", { a: true, k: false }) + ` && festive_date = ""`,
   );
   if (menus.length === 0) return [];
 
